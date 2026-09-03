@@ -1,0 +1,153 @@
+<!--
+//
+// Copyright © 2022 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+-->
+<script lang="ts">
+  import { Analytics } from '@hcengineering/analytics'
+  import { Class, Doc, Ref } from '@hcengineering/core'
+  import { jsonToPmNode, MarkupNode } from '@hcengineering/text'
+  import presentation from '@hcengineering/presentation'
+  import { Label } from '@hcengineering/ui'
+  import { Editor, Extension, mergeAttributes } from '@tiptap/core'
+  import { Plugin, PluginKey } from '@tiptap/pm/state'
+  import { DecorationSet } from '@tiptap/pm/view'
+  import { onDestroy, onMount } from 'svelte'
+
+  import { getEditorKit } from '../../src/kits/editor-kit'
+  import { calculateDecorations } from './diff/decorations'
+  import { defaultEditorAttributes } from './editor/editorProps'
+
+  export let content: MarkupNode
+  export let comparedVersion: MarkupNode | undefined = undefined
+  export let objectClass: Ref<Class<Doc>> | undefined = undefined
+
+  let element: HTMLElement
+  let editor: Editor | undefined
+
+  let _decoration = DecorationSet.empty
+  let oldContent: MarkupNode | undefined
+  let decorateFailed = false
+  let editorMountFailed = false
+
+  function updateEditor (editor: Editor, comparedVersion?: MarkupNode): void {
+    if (comparedVersion === undefined) {
+      return
+    }
+
+    try {
+      const node = jsonToPmNode(comparedVersion, editor.schema)
+      const r = calculateDecorations(editor, oldContent, node)
+      if (r !== undefined) {
+        oldContent = r.oldContent
+        _decoration = r.decorations
+      }
+      decorateFailed = false
+    } catch (err: unknown) {
+      decorateFailed = true
+      Analytics.handleError(err instanceof Error ? err : new Error(String(err)))
+    }
+  }
+
+  const updateDecorations = (): void => {
+    if (editor?.schema !== undefined) {
+      updateEditor(editor, comparedVersion)
+    }
+  }
+
+  // TODO: should be implemented as regular plugin
+  const DecorationExtension = Extension.create({
+    addProseMirrorPlugins () {
+      return [
+        new Plugin({
+          key: new PluginKey('diffs'),
+          props: {
+            decorations () {
+              updateDecorations()
+              return _decoration
+            }
+          }
+        })
+      ]
+    }
+  })
+
+  $: if (editor !== undefined && comparedVersion !== undefined) {
+    updateEditor(editor, comparedVersion)
+  }
+
+  onMount(async () => {
+    try {
+      const kit = await getEditorKit({
+        objectClass,
+        commentNode: true,
+        qms: {
+          qmsInlineComment: {
+            isHighlightModeOn: () => false,
+            getNodeHighlight: () => null
+          }
+        }
+      })
+
+      editor = new Editor({
+        editorProps: { attributes: mergeAttributes(defaultEditorAttributes, { class: 'flex-grow' }) },
+        element,
+        content,
+        editable: false,
+        extensions: [kit, DecorationExtension],
+        onContentError: ({ error, disableCollaboration }) => {
+          disableCollaboration()
+          Analytics.handleError(error)
+          editorMountFailed = true
+        },
+        onTransaction: () => {
+          // force re-render so `editor.isActive` works as expected
+          editor = editor
+        }
+      })
+    } catch (err: unknown) {
+      editorMountFailed = true
+      Analytics.handleError(err instanceof Error ? err : new Error(String(err)))
+    }
+  })
+
+  onDestroy(() => {
+    editor?.destroy()
+    editor = undefined
+  })
+</script>
+
+<div class="ref-container">
+  <div class="textInput" hidden={editorMountFailed}>
+    <div class="select-text" style="width: 100%;" bind:this={element} />
+  </div>
+  {#if editorMountFailed}
+    <div class="error-fallback">
+      <Label label={presentation.string.FailedToPreview} />
+    </div>
+  {/if}
+  {#if decorateFailed && !editorMountFailed}
+    <div class="error-fallback">
+      <Label label={presentation.string.FailedToPreview} />
+    </div>
+  {/if}
+</div>
+
+<style lang="scss">
+  .error-fallback {
+    padding: 0.5rem 0;
+    color: var(--theme-caption-color);
+    font-size: 0.875rem;
+  }
+</style>

@@ -1,0 +1,20 @@
+{
+  "string": {
+    "Channel": "Canal",
+    "Channels": "Canales",
+    "Chat": "Chat",
+    "Description": "Descripción",
+    "Loading": "Cargando...",
+    "MessageIn": "Mensaje en #{title}",
+    "Thread": "Hilo",
+    "Threads": "Hilos",
+    "Title": "Título",
+    "All": "Todo",
+    "Inbox": "Bande",
+    "ReactedToYourMessage": "reaccionó a tu mensaje",
+    "ClearAll": "Borrar todo",
+    "InboxIsClear": "Bande está vacía",
+    "YouDontHaveAnyNewMessages": "No tienes ninguna nueva mensaje"
+
+  }
+}

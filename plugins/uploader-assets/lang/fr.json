@@ -1,0 +1,15 @@
+{
+  "string": {
+    "Cancel": "Annuler",
+    "Retry": "Réessayer",
+    "UploadFiles": "Téléverser des Fichiers",
+    "UploadFolders": "Téléverser des Dossiers",
+    "UploadingTo": "Téléchargement de {files, plural, =1 {# fichier} other {# fichiers}} vers"
+  },
+  "status": {
+    "Error": "Erreur",
+    "Waiting": "En attente",
+    "Uploading": "Téléchargement",
+    "Completed": "Terminé"
+  }
+}

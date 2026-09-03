@@ -1,0 +1,135 @@
+<!--
+// Copyright © 2025 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<script lang="ts">
+  import { Card, MasterTag, Tag } from '@hcengineering/card'
+  import { Class, Doc, Ref } from '@hcengineering/core'
+  import { getClient } from '@hcengineering/presentation'
+  import { Process } from '@hcengineering/process'
+  import { Label } from '@hcengineering/ui'
+  import { createEventDispatcher } from 'svelte'
+  import process from '../plugin'
+  import { createExecution } from '../utils'
+
+  export let value: Card | Card[] | undefined
+
+  const values = Array.isArray(value) ? value : value ? [value] : []
+
+  const client = getClient()
+  const h = client.getHierarchy()
+
+  const resClasses = getPossibleClasses()
+
+  const res = client.getModel().findAllSync(process.class.Process, {})
+  const processes = res.filter((it) => resClasses.includes(it.masterTag) && it.automationOnly !== true)
+
+  type PossibleProcessClass = Ref<MasterTag | Tag>
+
+  function getCardPossibleClasses (card: Card): PossibleProcessClass[] {
+    const ancestors = h.getAncestors(card._class) as PossibleProcessClass[]
+    const res = new Set<PossibleProcessClass>(ancestors)
+
+    const mixins = h.getAllPossibleMixins(card._class).filter((mixin) => h.hasMixin(card, mixin))
+    for (const mixin of mixins) {
+      res.add(mixin)
+    }
+
+    return [...res]
+  }
+
+  function getPossibleClasses (): PossibleProcessClass[] {
+    if (!value) {
+      return []
+    }
+    const res = new Set<Ref<Class<Doc>>>()
+    for (const val of values) {
+      const resClasses = getCardPossibleClasses(val)
+      if (res.size === 0) {
+        for (const cls of resClasses) {
+          res.add(cls)
+        }
+      } else {
+        for (const cls of Array.from(res)) {
+          if (!resClasses.includes(cls)) {
+            res.delete(cls)
+          }
+        }
+      }
+    }
+    return [...res]
+  }
+
+  async function filterProcesses (processes: Process[]): Promise<Process[]> {
+    if (value === undefined) return []
+    const res: Process[] = []
+    const shouldCheck: Process[] = []
+    for (const val of processes) {
+      if (val.parallelExecutionForbidden === true) {
+        shouldCheck.push(val)
+      } else {
+        res.push(val)
+      }
+    }
+    if (shouldCheck.length === 0) return res
+
+    const executions = await client.findAll(process.class.Execution, {
+      process: { $in: shouldCheck.map((it) => it._id) },
+      card: { $in: values.map((it) => it._id) },
+      done: false
+    })
+    const notAllowed = new Set(executions.map((it) => it.process))
+    for (const val of shouldCheck) {
+      if (!notAllowed.has(val._id)) {
+        res.push(val)
+      }
+    }
+    return res
+  }
+
+  const dispatch = createEventDispatcher()
+
+  async function runProcess (_id: Ref<Process>): Promise<void> {
+    if (!value) return
+    for (const element of values) {
+      const tx = await createExecution(element._id, _id, element.space, client.txFactory)
+      if (tx) await client.tx(tx)
+    }
+    dispatch('close')
+  }
+</script>
+
+<div class="antiPopup">
+  <div class="ap-space x2" />
+  <div class="ap-scroll">
+    {#if processes.length === 0}
+      <div class="flex-row-center p-4">
+        <Label label={process.string.NoProcesses} />
+      </div>
+    {:else}
+      {#await filterProcesses(processes) then processes}
+        {#each processes as process}
+          <button
+            class="ap-menuItem flex-row-center withIcon w-full"
+            on:click|preventDefault|stopPropagation={async () => {
+              await runProcess(process._id)
+            }}
+          >
+            {process.name}
+          </button>
+        {/each}
+      {/await}
+    {/if}
+  </div>
+  <div class="ap-space x2" />
+</div>

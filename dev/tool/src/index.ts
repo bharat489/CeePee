@@ -1,0 +1,1700 @@
+//
+// Copyright © 2020, 2021 Anticrm Platform Contributors.
+// Copyright © 2021, 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import accountPlugin, {
+  assignWorkspace,
+  createWorkspaceRecord,
+  flattenStatus,
+  getAccountDB,
+  getWorkspaceInfoWithStatusById,
+  getWorkspaces,
+  getWorkspacesInfoWithStatusByIds,
+  signUpByEmail,
+  updateWorkspaceInfo,
+  type AccountDB,
+  type Workspace
+} from '@hcengineering/account'
+import {
+  getMongoAccountDB,
+  type Account as OldAccount,
+  type Workspace as OldWorkspace
+} from '@hcengineering/account-service'
+import { getWorkspaceClient as getHulylakeClient } from '@hcengineering/hulylake-client'
+import { setMetadata } from '@hcengineering/platform'
+import {
+  createPostgreeDestroyAdapter,
+  createPostgresAdapter,
+  createPostgresTxAdapter,
+  getDBClient,
+  shutdownPostgres
+} from '@hcengineering/postgres'
+import {
+  backup,
+  backupDownload,
+  backupFind,
+  checkBackupIntegrity,
+  checkWorkspaceBackup,
+  compactBackup,
+  createFileBackupStorage,
+  createStorageBackupStorage,
+  restore
+} from '@hcengineering/server-backup'
+import serverClientPlugin, { BlobClient, getAccountClient, getTransactorEndpoint } from '@hcengineering/server-client'
+import {
+  createBackupPipeline,
+  createEmptyBroadcastOps,
+  registerAdapterFactory,
+  registerDestroyFactory,
+  registerServerPlugins,
+  registerStringLoaders,
+  registerTxAdapterFactory,
+  setAdapterSecurity
+} from '@hcengineering/server-pipeline'
+import serverToken, { decodeToken, generateToken } from '@hcengineering/server-token'
+import { createWorkspace, upgradeWorkspace } from '@hcengineering/workspace-service'
+
+import { faker } from '@faker-js/faker'
+import { getPlatformQueue } from '@hcengineering/kafka'
+import { buildStorageFromConfig, createStorageFromConfig, storageConfigFromEnv } from '@hcengineering/server-storage'
+import { program, type Command } from 'commander'
+import { updateField } from './workspace'
+
+import { RatingCalculator, ratingEvents, type QueueRatingMessage } from '@hcengineering/pod-rating'
+
+import core, {
+  AccountRole,
+  isArchivingMode,
+  isDeletingMode,
+  MeasureMetricsContext,
+  metricsToString,
+  SocialIdType,
+  systemAccountEmail,
+  systemAccountUuid,
+  TxOperations,
+  type AccountUuid,
+  type Class,
+  type Client,
+  type Data,
+  type Doc,
+  type PersonId,
+  type PersonUuid,
+  type Ref,
+  type Tx,
+  type Version,
+  type WorkspaceDataId,
+  type WorkspaceUuid
+} from '@hcengineering/core'
+import { consoleModelLogger, type MigrateOperation } from '@hcengineering/model'
+import {
+  createMongoAdapter,
+  createMongoDestroyAdapter,
+  createMongoTxAdapter,
+  getMongoClient,
+  shutdownMongo
+} from '@hcengineering/mongo'
+
+import { getModelVersion } from '@hcengineering/model-all'
+import {
+  QueueTopic,
+  workspaceEvents,
+  type Pipeline,
+  type QueueWorkspaceMessage,
+  type StorageAdapter
+} from '@hcengineering/server-core'
+import { getAccountDBUrl, getKvsUrl, getMongoDBUrl } from './__start'
+import { changeConfiguration } from './configuration'
+
+import { performCalendarAccountMigrations } from './calendar'
+import {
+  ensureGlobalPersonsForLocalAccounts,
+  filterMergedAccountsInMembers,
+  migrateCreatedModifiedBy,
+  migrateMergedAccounts,
+  migrateTrustedV6Accounts,
+  moveAccountDbFromMongoToPG,
+  restoreFromv6All,
+  restoreTrustedV6Workspace
+} from './db'
+import { ensureMissingSocialIdentities } from './contact'
+import { performGithubAccountMigrations } from './github'
+import { performGmailAccountMigrations } from './gmail'
+import { getToolToken, getWorkspace, getWorkspaceTransactorEndpoint } from './utils'
+
+import { createRestClient } from '@hcengineering/api-client'
+import { type CardID } from '@hcengineering/communication-types'
+import { connect, sendTransactorEvent } from '@hcengineering/server-tool'
+import { existsSync } from 'fs'
+import { mkdir, writeFile } from 'fs/promises'
+import { dirname } from 'path'
+import { restoreMarkupRefs } from './markup'
+import { restoreGithubIntegrations } from './restoreGithub'
+import { migrateWorkspaceChat } from './communication'
+
+const colorConstants = {
+  colorRed: '\u001b[31m',
+  colorBlue: '\u001b[34m',
+  colorWhiteCyan: '\u001b[37;46m',
+  colorRedYellow: '\u001b[31;43m',
+  colorPing: '\u001b[38;5;201m',
+  colorLavander: '\u001b[38;5;147m',
+  colorAqua: '\u001b[38;2;145;231;255m',
+  colorPencil: '\u001b[38;2;253;182;0m',
+  reset: '\u001b[0m'
+}
+
+// Register close on process exit.
+process.on('exit', () => {
+  shutdownPostgres().catch((err) => {
+    console.error(err)
+  })
+  shutdownMongo().catch((err) => {
+    console.error(err)
+  })
+})
+
+/**
+ * @public
+ */
+export function devTool (
+  prepareTools: () => {
+    dbUrl: string
+    txes: Tx[]
+    version: Data<Version>
+    migrateOperations: [string, MigrateOperation][]
+  },
+  extendProgram?: (prog: Command) => void
+): void {
+  const toolCtx = new MeasureMetricsContext('tool', {})
+
+  registerTxAdapterFactory('mongodb', createMongoTxAdapter)
+  registerAdapterFactory('mongodb', createMongoAdapter)
+  registerDestroyFactory('mongodb', createMongoDestroyAdapter)
+
+  registerTxAdapterFactory('postgresql', createPostgresTxAdapter, true)
+  registerAdapterFactory('postgresql', createPostgresAdapter, true)
+  registerDestroyFactory('postgresql', createPostgreeDestroyAdapter, true)
+  setAdapterSecurity('postgresql', true)
+
+  registerServerPlugins()
+  registerStringLoaders()
+
+  const serverSecret = process.env.SERVER_SECRET
+  if (serverSecret === undefined) {
+    console.error('please provide server secret')
+    process.exit(1)
+  }
+
+  const accountsUrl = process.env.ACCOUNTS_URL
+  if (accountsUrl === undefined) {
+    console.error('please provide accounts url.')
+    process.exit(1)
+  }
+
+  const transactorUrl = process.env.TRANSACTOR_URL
+  if (transactorUrl === undefined) {
+    console.error('please provide transactor url.')
+  }
+
+  setMetadata(accountPlugin.metadata.Transactors, transactorUrl)
+  setMetadata(serverClientPlugin.metadata.Endpoint, accountsUrl)
+  setMetadata(serverToken.metadata.Secret, serverSecret)
+  setMetadata(serverToken.metadata.Service, 'tool')
+
+  async function withAccountDatabase (
+    f: (db: AccountDB) => Promise<any>,
+    dbOverride?: string,
+    nsOverride?: string
+  ): Promise<void> {
+    const uri = dbOverride ?? getAccountDBUrl()
+    const ns = nsOverride ?? process.env.ACCOUNT_DB_NS
+
+    const [accountDb, closeAccountsDb] = await getAccountDB(uri, ns)
+    try {
+      await f(accountDb)
+    } catch (err: any) {
+      console.error(err)
+    }
+    closeAccountsDb()
+    await shutdownMongo()
+  }
+
+  async function withStorage (f: (storageAdapter: StorageAdapter) => Promise<any>): Promise<void> {
+    const adapter = buildStorageFromConfig(storageConfigFromEnv())
+    try {
+      await f(adapter)
+    } catch (err: any) {
+      console.error(err)
+    }
+    await adapter.close()
+  }
+
+  program.version('0.0.1')
+
+  program.command('version').action(() => {
+    console.log(
+      `tools git_version: ${process.env.GIT_REVISION ?? ''} model_version: ${process.env.MODEL_VERSION ?? ''} ${JSON.stringify(getModelVersion())}`
+    )
+  })
+
+  // create-account john.appleseed@gmail.com --password 123 --workspace workspace --fullname "John Appleseed"
+  program
+    .command('create-account <email>')
+    .description('create user and corresponding account in master database')
+    .requiredOption('-p, --password <password>', 'user password')
+    .requiredOption('-f, --first <first>', 'first name')
+    .requiredOption('-l, --last <last>', 'last name')
+    .option('-n, --notconfirmed', 'creates not confirmed account', false)
+    .action(async (email: string, cmd: { password: string, first: string, last: string, notconfirmed: boolean }) => {
+      await withAccountDatabase(async (db) => {
+        console.log(`creating account ${cmd.first} ${cmd.last} (${email})...`)
+        await signUpByEmail(toolCtx, db, null, email, cmd.password, cmd.first, cmd.last, !cmd.notconfirmed)
+      })
+    })
+
+  program
+    .command('assign-workspace <email> <workspace>')
+    .description('assign workspace')
+    .action(async (email: string, workspace: string, cmd) => {
+      await withAccountDatabase(async (db) => {
+        console.log(`assigning user ${email} to ${workspace}...`)
+        try {
+          const ws = await getWorkspace(db, workspace)
+          if (ws === null) {
+            throw new Error(`Workspace ${workspace} not found`)
+          }
+
+          await assignWorkspace(toolCtx, db, null, getToolToken(), {
+            email,
+            workspaceUuid: ws.uuid,
+            role: AccountRole.User
+          })
+        } catch (err: any) {
+          console.error(err)
+        }
+      })
+    })
+
+  program
+    .command('create-workspace <name> <owner_social_id>')
+    .description('create workspace')
+    .option('-i, --init <ws>', 'Init from workspace')
+    .option('-r, --region <region>', 'Region')
+    .option('-d, --dataId <dataId>', 'DataId for workspace')
+    .option('-b, --branding <key>', 'Branding key')
+    .action(
+      async (
+        name,
+        socialString,
+        cmd: { account: string, init?: string, branding?: string, region?: string, dataId?: string }
+      ) => {
+        const { txes, version, migrateOperations } = prepareTools()
+        await withAccountDatabase(async (db) => {
+          const measureCtx = new MeasureMetricsContext('create-workspace', {})
+          const brandingObj =
+            cmd.branding !== undefined || cmd.init !== undefined ? { key: cmd.branding, initWorkspace: cmd.init } : null
+          const socialId = await db.socialId.findOne({ key: socialString as PersonId })
+          if (socialId == null) {
+            throw new Error(`Social id ${socialString} not found`)
+          }
+
+          const res = await createWorkspaceRecord(
+            measureCtx,
+            db,
+            brandingObj,
+            name,
+            socialId.personUuid,
+            cmd.region,
+            'manual-creation',
+            cmd.dataId as WorkspaceDataId
+          )
+          const wsInfo = await getWorkspaceInfoWithStatusById(db, res.workspaceUuid)
+
+          if (wsInfo == null) {
+            throw new Error(`Created workspace record ${res.workspaceUuid} not found`)
+          }
+          const coreWsInfo = flattenStatus(wsInfo)
+          const accountClient = getAccountClient(getToolToken())
+
+          const queue = getPlatformQueue('tool', cmd.region)
+          const wsProducer = queue.getProducer<QueueWorkspaceMessage>(toolCtx, QueueTopic.Workspace)
+
+          await createWorkspace(
+            measureCtx,
+            version,
+            brandingObj,
+            coreWsInfo,
+            txes,
+            migrateOperations,
+            accountClient,
+            wsProducer,
+            undefined,
+            true
+          )
+          await updateWorkspaceInfo(measureCtx, db, brandingObj, getToolToken(), {
+            workspaceUuid: res.workspaceUuid,
+            event: 'create-done',
+            version,
+            progress: 100
+          })
+
+          await wsProducer.send(measureCtx, res.workspaceUuid, [workspaceEvents.created()])
+          await queue.shutdown()
+          console.log(queue)
+        })
+      }
+    )
+
+  program
+    .command('set-user-role <email> <workspace> <role>')
+    .description('set user role')
+    .action(async (email: string, workspace: string, role: AccountRole, cmd) => {
+      console.log(`set user ${email} role for ${workspace}...`)
+      await withAccountDatabase(async (db) => {
+        const rolesArray = ['DocGuest', 'GUEST', 'USER', 'MAINTAINER', 'OWNER']
+        if (!rolesArray.includes(role)) {
+          throw new Error(`Invalid role ${role}. Valid roles are ${rolesArray.join(', ')}`)
+        }
+
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) {
+          throw new Error(`Workspace ${workspace} not found`)
+        }
+
+        await assignWorkspace(toolCtx, db, null, getToolToken(), { email, workspaceUuid: ws.uuid, role })
+      })
+    })
+
+  async function doUpgrade (
+    toolCtx: MeasureMetricsContext,
+    workspace: WorkspaceUuid,
+    forceUpdate: boolean,
+    forceIndexes: boolean
+  ): Promise<void> {
+    const { version, txes, migrateOperations } = prepareTools()
+
+    await withAccountDatabase(async (db) => {
+      const info = await getWorkspace(db, workspace)
+      if (info === null) {
+        throw new Error(`workspace ${workspace} not found`)
+      }
+
+      const wsInfo = await getWorkspaceInfoWithStatusById(db, info.uuid)
+      if (wsInfo === null) {
+        throw new Error(`workspace ${workspace} not found`)
+      }
+
+      const coreWsInfo = flattenStatus(wsInfo)
+      const measureCtx = new MeasureMetricsContext('upgrade-workspace', {})
+      const accountClient = getAccountClient(getToolToken(wsInfo.uuid))
+      const queue = getPlatformQueue('tool', info.region)
+      const wsProducer = queue.getProducer<QueueWorkspaceMessage>(toolCtx, QueueTopic.Workspace)
+      await upgradeWorkspace(
+        measureCtx,
+        version,
+        txes,
+        migrateOperations,
+        accountClient,
+        coreWsInfo,
+        consoleModelLogger,
+        wsProducer,
+        async () => {},
+        forceUpdate,
+        forceIndexes,
+        true
+      )
+
+      await updateWorkspaceInfo(measureCtx, db, null, getToolToken(), {
+        workspaceUuid: info.uuid,
+        event: 'upgrade-done',
+        version,
+        progress: 100
+      })
+
+      console.log(metricsToString(measureCtx.metrics, 'upgrade', 60))
+
+      await wsProducer.send(measureCtx, info.uuid, [workspaceEvents.upgraded()])
+      await queue.shutdown()
+      console.log('upgrade-workspace done')
+    })
+  }
+
+  program
+    .command('upgrade-workspace <name>')
+    .description('upgrade workspace')
+    .option('-f|--force [force]', 'Force update', true)
+    .option('-i|--indexes [indexes]', 'Force indexes rebuild', false)
+    .action(async (workspace, cmd: { force: boolean, indexes: boolean }) => {
+      await doUpgrade(toolCtx, workspace, cmd.force, cmd.indexes)
+    })
+
+  program
+    .command('backup <dirName> <workspace>')
+    .description('dump workspace transactions, blobs and accounts')
+    .option('-i, --include <include>', 'A list of ; separated domain names to include during backup', '*')
+    .option('-s, --skip <skip>', 'A list of ; separated domain names to skip during backup', '')
+    .option('--full', 'Full recheck', false)
+    .option(
+      '--ct, --contentTypes <contentTypes>',
+      'A list of ; separated content types for blobs to skip download if size >= limit',
+      ''
+    )
+    .option('--bl, --blobLimit <blobLimit>', 'A blob size limit in megabytes (default 5mb)', '5')
+    .option('-f, --force', 'Force backup', false)
+    .option('-t, --timeout <timeout>', 'Connect timeout in seconds', '30')
+    .option('-k, --keepSnapshots <keepSnapshots>', 'Keep snapshots for days', '14')
+    .option('--fv, --fullVerify', 'Full verification', false)
+    .action(
+      async (
+        dirName: string,
+        workspace: string,
+        cmd: {
+          skip: string
+          force: boolean
+          timeout: string
+          include: string
+          blobLimit: string
+          contentTypes: string
+          full: boolean
+          keepSnapshots: string
+          fullVerify: boolean
+        }
+      ) => {
+        const storage = await createFileBackupStorage(dirName)
+        await withAccountDatabase(async (db) => {
+          const { txes, dbUrl } = prepareTools()
+          const ws = await getWorkspace(db, workspace)
+          if (ws === null) {
+            throw new Error(`workspace ${workspace} not found`)
+          }
+          const wsIds = {
+            uuid: ws.uuid,
+            dataId: ws.dataId,
+            url: ws.url
+          }
+          const storageConfig = storageConfigFromEnv()
+
+          const workspaceStorage: StorageAdapter = buildStorageFromConfig(storageConfig)
+
+          let pipeline: Pipeline | undefined
+          try {
+            pipeline = await createBackupPipeline(toolCtx, dbUrl, txes, {
+              externalStorage: workspaceStorage,
+              usePassedCtx: true
+            })(
+              toolCtx,
+              {
+                uuid: ws.uuid,
+                url: ws.url ?? '',
+                dataId: ws.dataId
+              },
+              createEmptyBroadcastOps(),
+              null
+            )
+            if (pipeline === undefined) {
+              toolCtx.error('failed to restore, pipeline is undefined', { workspace })
+              return
+            }
+
+            await backup(toolCtx, pipeline, wsIds, storage, db, {
+              force: cmd.force,
+              include: cmd.include === '*' ? undefined : new Set(cmd.include.split(';').map((it) => it.trim())),
+              skipDomains: (cmd.skip ?? '').split(';').map((it) => it.trim()),
+              timeout: 0,
+              connectTimeout: parseInt(cmd.timeout) * 1000,
+              blobDownloadLimit: parseInt(cmd.blobLimit),
+              skipBlobContentTypes: cmd.contentTypes
+                .split(';')
+                .map((it) => it.trim())
+                .filter((it) => it.length > 0),
+              keepSnapshots: parseInt(cmd.keepSnapshots),
+              fullVerify: cmd.fullVerify
+            })
+          } catch (err: any) {
+            toolCtx.error('Failed to backup workspace', { err, workspace })
+          } finally {
+            if (pipeline !== undefined) {
+              await pipeline.close()
+            }
+            await workspaceStorage.close()
+          }
+        })
+      }
+    )
+  program
+    .command('backup-find <dirName> <fileId>')
+    .description('dump workspace transactions and minio resources')
+    .option('-d, --domain <domain>', 'Check only domain')
+    .option('-a, --all', 'Show all versions', false)
+    .action(async (dirName: string, fileId: string, cmd: { domain: string | undefined, all: boolean }) => {
+      const storage = await createFileBackupStorage(dirName)
+      console.log(cmd.all)
+      await backupFind(storage, fileId as unknown as Ref<Doc>, cmd.all, cmd.domain)
+    })
+
+  program
+    .command('backup-compact <dirName>')
+    .description('Compact a given backup, will create one snapshot clean unused resources')
+    .option('-f, --force', 'Force compact.', false)
+    .option(
+      '--ct, --contentTypes <contentTypes>',
+      'A list of ; separated content types for blobs to exclude from backup',
+      'video/;application/octet-stream;audio/;image/'
+    )
+    .option('-k, --keepSnapshots <keepSnapshots>', 'Keep snapshots for days', '14')
+    .action(async (dirName: string, cmd: { force: boolean, contentTypes: string, keepSnapshots: string }) => {
+      const storage = await createFileBackupStorage(dirName)
+      await compactBackup(toolCtx, storage, cmd.force, {
+        blobLimit: 5 * 1024 * 1024, // 5 MB
+        skipContentTypes: cmd.contentTypes.split(';')
+      })
+    })
+  program
+    .command('backup-check <dirName>')
+    .description('Compact a given backup, will create one snapshot clean unused resources')
+    .action(async (dirName: string, cmd: any) => {
+      const storage = await createFileBackupStorage(dirName)
+      await checkBackupIntegrity(toolCtx, storage)
+    })
+
+  program
+    .command('backup-check-all')
+    .description('Check Backup integrity')
+    .option('-r|--region [region]', 'Timeout in days', '')
+    .option('-w|--workspace [workspace]', 'Force backup of selected workspace', '')
+    .option('-s|--skip [skip]', 'A command separated list of workspaces to skip', '')
+    .option('-d|--dry [dry]', 'Dry run', false)
+    .action(async (cmd: { timeout: string, workspace: string, region: string, dry: boolean, skip: string }) => {
+      const bucketName = process.env.BUCKET_NAME
+      if (bucketName === '' || bucketName == null) {
+        console.error('please provide butket name env')
+        process.exit(1)
+      }
+
+      const skipWorkspaces = new Set(cmd.skip.split(',').map((it) => it.trim()))
+
+      const token = generateToken(systemAccountUuid, undefined, {
+        service: 'tool'
+      })
+      const workspaces = (await getAccountClient(token).listWorkspaces(cmd.region))
+        .sort((a, b) => {
+          const bsize = b.backupInfo?.backupSize ?? 0
+          const asize = a.backupInfo?.backupSize ?? 0
+          return bsize - asize
+        })
+        .filter((it) => (cmd.workspace === '' || cmd.workspace === it.url) && !skipWorkspaces.has(it.url))
+
+      const backupStorageConfig = storageConfigFromEnv(process.env.STORAGE)
+      const storageAdapter = createStorageFromConfig(backupStorageConfig.storages[0])
+      for (const ws of workspaces) {
+        const lastVisitDays = Math.floor((Date.now() - (ws.lastVisit ?? 0)) / 1000 / 3600 / 24)
+
+        toolCtx.warn('--- checking workspace backup', {
+          url: ws.url,
+          id: ws.uuid,
+          lastVisitDays,
+          backupSize: ws.backupInfo?.blobsSize ?? 0,
+          mode: ws.mode
+        })
+        if (cmd.dry) {
+          continue
+        }
+        try {
+          const st = Date.now()
+
+          try {
+            const storage = await createStorageBackupStorage(
+              toolCtx,
+              storageAdapter,
+              {
+                uuid: 'backup' as WorkspaceUuid,
+                url: 'backup',
+                dataId: bucketName as WorkspaceDataId
+              },
+              ws.dataId ?? ws.uuid
+            )
+            await checkBackupIntegrity(toolCtx, storage)
+          } catch (err: any) {
+            toolCtx.error('failed to size backup', { err })
+          }
+          const ed = Date.now()
+          toolCtx.warn('--- check complete', {
+            time: ed - st
+          })
+        } catch (err: any) {
+          toolCtx.error('Restore of f workspace failedarchive workspace', { workspace: ws.url })
+        }
+      }
+      await storageAdapter.close()
+    })
+
+  program
+    .command('backup-check-workspace <dirName> <workspace> [date]')
+    .description(
+      'Check whether all data from a backup is present in the workspace. Read-only: no data is added, removed or changed.'
+    )
+    .action(async (dirName: string, workspaceId: string, date: string | undefined) => {
+      await withAccountDatabase(async (db) => {
+        const { txes, dbUrl } = prepareTools()
+        const ws = await getWorkspace(db, workspaceId)
+        if (ws === null) {
+          throw new Error(`workspace ${workspaceId} not found`)
+        }
+
+        const wsIds = { uuid: ws.uuid, dataId: ws.dataId, url: ws.url ?? '' }
+        const storage = await createFileBackupStorage(dirName)
+        const workspaceStorage: StorageAdapter = buildStorageFromConfig(storageConfigFromEnv())
+
+        let pipeline: Pipeline | undefined
+        try {
+          pipeline = await createBackupPipeline(toolCtx, dbUrl, txes, {
+            externalStorage: workspaceStorage,
+            usePassedCtx: true
+          })(
+            toolCtx,
+            {
+              uuid: ws.uuid,
+              url: ws.url ?? '',
+              dataId: ws.dataId
+            },
+            createEmptyBroadcastOps(),
+            null
+          )
+          if (pipeline === undefined) {
+            toolCtx.error('failed to check, pipeline is undefined', { workspaceId })
+            process.exitCode = 1
+            return
+          }
+
+          const result = await checkWorkspaceBackup(toolCtx, pipeline, wsIds, storage, parseInt(date ?? '-1'))
+
+          console.log('')
+          for (const d of result.domains) {
+            const ok = d.missing.length === 0 && d.modified.length === 0
+            console.log(
+              `${ok ? 'OK  ' : 'FAIL'}  ${d.domain}: backup=${d.backupCount} workspace=${d.workspaceCount} missing=${d.missing.length} modified=${d.modified.length}`
+            )
+          }
+          console.log(
+            `${result.blobs.ok ? 'OK  ' : 'FAIL'}  blobs (storage): total=${result.blobs.total} missing=${result.blobs.missing.length}`
+          )
+          console.log('')
+          if (result.ok) {
+            console.log('OK: workspace contains all data from backup')
+          } else {
+            console.log('FAILED: workspace is missing data present in the backup')
+            process.exitCode = 1
+          }
+        } catch (err: any) {
+          toolCtx.error('failed to check workspace against backup', { err, workspaceId })
+          process.exitCode = 1
+        } finally {
+          await pipeline?.close()
+          await workspaceStorage?.close()
+        }
+      })
+    })
+
+  program
+    .command('validate-workspace <workspace>')
+    .description('Validate a (restored) workspace: connect as system, check model, data counts and blob download')
+    .option('--blobs <blobs>', 'Number of sample blobs to download-check (0 to skip)', '5')
+    .option('--blob-limit <blobLimit>', 'Stop enumerating blobs after this many (0 = iterate all)', '0')
+    .action(async (workspace: string, cmd: { blobs: string, blobLimit: string }) => {
+      await withAccountDatabase(async (db) => {
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) {
+          throw new Error(`workspace ${workspace} not found`)
+        }
+        const wsIds = { uuid: ws.uuid, dataId: ws.dataId, url: ws.url ?? '' }
+
+        const failures: string[] = []
+        const pass = (m: string): void => {
+          console.log(`  ✓ ${m}`)
+        }
+        const fail = (m: string): void => {
+          console.error(`  ✗ ${m}`)
+          failures.push(m)
+        }
+        const info = (m: string): void => {
+          console.log(`  • ${m}`)
+        }
+        const warn = (m: string): void => {
+          console.warn(`  ! ${m}`)
+        }
+        const emsg = (err: any): string => (err instanceof Error ? err.message : String(err))
+
+        console.log(`Validating workspace ${ws.url ?? ws.uuid} (${ws.uuid})`)
+
+        if ((process.env.STORAGE_CONFIG ?? '').trim() === '') {
+          warn('STORAGE_CONFIG is not set — storage falls back to default minio; blob results may be wrong')
+        }
+
+        const workspaceStorage: StorageAdapter = buildStorageFromConfig(storageConfigFromEnv())
+        let connection: Client | undefined
+        try {
+          // 1. Connectivity: resolve transactor endpoint and connect as system user
+          let endpoint: string
+          try {
+            endpoint = await getWorkspaceTransactorEndpoint(ws.uuid)
+            pass('resolved transactor endpoint')
+          } catch (err: any) {
+            fail(`cannot resolve transactor endpoint: ${emsg(err)}`)
+            process.exitCode = 1
+            return
+          }
+
+          try {
+            connection = await connect(endpoint, ws.uuid, undefined, { service: 'tool', admin: 'true' })
+            pass('connected to transactor as system user')
+          } catch (err: any) {
+            fail(`connect failed: ${emsg(err)}`)
+            process.exitCode = 1
+            return
+          }
+
+          const ops = new TxOperations(connection, core.account.System)
+
+          // 2. Model loads and hierarchy is populated
+          try {
+            const classes = ops.getHierarchy().getDescendants(core.class.Doc).length
+            if (classes > 0) {
+              pass(`model loaded: ${classes} classes in hierarchy`)
+            } else {
+              fail('model loaded but hierarchy is empty')
+            }
+          } catch (err: any) {
+            fail(`model load failed: ${emsg(err)}`)
+          }
+
+          // 3. Read path: count key domains
+          const countOf = async (label: string, _class: Ref<Class<Doc>>): Promise<number> => {
+            try {
+              const r = await ops.findAll(_class, {}, { limit: 1, total: true })
+              info(`${label}: ${r.total}`)
+              return r.total
+            } catch (err: any) {
+              fail(`findAll ${label} failed: ${emsg(err)}`)
+              return -1
+            }
+          }
+          await countOf('transactions (Tx)', core.class.Tx)
+          await countOf('spaces (Space)', core.class.Space)
+
+          // 4. Verify blobs count
+          const nBlobs = parseInt(cmd.blobs)
+          const blobLimit = parseInt(cmd.blobLimit)
+          const hasBlobLimit = !Number.isNaN(blobLimit) && blobLimit > 0
+          try {
+            const blobClient = new BlobClient(workspaceStorage, wsIds)
+            const iterator = await workspaceStorage.listStream(toolCtx, wsIds)
+            let blobCount = 0
+            let capped = false
+            const sample: Array<{ id: Ref<Doc>, size: number }> = []
+            try {
+              while (true) {
+                const batch = await iterator.next()
+                if (batch.length === 0) {
+                  break
+                }
+                for (const b of batch) {
+                  blobCount++
+                  if (!Number.isNaN(nBlobs) && nBlobs > 0 && sample.length < nBlobs) {
+                    sample.push({ id: b._id, size: b.size })
+                  }
+                  if (hasBlobLimit && blobCount >= blobLimit) {
+                    capped = true
+                    break
+                  }
+                }
+                if (capped) {
+                  break
+                }
+              }
+            } finally {
+              await iterator.close()
+            }
+
+            if (capped) {
+              info(`blobs in storage: >= ${blobCount} (stopped at --blob-limit ${blobLimit})`)
+            } else {
+              info(`blobs in storage: ${blobCount}`)
+            }
+            if (blobCount === 0) {
+              fail(
+                'no blobs found in storage — either the workspace has no files, ' +
+                  "or STORAGE_CONFIG does not point at this workspace's storage"
+              )
+            } else if (!Number.isNaN(nBlobs) && nBlobs > 0) {
+              let okCount = 0
+              for (const s of sample) {
+                try {
+                  let bytes = 0
+                  await blobClient.writeTo(toolCtx, s.id, s.size, {
+                    write: (buffer: Buffer, cb: (err?: any) => void) => {
+                      bytes += buffer.length
+                      cb()
+                    },
+                    end: (cb: () => void) => {
+                      cb()
+                    }
+                  })
+                  if (bytes === s.size) {
+                    okCount++
+                  } else {
+                    fail(`blob ${s.id}: downloaded ${bytes} of ${s.size} bytes`)
+                  }
+                } catch (err: any) {
+                  fail(`blob ${s.id} download failed: ${emsg(err)}`)
+                }
+              }
+              if (okCount === sample.length && okCount > 0) {
+                pass(`downloaded ${okCount}/${sample.length} sample blobs, sizes match metadata`)
+              }
+            }
+          } catch (err: any) {
+            fail(`blob storage check failed: ${emsg(err)}`)
+          }
+        } finally {
+          await connection?.close()
+          await workspaceStorage.close()
+        }
+
+        if (failures.length > 0) {
+          console.error(`\nVALIDATION FAILED: ${failures.length} issue(s)`)
+          process.exitCode = 1
+        } else {
+          console.log('\nVALIDATION PASSED')
+        }
+      })
+    })
+
+  program
+    .command('backup-restore <dirName> <workspace> [date]')
+    .option('-m, --merge', 'Enable merge of remote and backup content.', false)
+    .option('-p, --parallel <parallel>', 'Enable merge of remote and backup content.', '1')
+    .option('-c, --recheck', 'Force hash recheck on server', false)
+    .option('-i, --include <include>', 'A list of ; separated domain names to include during backup', '*')
+    .option('-s, --skip <skip>', 'A list of ; separated domain names to skip during backup', '')
+    .option('--upgrade', 'Upgrade workspace', false)
+    .option('--noqueue', 'NoQueue', false)
+    .option('--accounts', 'Restore accounts (person/socialId) from backup', false)
+    .option(
+      '--history-file <historyFile>',
+      'Store blob send info into file. Will skip already send documents.',
+      undefined
+    )
+    .description('dump workspace transactions and minio resources')
+    .action(
+      async (
+        dirName: string,
+        workspaceId: string,
+        date,
+        cmd: {
+          merge: boolean
+          parallel: string
+          recheck: boolean
+          include: string
+          skip: string
+          useStorage: string
+          historyFile: string
+          upgrade: boolean
+          noqueue: boolean
+          accounts: boolean
+        }
+      ) => {
+        if ((process.env.STORAGE_CONFIG ?? '').trim() === '') {
+          console.warn(
+            'WARNING: STORAGE_CONFIG is not set — blob storage falls back to default minio. ' +
+              'Restored blobs may be written to the wrong storage. Set STORAGE_CONFIG to match the transactor before restoring.'
+          )
+        }
+        await withAccountDatabase(async (db) => {
+          const { txes, dbUrl } = prepareTools()
+          const ws = await getWorkspace(db, workspaceId)
+          if (ws === null) {
+            throw new Error(`workspace ${workspaceId} not found`)
+          }
+
+          const workspace = ws.uuid
+          const wsIds = {
+            uuid: ws.uuid,
+            dataId: ws.dataId,
+            url: ws.url
+          }
+          const storage = await createFileBackupStorage(dirName)
+          const storageConfig = storageConfigFromEnv()
+
+          const queue = !cmd.noqueue ? getPlatformQueue('tool', ws.region) : undefined
+          const wsProducer = queue?.getProducer<QueueWorkspaceMessage>(toolCtx, QueueTopic.Workspace)
+
+          await wsProducer?.send(toolCtx, ws.uuid, [workspaceEvents.restoring()])
+
+          const workspaceStorage: StorageAdapter = buildStorageFromConfig(storageConfig)
+
+          let pipeline: Pipeline | undefined
+          try {
+            pipeline = await createBackupPipeline(toolCtx, dbUrl, txes, {
+              externalStorage: workspaceStorage,
+              usePassedCtx: true
+            })(
+              toolCtx,
+              {
+                uuid: ws.uuid,
+                url: ws.url ?? '',
+                dataId: ws.dataId
+              },
+              createEmptyBroadcastOps(),
+              null
+            )
+            if (pipeline === undefined) {
+              toolCtx.error('failed to restore, pipeline is undefined', { workspaceId })
+              return
+            }
+            await sendTransactorEvent(workspace, 'force-maintenance')
+
+            await restore(toolCtx, pipeline, wsIds, storage, cmd.accounts ? db : undefined, {
+              date: parseInt(date ?? '-1'),
+              merge: cmd.merge,
+              parallel: parseInt(cmd.parallel ?? '1'),
+              recheck: cmd.recheck,
+              include: cmd.include === '*' ? undefined : new Set(cmd.include.split(';')),
+              skip: new Set(cmd.skip.split(';')),
+              historyFile: cmd.historyFile
+            })
+
+            if (cmd.upgrade) {
+              await doUpgrade(toolCtx, workspace, true, true)
+            } else {
+              await sendTransactorEvent(workspace, 'force-close')
+            }
+
+            console.log('workspace restored')
+            await wsProducer?.send(toolCtx, ws.uuid, [workspaceEvents.restored()])
+          } catch (err) {
+            toolCtx.error('failed to restore', { err })
+          }
+          await pipeline?.close()
+          await queue?.shutdown()
+          await workspaceStorage?.close()
+        })
+      }
+    )
+
+  program
+    .command('backup-s3-compact <bucketName> <dirName>')
+    .description('Compact a given backup to just one snapshot')
+    .option('-f, --force', 'Force compact.', false)
+    .option(
+      '--ct, --contentTypes <contentTypes>',
+      'A list of ; separated content types for blobs to exclude from backup',
+      'video/;application/octet-stream;audio/;image/'
+    )
+    .action(async (bucketName: string, dirName: string, cmd: { force: boolean, contentTypes: string }) => {
+      const backupStorageConfig = storageConfigFromEnv(process.env.STORAGE)
+      const storageAdapter = createStorageFromConfig(backupStorageConfig.storages[0])
+      const backupIds = { uuid: bucketName as WorkspaceUuid, dataId: bucketName as WorkspaceDataId, url: '' }
+      try {
+        const storage = await createStorageBackupStorage(toolCtx, storageAdapter, backupIds, dirName)
+        await compactBackup(
+          toolCtx,
+          storage,
+          cmd.force,
+          {
+            blobLimit: 5 * 1024 * 1024, // 5 MB
+            skipContentTypes: cmd.contentTypes !== undefined ? cmd.contentTypes.split(';') : undefined
+          },
+          true
+        )
+      } catch (err: any) {
+        toolCtx.error('failed to size backup', { err })
+      }
+      await storageAdapter.close()
+    })
+
+  program
+    .command('backup-s3-download <bucketName> <dirName> <storeIn>')
+    .description('Download a full backup from s3 to local dir')
+    .option('-s, --skip <skip>', 'skip downloading of these files', '')
+    .action(async (bucketName: string, dirName: string, storeIn: string, cmd) => {
+      const backupStorageConfig = storageConfigFromEnv(process.env.STORAGE)
+      const storageAdapter = createStorageFromConfig(backupStorageConfig.storages[0])
+      const backupIds = { uuid: bucketName as WorkspaceUuid, dataId: bucketName as WorkspaceDataId, url: '' }
+      try {
+        const storage = await createStorageBackupStorage(toolCtx, storageAdapter, backupIds, dirName)
+        console.log('downloading backup...', cmd.skip)
+        await backupDownload(storage, storeIn, new Set(cmd.skip.split(';')))
+      } catch (err: any) {
+        toolCtx.error('failed to download backup', { err })
+      }
+      await storageAdapter.close()
+    })
+
+  program
+    .command('generate-token <name> <workspace>')
+    .description('generate token')
+    .option('--admin', 'Generate token with admin access', false)
+    .action(async (name: string, workspace: string, opt: { admin: boolean }) => {
+      await withAccountDatabase(async (db) => {
+        if (name === systemAccountEmail) {
+          name = systemAccountUuid
+        }
+        const wsByUrl = await db.workspace.findOne({ url: workspace })
+        const account = await db.socialId.findOne({ value: name })
+        console.log(
+          generateToken(account?.personUuid ?? (name as AccountUuid), wsByUrl?.uuid ?? (workspace as WorkspaceUuid), {
+            ...(opt.admin ? { admin: 'true' } : {})
+          })
+        )
+      })
+    })
+  program
+    .command('profile <endpoint> <mode>')
+    .description('Enable or disable profiling')
+    .option('-o, --output <output>', 'Output file', 'profile.cpuprofile')
+    .action(async (endpoint: string, mode: string, opt: { output: string }) => {
+      const token = generateToken(systemAccountUuid, undefined, { admin: 'true' })
+      if (mode === 'start') {
+        await fetch(`${endpoint}/api/v1/manage?token=${token}&operation=profile-start`, {
+          method: 'PUT'
+        })
+      } else {
+        const resp = await fetch(`${endpoint}/api/v1/manage?token=${token}&operation=profile-stop`, {
+          method: 'PUT'
+        })
+        if (resp.ok) {
+          const bdir = dirname(opt.output)
+          if (!existsSync(bdir)) {
+            await mkdir(bdir, { recursive: true })
+          }
+          const bytes = await resp.arrayBuffer()
+          console.log('writing to', opt.output)
+          await writeFile(opt.output, new Uint8Array(bytes))
+        } else {
+          console.error('failed to stop profile', resp.headers)
+        }
+      }
+    })
+
+  program
+    .command('generate-persons <workspace>')
+    .description('generate a random persons into workspace')
+    .option('--admin', 'Generate token with admin access', false)
+    .option('--count <count>', 'Number of persons to generate', '1000')
+    .action(async (workspace: string, opt: { admin: boolean, count: string }) => {
+      const count = parseInt(opt.count)
+      const token = generateToken(systemAccountUuid, workspace as WorkspaceUuid, {
+        ...(opt.admin ? { admin: 'true', service: 'tool' } : { service: 'tool' })
+      })
+      const endpoint = await getTransactorEndpoint(token, 'external')
+      const client = createRestClient(endpoint, workspace, token)
+      for (let i = 0; i < count; i++) {
+        const email = `${faker.internet.email()}`
+        await client.ensurePerson(SocialIdType.EMAIL, email, faker.person.firstName(), faker.person.lastName())
+      }
+    })
+
+  program
+    .command('decode-token <token>')
+    .description('decode token')
+    .action(async (token) => {
+      console.log(decodeToken(token))
+    })
+
+  program
+    .command('configure <workspace>')
+    .description('clean archived spaces')
+    .option('--enable <enable>', 'Enable plugin configuration', '')
+    .option('--disable <disable>', 'Disable plugin configuration', '')
+    .option('--list', 'List plugin states', false)
+    .action(async (workspace: string, cmd: { enable: string, disable: string, list: boolean }) => {
+      await withAccountDatabase(async (db) => {
+        console.log(JSON.stringify(cmd))
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) {
+          throw new Error(`workspace ${workspace} not found`)
+        }
+
+        await changeConfiguration(ws.uuid, await getWorkspaceTransactorEndpoint(ws.uuid), cmd)
+      })
+    })
+
+  program
+    .command('change-field <workspace>')
+    .description('change field value for the object')
+    .requiredOption('--objectId <objectId>', 'objectId')
+    .requiredOption('--objectClass <objectClass>')
+    .requiredOption('--attribute <attribute>')
+    .requiredOption('--type <type>', 'number | string')
+    .requiredOption('--value <value>')
+    .action(
+      async (
+        workspace: string,
+        cmd: { objectId: string, objectClass: string, type: string, attribute: string, value: string, domain: string }
+      ) => {
+        await withAccountDatabase(async (db) => {
+          const ws = await getWorkspace(db, workspace)
+          if (ws === null) {
+            throw new Error(`workspace ${workspace} not found`)
+          }
+          await updateField(ws.uuid, await getWorkspaceTransactorEndpoint(ws.uuid), cmd)
+        })
+      }
+    )
+
+  program
+    .command('fulltext-reindex <workspace>')
+    .description('reindex workspace')
+    .action(async (workspace: string) => {
+      const fulltextUrl = process.env.FULLTEXT_URL
+      if (fulltextUrl === undefined) {
+        console.error('please provide FULLTEXT_URL')
+        process.exit(1)
+      }
+
+      await withAccountDatabase(async (db) => {
+        const ws = await getWorkspace(db, workspace)
+
+        if (ws == null) {
+          throw new Error(`workspace ${workspace} not found`)
+        }
+
+        console.log('reindex workspace', workspace)
+        const queue = getPlatformQueue('tool', ws.region)
+        const wsProducer = queue.getProducer<QueueWorkspaceMessage>(toolCtx, QueueTopic.Workspace)
+        await wsProducer.send(toolCtx, ws.uuid, [workspaceEvents.fullReindex()])
+        await queue.shutdown()
+        console.log('done', workspace)
+      })
+    })
+
+  program
+    .command('fulltext-reindex-all')
+    .description('reindex workspaces')
+    .action(async () => {
+      const fulltextUrl = process.env.FULLTEXT_URL
+      if (fulltextUrl === undefined) {
+        console.error('please provide FULLTEXT_URL')
+        process.exit(1)
+      }
+
+      let workspaces: Workspace[] = []
+
+      await withAccountDatabase(async (db) => {
+        const statuses = await db.workspaceStatus.find({ mode: 'active', isDisabled: false })
+        const statusByWs = new Map(statuses.map((it) => [it.workspaceUuid, it]))
+
+        workspaces = await db.workspace.find({})
+        workspaces = workspaces.filter((p) => statusByWs.has(p.uuid))
+        workspaces.sort((a, b) => {
+          const sa = statusByWs.get(a.uuid)
+          const sb = statusByWs.get(b.uuid)
+          return (sb?.lastVisit ?? 0) - (sa?.lastVisit ?? 0)
+        })
+      })
+
+      console.log('found workspaces', workspaces.length)
+      for (const ws of workspaces) {
+        console.log('reindex workspace', ws)
+        const queue = getPlatformQueue('tool', ws.region)
+        const wsProducer = queue.getProducer<QueueWorkspaceMessage>(toolCtx, QueueTopic.Workspace)
+        await wsProducer.send(toolCtx, ws.uuid, [workspaceEvents.fullReindex()])
+        await queue.shutdown()
+      }
+      console.log('done')
+    })
+
+  program.command('move-account-db-to-pg').action(async () => {
+    const { dbUrl } = prepareTools()
+    const mongodbUri = getMongoDBUrl()
+
+    if (mongodbUri === dbUrl) {
+      throw new Error('MONGO_URL and DB_URL are the same')
+    }
+
+    const mongoNs = process.env.OLD_ACCOUNTS_NS
+
+    await withAccountDatabase(async (pgDb) => {
+      await withAccountDatabase(
+        async (mongoDb) => {
+          await moveAccountDbFromMongoToPG(toolCtx, mongoDb, pgDb)
+        },
+        mongodbUri,
+        mongoNs
+      )
+    }, dbUrl)
+  })
+
+  program
+    .command('migrate-created-modified-by')
+    .option('--include-domains <includeDomains>', 'Domains to migrate(comma-separated)')
+    .option('--exclude-domains <excludeDomains>', 'Domains to skip migration for(comma-separated)')
+    .option('--lifetime <lifetime>', 'Max lifetime for the connection in seconds')
+    .option('--batch <batch>', 'Batch size')
+    .option('--force <force>', 'Force update', false)
+    .option('--max-reconnects <maxReconnects>', 'Max reconnects', '30')
+    .option('--max-retries <maxRetries>', 'Max reconnects', '50')
+    .option('--workspaces <workspaces>', 'Workspaces to migrate(comma-separated)')
+    .action(
+      async (cmd: {
+        includeDomains?: string
+        excludeDomains?: string
+        lifetime?: string
+        batch?: string
+        workspaces?: string
+        force: boolean
+        maxReconnects: string
+        maxRetries: string
+      }) => {
+        const { dbUrl } = prepareTools()
+        const includeDomains = cmd.includeDomains?.split(',').map((d) => d.trim())
+        const excludeDomains = cmd.excludeDomains?.split(',').map((d) => d.trim())
+        const maxLifetime = cmd.lifetime != null ? parseInt(cmd.lifetime) : undefined
+        const batchSize = cmd.batch != null ? parseInt(cmd.batch) : undefined
+        const maxReconnects = parseInt(cmd.maxReconnects)
+        const maxRetries = parseInt(cmd.maxRetries)
+        const wsUuids = cmd.workspaces?.split(',').map((it) => it.trim()) as WorkspaceUuid[]
+
+        await withAccountDatabase(async (accDb) => {
+          const rawWorkspaces =
+            wsUuids != null && wsUuids.length > 0
+              ? await getWorkspacesInfoWithStatusByIds(accDb, wsUuids)
+              : await getWorkspaces(accDb, null, null, null)
+          const workspaces = rawWorkspaces
+            .filter((it) => !isArchivingMode(it.status.mode) && !isDeletingMode(it.status.mode))
+            .sort((a, b) => (b.status.lastVisit ?? 0) - (a.status.lastVisit ?? 0))
+
+          toolCtx.info('Workspaces found', { count: workspaces.length })
+
+          for (const workspace of workspaces) {
+            await migrateCreatedModifiedBy(
+              toolCtx,
+              dbUrl,
+              workspace,
+              includeDomains,
+              excludeDomains,
+              maxLifetime,
+              batchSize,
+              cmd.force,
+              maxReconnects,
+              maxRetries
+            )
+          }
+        })
+      }
+    )
+
+  program.command('ensure-global-persons-for-local-accounts').action(async () => {
+    const { dbUrl } = prepareTools()
+
+    await withAccountDatabase(async (accDb) => {
+      await ensureGlobalPersonsForLocalAccounts(toolCtx, dbUrl, accDb)
+    }, dbUrl)
+  })
+
+  program.command('migrate-merged-accounts').action(async () => {
+    const { dbUrl } = prepareTools()
+
+    await withAccountDatabase(async (accDb) => {
+      await migrateMergedAccounts(toolCtx, dbUrl, accDb)
+    }, dbUrl)
+  })
+
+  program.command('filter-merged-accounts-in-members').action(async () => {
+    const { dbUrl } = prepareTools()
+
+    await withAccountDatabase(async (accDb) => {
+      await filterMergedAccountsInMembers(toolCtx, dbUrl, accDb)
+    }, dbUrl)
+  })
+
+  program
+    .command('migrate-github-account')
+    .option('--db <db>', 'Github DB', '%github')
+    .option('--region <region>', 'Github DB')
+    .action(async (cmd: { db: string, region?: string }) => {
+      const mongodbUri = getMongoDBUrl()
+      const client = getMongoClient(mongodbUri)
+      const _client = await client.getClient()
+
+      const { dbUrl, txes } = prepareTools()
+
+      await performGithubAccountMigrations(_client.db(cmd.db), dbUrl, txes, cmd.region ?? null)
+      await _client.close()
+      client.close()
+    })
+
+  program
+    .command('queue-init-topics')
+    .description('create required kafka topics')
+    .option('--tx <tx>', 'Number of TX partitions', '5')
+    .action(async (cmd: { tx: string }) => {
+      const queue = getPlatformQueue('tool')
+      await queue.createTopics(parseInt(cmd.tx ?? '1'))
+    })
+
+  program
+    .command('migrate-gmail-account')
+    .option('--db <db>', 'DB name', 'gmail-service')
+    .option('--region <region>', 'DB region')
+    .action(async (cmd: { db: string, region?: string }) => {
+      const mongodbUri = getMongoDBUrl()
+      const client = getMongoClient(mongodbUri)
+      const _client = await client.getClient()
+
+      const kvsUrl = getKvsUrl()
+      const { dbUrl, txes } = prepareTools()
+
+      await performGmailAccountMigrations(_client.db(cmd.db), dbUrl, cmd.region ?? null, kvsUrl, txes)
+      await _client.close()
+      client.close()
+    })
+
+  program
+    .command('migrate-calendar-integrations-data')
+    .option('--db <db>', 'DB name', 'calendar-service')
+    .option('--region <region>', 'DB region')
+    .action(async (cmd: { db: string, region?: string }) => {
+      const mongodbUri = getMongoDBUrl()
+      const client = getMongoClient(mongodbUri)
+      const _client = await client.getClient()
+
+      const kvsUrl = getKvsUrl()
+      await performCalendarAccountMigrations(_client.db(cmd.db), cmd.region ?? null, kvsUrl)
+      await _client.close()
+      client.close()
+    })
+
+  program
+    .command('restore-markup-refs')
+    .option('--region <region>', 'DB region')
+    .action(async (cmd: { region?: string }) => {
+      const { dbUrl, txes } = prepareTools()
+      const region = cmd.region ?? null
+
+      await withStorage(async (adapter) => {
+        await restoreMarkupRefs(dbUrl, txes, adapter, region)
+      })
+    })
+
+  program
+    .command('restore-github-integrations')
+    .option('-d, --dryrun', 'Dry run', false)
+    .action(async (cmd: { dryrun: boolean }) => {
+      const { dbUrl } = prepareTools()
+
+      await restoreGithubIntegrations(dbUrl, cmd.dryrun)
+    })
+
+  program
+    .command('migrate-trusted-v6-accounts')
+    .description('Migrate trusted v6 accounts')
+    .option('-s|--skip [skip]', 'A command separated list of workspaces to skip', '')
+    .option('-d|--dry [dry]', 'Dry run', false)
+    .action(async (cmd: { skip: string, dry: boolean }) => {
+      const { dbUrl } = prepareTools()
+      const mongodbUri = getMongoDBUrl()
+
+      if (mongodbUri === dbUrl) {
+        throw new Error('MONGO_URL and DB_URL are the same')
+      }
+
+      const mongoNs = process.env.OLD_ACCOUNTS_NS
+      const skipWorkspaces = new Set(cmd.skip.split(',').map((it) => it.trim()))
+
+      await withAccountDatabase(async (pgDb) => {
+        const [v6MongoAccountDb, closeMongoAccountDb] = await getMongoAccountDB(mongodbUri, mongoNs)
+        try {
+          await migrateTrustedV6Accounts(toolCtx, pgDb, v6MongoAccountDb, cmd.dry, skipWorkspaces)
+        } finally {
+          closeMongoAccountDb()
+        }
+      }, dbUrl)
+    })
+
+  program
+    .command('restore-from-v6-all <dirName>')
+    .description('Restore from full v6 dump')
+    .action(async (dirName) => {
+      const { txes, dbUrl } = prepareTools()
+
+      await withAccountDatabase(async (pgDb) => {
+        await restoreFromv6All(toolCtx, pgDb, dirName, txes, dbUrl)
+      }, dbUrl)
+    })
+
+  program
+    .command('restore-v6-from-storage <workspace> <accsRoot>')
+    .description('Restore a workspace from v6 backup storage with accounts info')
+    .option('-r, --region <region>', 'Region to restore workspace to')
+    .option('-b, --branding <branding>', 'Branding to restore workspace with', 'huly')
+    .option('-s, --suffix <suffix>', 'Url suffix if conflicting', 'bold')
+    .option('-f, --force', 'Force restore if the same uuid', false)
+    .action(async (workspace, accsRoot, cmd: { suffix: string, region: string, branding: string, force: boolean }) => {
+      const bucketName = process.env.BUCKET_NAME
+      if (bucketName === '' || bucketName == null) {
+        console.error('please provide bucket name env')
+        process.exit(1)
+      }
+
+      const backupStorageConfig = storageConfigFromEnv(process.env.BACKUP_STORAGE)
+      const backupStorageAdapter = createStorageFromConfig(backupStorageConfig.storages[0])
+      const backupIds = { uuid: bucketName as WorkspaceUuid, dataId: bucketName as WorkspaceDataId, url: '' }
+      const backupAccsStorage = await createStorageBackupStorage(toolCtx, backupStorageAdapter, backupIds, accsRoot)
+      const v6AccountsFile = 'account.accounts.json'
+      const v6WorkspacesFile = 'account.workspaces.json'
+      const v6InvitesFile = 'account.invites.json'
+
+      if (!(await backupAccsStorage.exists(v6AccountsFile))) {
+        toolCtx.error('file not present', { file: v6AccountsFile })
+        throw new Error(`${v6AccountsFile} should be present to restore`)
+      }
+      if (!(await backupAccsStorage.exists(v6WorkspacesFile))) {
+        toolCtx.error('file not present', { file: v6WorkspacesFile })
+        throw new Error(`${v6WorkspacesFile} should be present to restore`)
+      }
+      if (!(await backupAccsStorage.exists(v6InvitesFile))) {
+        toolCtx.error('file not present', { file: v6InvitesFile })
+        throw new Error(`${v6InvitesFile} should be present to restore`)
+      }
+
+      const v6Workspaces = JSON.parse((await backupAccsStorage.loadFile(v6WorkspacesFile)).toString()) as OldWorkspace[]
+      const v6Workspace = v6Workspaces.find((it) => it.workspace === workspace)
+
+      if (v6Workspace == null) {
+        toolCtx.error('workspace not found in the accounts backup', { workspace })
+        throw new Error(`workspace ${workspace} not found in the accounts backup`)
+      }
+
+      const uniqueWorkspaceAccounts = new Set((v6Workspace.accounts ?? []).map((it) => it.toString()))
+      const v6AccountsRaw = JSON.parse((await backupAccsStorage.loadFile(v6AccountsFile)).toString()) as any[]
+      const v6WorkspaceAccountsRaw = v6AccountsRaw.filter((acc) => uniqueWorkspaceAccounts.has(acc._id.toString()))
+
+      const v6WorkspaceAccounts: OldAccount[] = []
+      for (const rawAccount of v6WorkspaceAccountsRaw) {
+        const hashTypedArray = rawAccount.hash != null ? new Uint8Array(rawAccount.hash.data) : null
+        const saltTypedArray = new Uint8Array(rawAccount.salt.data)
+
+        v6WorkspaceAccounts.push({
+          ...rawAccount,
+          hash: hashTypedArray != null ? Buffer.from(hashTypedArray.buffer) : null,
+          salt: Buffer.from(saltTypedArray.buffer)
+        })
+      }
+
+      let v6Invites = JSON.parse((await backupAccsStorage.loadFile(v6InvitesFile)).toString()) as any[]
+      v6Invites = v6Invites.filter((invite: any) => invite.workspace.name === v6Workspace.workspace)
+
+      const { txes, dbUrl } = prepareTools()
+      const backupWsStorage = await createStorageBackupStorage(
+        toolCtx,
+        backupStorageAdapter,
+        backupIds,
+        v6Workspace.uuid ?? v6Workspace.workspace
+      )
+
+      const storageConfig = storageConfigFromEnv()
+      const workspaceStorage: StorageAdapter = buildStorageFromConfig(storageConfig)
+      const { suffix, region, branding, force } = cmd
+
+      await withAccountDatabase(async (pgDb) => {
+        await restoreTrustedV6Workspace(
+          toolCtx,
+          pgDb,
+          v6Workspace,
+          v6WorkspaceAccounts,
+          v6Invites,
+          backupWsStorage,
+          workspaceStorage,
+          txes,
+          dbUrl,
+          { conflictSuffix: suffix, region, branding, force }
+        )
+      }, dbUrl)
+    })
+
+  program
+    .command('migrate-chat-to-communication')
+    .description('Migrate old chat to new communication')
+    .option('-w, --workspace <workspace>', 'Workspace to migrate')
+    .action(async (cmd: { workspace?: WorkspaceUuid }) => {
+      const { dbUrl, txes } = prepareTools()
+      const hulylakeUrl = process.env.HULYLAKE_URL ?? ''
+
+      const workspace = cmd.workspace
+      console.log('Workspace', workspace)
+
+      if (hulylakeUrl === '') {
+        throw new Error('HULYLAKE_URL should be specified')
+      }
+
+      const token = generateToken(systemAccountUuid, undefined, {
+        service: 'tool'
+      })
+      const db = getDBClient(dbUrl, undefined, 'tool')
+      const dbClient = await db.getClient()
+      const accountClient = getAccountClient(token)
+      const personUuidBySocialId = new Map<PersonId, PersonUuid>()
+      const storageConfig = storageConfigFromEnv()
+      const storage: StorageAdapter = buildStorageFromConfig(storageConfig)
+
+      await withAccountDatabase(async (accountDb) => {
+        const workspaces =
+          workspace != null
+            ? await accountDb.workspaceStatus.find({ workspaceUuid: workspace })
+            : await accountDb.workspaceStatus.find({}, { lastVisit: 'descending' })
+        for (const wss of workspaces) {
+          try {
+            const ws = await accountDb.workspace.findOne({ uuid: wss.workspaceUuid })
+            if (ws == null) continue
+            const hulylake = getHulylakeClient(hulylakeUrl, ws.uuid, token)
+
+            let pipeline: Pipeline | undefined
+            try {
+              pipeline = await createBackupPipeline(toolCtx, dbUrl, txes, {
+                externalStorage: storage,
+                usePassedCtx: true
+              })(
+                toolCtx,
+                {
+                  uuid: ws.uuid,
+                  url: ws.url ?? '',
+                  dataId: ws.dataId
+                },
+                createEmptyBroadcastOps(),
+                null
+              )
+            } catch (e) {
+              pipeline = undefined
+            }
+            if (pipeline === undefined) {
+              toolCtx.error('failed to migrate, pipeline is undefined', { ws })
+              return
+            }
+            const client = pipeline.context.lowLevelStorage
+
+            if (client == null) {
+              toolCtx.error('failed to migrate, lowLevelStorage is undefined', { ws })
+              return
+            }
+
+            console.log('------------start workspace migration', ws.name)
+            const s = Date.now()
+            await migrateWorkspaceChat(
+              toolCtx.newChild(ws.name, {}),
+              ws,
+              dbClient,
+              client,
+              pipeline.context.hierarchy,
+              hulylake,
+              accountClient,
+              personUuidBySocialId
+            )
+            const e = Date.now()
+            console.log('---------------done workspace migration', ws.name, ((e - s) / 1000 / 60).toFixed(2), 'minutes')
+            await pipeline.close()
+          } catch (err: any) {
+            console.error('failed to migrate workspace', wss.workspaceUuid)
+            console.error(err)
+          }
+        }
+        db.close()
+      }, dbUrl)
+
+      console.log('done')
+    })
+
+  program
+    .command('calculate-ratings <workspace>')
+    .description('Perform a rating re-calculation')
+    .option('-q <queue>', 'Send to queue', false)
+    .option('-r, --region <region>', 'Region')
+    .action(async (workspace: string, cmd: { queue: boolean | undefined, region: string | undefined }) => {
+      await withAccountDatabase(async (db) => {
+        const { txes, dbUrl } = prepareTools()
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) {
+          throw new Error(`workspace ${workspace} not found`)
+        }
+
+        if (cmd.queue === true) {
+          const queue = getPlatformQueue('tool', cmd.region ?? '')
+          const ratingQueue = queue.getProducer<QueueRatingMessage>(toolCtx, 'rating')
+
+          await ratingQueue.send(toolCtx, ws.uuid, [ratingEvents.reindex()])
+
+          await queue.shutdown()
+        } else {
+          const wsIds = {
+            uuid: ws.uuid,
+            dataId: ws.dataId,
+            url: ws.url
+          }
+          const calculator = await RatingCalculator.create(toolCtx, txes, wsIds, dbUrl, async () => '')
+
+          await calculator.recalculateAll(toolCtx)
+
+          await calculator.close()
+        }
+      })
+    })
+
+  program
+    .command('ensure-missing-social-identities <workspace>')
+    .description(
+      'Create contact.class.SocialIdentity in the workspace for account social ids missing on the person (see contact migration createSocialIdentities)'
+    )
+    .option('-d, --dry-run', 'Only log persons/social ids that would be created', false)
+    .action(async (workspace: string, cmd: { dryRun: boolean }) => {
+      await withAccountDatabase(async (db) => {
+        const info = await getWorkspace(db, workspace)
+        if (info === null) {
+          throw new Error(`Workspace ${workspace} not found`)
+        }
+        const wsUuid = info.uuid
+        const endpoint = await getWorkspaceTransactorEndpoint(wsUuid)
+        const accountClient = getAccountClient(getToolToken(wsUuid))
+        const connection = await connect(endpoint, wsUuid, undefined, { model: 'upgrade' })
+        const ops = new TxOperations(connection, core.account.ConfigUser)
+        try {
+          const { skippedPersons, wouldCreate, created } = await ensureMissingSocialIdentities(
+            toolCtx,
+            ops,
+            accountClient,
+            cmd.dryRun
+          )
+          console.log(
+            cmd.dryRun
+              ? `ensure-missing-social-identities dry-run: persons without personUuid skipped=${skippedPersons}, social identities that would be created=${wouldCreate}`
+              : `ensure-missing-social-identities: persons without personUuid skipped=${skippedPersons}, SocialIdentity docs created=${created}`
+          )
+        } finally {
+          await connection.close()
+        }
+      })
+    })
+
+  extendProgram?.(program)
+
+  process.on('unhandledRejection', (reason, promise) => {
+    toolCtx.error('Unhandled Rejection at:', { reason, promise })
+  })
+
+  process.on('uncaughtException', (error, origin) => {
+    toolCtx.error('Uncaught Exception at:', { origin, error })
+  })
+
+  program.parse(process.argv)
+}

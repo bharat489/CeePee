@@ -1,0 +1,96 @@
+<!--
+// Copyright © 2020, 2021 Anticrm Platform Contributors.
+// Copyright © 2021 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<script lang="ts">
+  import type { IntlString } from '@hcengineering/platform'
+  import type { ButtonKind, ButtonSize } from '@hcengineering/ui'
+  import { EditBox, Label, showPopup, eventToHTMLElement, Button } from '@hcengineering/ui'
+  import EditBoxPopup from './EditBoxPopup.svelte'
+  import { AnyAttribute, TypeNumber } from '@hcengineering/core'
+
+  export let label: IntlString
+  export let value: number | undefined
+  export let autoFocus: boolean = false
+  export let attribute: AnyAttribute | undefined = undefined
+  export let onChange: (value: number | undefined) => void
+  export let kind: ButtonKind | undefined = undefined
+  export let readonly = false
+  export let size: ButtonSize = 'small'
+  export let justify: 'left' | 'center' = 'center'
+  export let width: string | undefined = 'fit-content'
+
+  let shown: boolean = false
+
+  function _onchange (ev: Event) {
+    const value = (ev.target as HTMLInputElement).valueAsNumber
+    if (Number.isFinite(value)) {
+      onChange(value)
+    }
+  }
+
+  $: minValue = (attribute?.type as TypeNumber)?.min
+  $: maxValue = (attribute?.type as TypeNumber)?.max
+  $: maxDigitsAfterPoint = (attribute?.type as TypeNumber)?.digits
+</script>
+
+{#if kind}
+  <Button
+    {kind}
+    {size}
+    {justify}
+    {width}
+    on:click={(ev) => {
+      if (!shown && !readonly) {
+        showPopup(
+          EditBoxPopup,
+          { value, placeholder: label, format: 'number', maxDigitsAfterPoint, maxValue, minValue },
+          eventToHTMLElement(ev),
+          (res) => {
+            if (Number.isFinite(res)) {
+              value = res
+              onChange(value)
+            }
+            shown = false
+          }
+        )
+      }
+    }}
+  >
+    <svelte:fragment slot="content">
+      {#if value != null}
+        <span class="caption-color overflow-label pointer-events-none">{value}</span>
+      {:else}
+        <span class="content-dark-color overflow-labelpointer-events-none"><Label {label} /></span>
+      {/if}
+    </svelte:fragment>
+  </Button>
+{:else if readonly}
+  {#if value != null}
+    <span class="caption-color overflow-label">{value}</span>
+  {:else}
+    <span class="content-dark-color"><Label {label} /></span>
+  {/if}
+{:else}
+  <EditBox
+    placeholder={label}
+    bind:value
+    format={'number'}
+    {autoFocus}
+    {maxDigitsAfterPoint}
+    {maxValue}
+    {minValue}
+    on:change={_onchange}
+  />
+{/if}

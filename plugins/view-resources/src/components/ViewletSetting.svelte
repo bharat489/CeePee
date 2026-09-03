@@ -1,0 +1,620 @@
+<!--
+// Copyright © 2022 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<script lang="ts">
+  import core, {
+    AnyAttribute,
+    Association,
+    AssociationQuery,
+    Class,
+    Client,
+    Doc,
+    Ref,
+    TxOperations,
+    Type
+  } from '@hcengineering/core'
+  import { Asset, getEmbeddedLabel, IntlString, translate } from '@hcengineering/platform'
+  import { createQuery, getAttributePresenterClass, getClient, hasResource } from '@hcengineering/presentation'
+  import { DropdownLabelsIntl, Loading, resizeObserver } from '@hcengineering/ui'
+  import { BuildModelKey, Viewlet, ViewletPreference } from '@hcengineering/view'
+  import { deepEqual } from 'fast-equals'
+  import { createEventDispatcher } from 'svelte'
+  import view from '../plugin'
+  import { buildConfigLookup, canResolveAttribute, getKeyLabel } from '../utils'
+  import ViewletClassSettings from './ViewletClassSettings.svelte'
+
+  export let viewlet: Viewlet
+  export let defaultConfig: (BuildModelKey | string)[] | undefined = undefined
+
+  const dispatch = createEventDispatcher()
+
+  let preferences: ViewletPreference[] = []
+  const preferenceQuery = createQuery()
+
+  let selected = viewlet._id
+
+  let viewlets: Viewlet[] = []
+
+  $: client
+    .findAll(view.class.Viewlet, {
+      attachTo: {
+        $in: client
+          .getHierarchy()
+          .getDescendants(viewlet.attachTo)
+          .filter((it) => !client.getHierarchy().isMixin(it) || it === viewlet.attachTo)
+      },
+      variant: viewlet.variant ? viewlet.variant : { $exists: false },
+      descriptor: viewlet.descriptor
+    })
+    .then((res) => {
+      viewlets = res
+    })
+
+  $: if (viewlet && viewlets.length > 0) {
+    preferenceQuery.query(
+      view.class.ViewletPreference,
+      {
+        space: core.space.Workspace,
+        attachedTo: { $in: Array.from(viewlets.map((it) => it._id)) }
+      },
+      (res) => {
+        preferences = res
+        loading = false
+      }
+    )
+  } else {
+    preferenceQuery.unsubscribe()
+  }
+
+  const client = getClient()
+  const hierarchy = client.getHierarchy()
+  let loading = true
+
+  interface Config {
+    value: string | BuildModelKey | undefined
+    type: 'divider' | 'attribute'
+  }
+
+  interface AttributeConfig extends Config {
+    type: 'attribute'
+    enabled: boolean
+    label: IntlString
+    _class: Ref<Class<Doc>>
+    icon: Asset | undefined
+    order?: number
+  }
+
+  function getObjectConfig (_class: Ref<Class<Doc>>, param: string): AttributeConfig {
+    const clazz = hierarchy.getClass(_class)
+    return {
+      type: 'attribute',
+      value: param,
+      label: clazz.label,
+      enabled: true,
+      icon: clazz.icon,
+      _class
+    }
+  }
+
+  function getAssociationLabel (client: TxOperations, param: string): IntlString {
+    return getKeyLabel(client, viewlet.attachTo, param, undefined)
+  }
+
+  function getBaseConfig (viewlet: Viewlet): Config[] {
+    const config = defaultConfig ?? viewlet.config
+    const lookup = buildConfigLookup(hierarchy, viewlet.attachTo, config, viewlet.options?.lookup)
+    const result: Config[] = []
+    const clazz = hierarchy.getClass(viewlet.attachTo)
+    let wasOptional = false
+
+    for (const param of config) {
+      if (typeof param === 'string') {
+        if (viewlet.configOptions?.hiddenKeys?.includes(param)) continue
+        if (param.length === 0) {
+          result.push(getObjectConfig(viewlet.attachTo, param))
+        } else if (param.startsWith('$associations.')) {
+          const assocConfig: AttributeConfig = {
+            type: 'attribute',
+            value: param,
+            enabled: true,
+            label: getAssociationLabel(client, param),
+            _class: viewlet.attachTo,
+            icon: clazz.icon
+          }
+          result.push(assocConfig)
+        } else {
+          if (!canResolveAttribute(hierarchy, viewlet.attachTo, param, lookup)) continue
+          const paramValue = param.startsWith('custom') ? { key: param, displayProps: { optional: true } } : param
+          const attrCfg: AttributeConfig = {
+            type: 'attribute',
+            value: paramValue,
+            enabled: true,
+            label: getKeyLabel(client, viewlet.attachTo, param, lookup),
+            _class: viewlet.attachTo,
+            icon: clazz.icon
+          }
+          result.push(attrCfg)
+        }
+      } else {
+        if (viewlet.configOptions?.hiddenKeys?.includes(param.key)) continue
+        if (param.displayProps?.grow === true) {
+          result.push({
+            type: 'divider',
+            value: param
+          })
+        } else {
+          if (param.displayProps?.optional === true && !wasOptional) {
+            wasOptional = true
+            result.push({
+              type: 'divider',
+              value: ''
+            })
+          }
+          if (!canResolveAttribute(hierarchy, viewlet.attachTo, param.key, lookup)) continue
+          const attrCfg: AttributeConfig = {
+            type: 'attribute',
+            value: param,
+            label: param.label ?? getKeyLabel(client, viewlet.attachTo, param.key, lookup),
+            enabled: true,
+            _class: viewlet.attachTo,
+            icon: clazz.icon
+          }
+          result.push(attrCfg)
+        }
+      }
+    }
+    return result
+  }
+
+  function getValue (name: string, type: Type<any>, attrClass: Ref<Class<Doc>>): string {
+    const presenter = hierarchy.classHierarchyMixin(attrClass, view.mixin.AttributePresenter)?.presenter
+    if (presenter !== undefined) {
+      return name
+    }
+    if (hierarchy.isDerived(type._class, core.class.RefTo)) {
+      return '$lookup.' + name
+    }
+    return name
+  }
+
+  function processAttribute (attribute: AnyAttribute, result: Config[], useMixinProxy = false): void {
+    if (attribute.hidden || attribute.label === undefined) return
+    if (viewlet.configOptions?.hiddenKeys?.includes(attribute.name)) return
+    if (hierarchy.isDerived(attribute.type._class, core.class.Collection)) return
+    const { attrClass, category } = getAttributePresenterClass(hierarchy, attribute.type)
+    const value = getValue(attribute.name, attribute.type, attrClass)
+    for (const res of result) {
+      const key = getKey(res.value)
+      if (key === undefined) continue
+      if (key === attribute.name || key === value) return
+      if (key === '' && isAttribute(res) && res.label === attribute.label) return
+    }
+    const mixin =
+      category === 'object'
+        ? view.mixin.ObjectPresenter
+        : category === 'collection'
+          ? view.mixin.CollectionPresenter
+          : view.mixin.AttributePresenter
+    const presenter = hierarchy.classHierarchyMixin(
+      attrClass,
+      mixin,
+      (m) => hasResource(m.presenter) ?? false
+    )?.presenter
+    if (presenter === undefined) return
+    const clazz = hierarchy.getClass(attribute.attributeOf)
+    const extraProps = viewlet.configOptions?.extraProps
+    if (useMixinProxy) {
+      const newValue: AttributeConfig = {
+        type: 'attribute',
+        value: attribute.attributeOf + '.' + attribute.name,
+        label: attribute.label,
+        enabled: false,
+        _class: attribute.attributeOf,
+        icon: clazz.icon
+      }
+      if (!isExist(result, newValue)) {
+        result.push(newValue)
+      }
+    } else {
+      const isCustomAttribute = attribute.name.startsWith('custom')
+      const attributeValue = isCustomAttribute ? { key: value, displayProps: { optional: true } } : value
+
+      const newValue: AttributeConfig = {
+        type: 'attribute',
+        value: extraProps != null ? { ...extraProps, key: value } : attributeValue,
+        label: attribute.label,
+        enabled: false,
+        _class: attribute.attributeOf,
+        icon: clazz.icon
+      }
+      if (!isExist(result, newValue)) {
+        result.push(newValue)
+      }
+    }
+  }
+
+  function isAttribute (val: Config): val is AttributeConfig {
+    return val.type === 'attribute'
+  }
+
+  function getKey (value: string | BuildModelKey | undefined): string | undefined {
+    return typeof value === 'string' ? value : value?.key
+  }
+
+  function getAttributeKey (key: string): string {
+    if (key.startsWith('$lookup.')) {
+      return key.slice('$lookup.'.length)
+    }
+    const dotIndex = key.lastIndexOf('.')
+    return dotIndex === -1 ? key : key.slice(dotIndex + 1)
+  }
+
+  function isSourceAttribute (sourceClass: Ref<Class<Doc>>, key: string): boolean {
+    return hierarchy.getAllAttributes(sourceClass).has(getAttributeKey(key))
+  }
+
+  function syncConfigOrder (
+    sourceClass: Ref<Class<Doc>>,
+    previousSourceConfig: Array<BuildModelKey | string>,
+    sourceConfig: Array<BuildModelKey | string>,
+    targetConfig: Array<BuildModelKey | string>
+  ): Array<BuildModelKey | string> {
+    const sourceKeys = new Set(sourceConfig.map(getKey).filter((it): it is string => it !== undefined))
+    const previousSourceKeys = new Set(previousSourceConfig.map(getKey).filter((it): it is string => it !== undefined))
+    const targetByKey = new Map<string, Array<{ item: BuildModelKey | string, index: number }>>()
+    for (const [index, item] of targetConfig.entries()) {
+      const key = getKey(item)
+      if (key === undefined) continue
+      const items = targetByKey.get(key) ?? []
+      items.push({ item, index })
+      targetByKey.set(key, items)
+    }
+
+    const sourceItems: Array<BuildModelKey | string> = []
+    const usedIndexes = new Set<number>()
+    for (const sourceItem of sourceConfig) {
+      const key = getKey(sourceItem)
+      if (key === undefined) continue
+
+      const targetItem = targetByKey.get(key)?.shift()
+      sourceItems.push(targetItem?.item ?? sourceItem)
+      if (targetItem !== undefined) {
+        usedIndexes.add(targetItem.index)
+      }
+    }
+
+    const synced = [...sourceItems]
+    for (const [index, targetItem] of targetConfig.entries()) {
+      if (usedIndexes.has(index)) continue
+
+      const key = getKey(targetItem)
+      if (
+        key !== undefined &&
+        !sourceKeys.has(key) &&
+        (previousSourceKeys.has(key) || isSourceAttribute(sourceClass, key))
+      ) {
+        continue
+      }
+
+      synced.splice(Math.min(index, synced.length), 0, targetItem)
+    }
+
+    return synced
+  }
+
+  function isExist (result: Config[], newValue: Config): boolean {
+    if (!isAttribute(newValue)) return false
+    const newValueKey = getKey(newValue.value)
+    if (newValueKey === undefined) return false
+
+    for (const res of result) {
+      if (!isAttribute(res)) {
+        continue
+      }
+      if (getKey(res.value) === newValueKey) {
+        return true
+      }
+      if (newValueKey === '' && res.label === newValue.label) {
+        return true
+      }
+    }
+    return false
+  }
+
+  function getParentsString (parents: AssociationQuery[]): string {
+    return parents.map(([assocId, direction]) => `$associations.${assocId}_${direction === 1 ? 'a' : 'b'}`).join('.')
+  }
+
+  async function processAssociation (
+    association: Association,
+    direction: 'a' | 'b',
+    result: Config[],
+    preference: ViewletPreference | undefined,
+    parents: AssociationQuery[]
+  ): Promise<void> {
+    const associationName = `$associations.${association._id}_${direction}`
+    const resultName = parents.length > 0 ? `${getParentsString(parents)}.${associationName}` : associationName
+
+    const name = direction === 'a' ? association.nameA : association.nameB
+    const targetClass = direction === 'a' ? association.classA : association.classB
+
+    if (name.trim().length === 0) return
+    const model = client.getModel()
+
+    const resultLabels = parents
+      .map((r) => {
+        const assoc = model.findObject(r[0])
+        if (assoc === undefined) return ''
+        return r[1] === 1 ? assoc.nameA : assoc.nameB
+      })
+      .filter((it) => it.length > 0)
+    resultLabels.push(name)
+    const fullLabel = resultLabels.join(' › ')
+
+    const clazz = hierarchy.getClass(targetClass)
+    const newValue: AttributeConfig = {
+      type: 'attribute',
+      value: resultName,
+      label: getEmbeddedLabel(fullLabel),
+      enabled: false,
+      _class: targetClass,
+      icon: clazz.icon
+    }
+
+    if (!isExist(result, newValue)) {
+      result.push(newValue)
+    }
+
+    if (preference === undefined) return
+    const exists = preference.config.find((p) => {
+      const key = typeof p === 'string' ? p : p.key
+      return key === resultName
+    })
+    if (exists) {
+      addAssociations(result, targetClass, preference, [...parents, [association._id, direction === 'a' ? 1 : -1]])
+      await addAssociationAttributes(result, targetClass, resultName, fullLabel)
+    }
+  }
+
+  async function addAssociationAttributes (
+    result: Config[],
+    targetClass: Ref<Class<Doc>>,
+    associationKey: string,
+    associationLabel: string
+  ): Promise<void> {
+    const allAttributes = hierarchy.getAllAttributes(targetClass)
+    for (const [, attribute] of allAttributes) {
+      if (attribute.hidden || attribute.label === undefined) continue
+      if (hierarchy.isDerived(attribute.type._class, core.class.Collection)) continue
+      const { attrClass, category } = getAttributePresenterClass(hierarchy, attribute.type)
+      const mixin =
+        category === 'object'
+          ? view.mixin.ObjectPresenter
+          : category === 'collection'
+            ? view.mixin.CollectionPresenter
+            : view.mixin.AttributePresenter
+      const presenter = hierarchy.classHierarchyMixin(
+        attrClass,
+        mixin,
+        (m) => hasResource(m.presenter) ?? false
+      )?.presenter
+      if (presenter === undefined) continue
+
+      const fieldKey = `${associationKey}.${attribute.name}`
+      const fieldLabel = getAssociationLabel(client, fieldKey)
+      const translatedLabel = await translate(fieldLabel, {})
+      const clazz = hierarchy.getClass(targetClass)
+      const newValue: AttributeConfig = {
+        type: 'attribute',
+        value: fieldKey,
+        label: getEmbeddedLabel(associationLabel + ' > ' + translatedLabel),
+        enabled: false,
+        _class: targetClass,
+        icon: clazz.icon
+      }
+      if (!isExist(result, newValue)) {
+        result.push(newValue)
+      }
+    }
+  }
+
+  async function getConfig (viewlet: Viewlet, preference: ViewletPreference | undefined): Promise<Config[]> {
+    const result = getBaseConfig(viewlet)
+
+    if (viewlet.configOptions?.strict !== true) {
+      const allAttributes = hierarchy.getAllAttributes(viewlet.attachTo)
+      for (const [, attribute] of allAttributes) {
+        processAttribute(attribute, result)
+      }
+
+      const desc = hierarchy.getDescendants(viewlet.attachTo)
+      for (const d of desc) {
+        if (!hierarchy.isMixin(d)) continue
+        hierarchy.getOwnAttributes(d).forEach((attr) => {
+          processAttribute(attr, result, true)
+        })
+      }
+
+      await addAssociations(result, viewlet.attachTo, preference)
+    }
+
+    return preference === undefined ? result : setStatus(result, preference)
+  }
+
+  async function upsertViewletPreference (
+    viewletId: Ref<Viewlet>,
+    config: Array<BuildModelKey | string>
+  ): Promise<void> {
+    const preference = preferences.find((p) => p.attachedTo === viewletId)
+    if (preference !== undefined) {
+      if (!deepEqual(preference.config, config)) {
+        await client.update(preference, {
+          config
+        })
+      }
+    } else {
+      await client.createDoc(view.class.ViewletPreference, core.space.Workspace, {
+        attachedTo: viewletId,
+        config
+      })
+    }
+  }
+
+  async function syncChildViewletPreferences (
+    sourceViewlet: Viewlet,
+    previousSourceConfig: Array<BuildModelKey | string>,
+    sourceConfig: Array<BuildModelKey | string>
+  ): Promise<void> {
+    const descendants = new Set(
+      hierarchy.getDescendants(sourceViewlet.attachTo).filter((it) => it !== sourceViewlet.attachTo)
+    )
+    for (const childViewlet of viewlets) {
+      if (!descendants.has(childViewlet.attachTo)) continue
+
+      const preference = preferences.find((p) => p.attachedTo === childViewlet._id)
+      const targetConfig = preference?.config ?? childViewlet.config
+      const config = syncConfigOrder(sourceViewlet.attachTo, previousSourceConfig, sourceConfig, targetConfig)
+      if (deepEqual(targetConfig, config)) continue
+
+      await upsertViewletPreference(childViewlet._id, config)
+    }
+  }
+
+  async function addAssociations (
+    result: Config[],
+    _class: Ref<Class<Doc>>,
+    preference: ViewletPreference | undefined,
+    parents: AssociationQuery[] = []
+  ): Promise<void> {
+    const ancestors = new Set(hierarchy.getAncestors(_class))
+    const parent = hierarchy.getParentClass(_class)
+    const parentMixins = hierarchy
+      .getDescendants(parent)
+      .map((p) => hierarchy.getClass(p))
+      .filter((p) => hierarchy.isMixin(p._id) && ancestors.has(hierarchy.getBaseClass(p._id)))
+
+    parentMixins.forEach((it) => {
+      hierarchy.getOwnAttributes(it._id).forEach((attr) => {
+        processAttribute(attr, result, true)
+      })
+    })
+
+    const allClasses = [...ancestors, ...parentMixins.map((it) => it._id)]
+
+    const associationsB = client.getModel().findAllSync(core.class.Association, { classA: { $in: allClasses } })
+    const associationsA = client.getModel().findAllSync(core.class.Association, { classB: { $in: allClasses } })
+
+    for (const a of associationsB) {
+      await processAssociation(a, 'b', result, preference, parents)
+    }
+    for (const a of associationsA) {
+      await processAssociation(a, 'a', result, preference, parents)
+    }
+  }
+
+  async function save (viewletId: Ref<Viewlet>, items: Array<Config | AttributeConfig>): Promise<void> {
+    const configValues = items.filter(
+      (p) =>
+        p.value !== undefined &&
+        ((p.type === 'divider' && typeof p.value === 'object' && p.value.displayProps?.grow) ||
+          (p.type === 'attribute' && (p as AttributeConfig).enabled))
+    )
+    const config = configValues.map((p) => {
+      const value = p.value as string | BuildModelKey
+      if (typeof value === 'string' && value.startsWith('custom')) {
+        return { key: value, displayProps: { optional: true } }
+      }
+      return value
+    })
+    const selectedViewlet = viewlets.find((it) => it._id === viewletId)
+    const previousSourceConfig =
+      preferences.find((p) => p.attachedTo === viewletId)?.config ?? selectedViewlet?.config ?? []
+
+    await upsertViewletPreference(viewletId, config)
+
+    if (selectedViewlet !== undefined) {
+      await syncChildViewletPreferences(selectedViewlet, previousSourceConfig, config)
+    }
+  }
+
+  async function restoreDefault (viewletId: Ref<Viewlet>): Promise<void> {
+    const preference = preferences.find((p) => p.attachedTo === viewletId)
+    if (preference !== undefined) {
+      await client.remove(preference)
+    }
+  }
+
+  function setStatus (result: Config[], preference: ViewletPreference): Config[] {
+    for (const key of result) {
+      if (!isAttribute(key)) continue
+      const index = preference.config.findIndex((p) => deepEqual(p, key.value))
+      key.enabled = index !== -1
+      key.order = index !== -1 ? index : undefined
+    }
+    if (viewlet.configOptions?.sortable) {
+      result.sort((a, b) => {
+        if (!isAttribute(a) || !isAttribute(b)) return 0
+        if (a.order === undefined && b.order === undefined) return 0
+        if (a.order === undefined) return 1
+        if (b.order === undefined) return -1
+        return a.order - b.order
+      })
+    }
+    return result
+  }
+</script>
+
+<div class="selectPopup" use:resizeObserver={() => dispatch('changeContent')}>
+  <div class="menu-space" />
+  <div class="scroll">
+    <div class="box">
+      {#if loading}
+        <Loading />
+      {:else}
+        {#if viewlets.length > 1}
+          <div class="p-1">
+            <DropdownLabelsIntl
+              kind={'ghost'}
+              items={viewlets.map((it) => ({ id: it._id, label: hierarchy.getClass(it.attachTo).label }))}
+              {selected}
+              on:selected={(evt) => {
+                selected = evt.detail
+              }}
+              width={'100%'}
+            />
+          </div>
+        {/if}
+        {@const selectedViewlet = viewlets.find((it) => it._id === selected)}
+        {@const selectedPreferece = preferences.find((it) => it.attachedTo === selected)}
+        {#if selectedViewlet}
+          {#await getConfig(selectedViewlet, selectedPreferece)}
+            <Loading />
+          {:then citems}
+            <ViewletClassSettings
+              {viewlet}
+              items={citems}
+              on:restoreDefaults={() => {
+                restoreDefault(selected)
+              }}
+              on:save={(evt) => {
+                save(selected, evt.detail)
+              }}
+            />
+          {/await}
+        {/if}
+      {/if}
+    </div>
+  </div>
+  <div class="menu-space" />
+</div>

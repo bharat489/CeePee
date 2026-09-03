@@ -1,0 +1,112 @@
+<!--
+// Copyright © 2022 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<script lang="ts">
+  import core, { AnyAttribute, ArrOf, Doc, EnumOf, RefTo, Type } from '@hcengineering/core'
+  import { IntlString } from '@hcengineering/platform'
+  import { getClient } from '@hcengineering/presentation'
+  import { AnySvelteComponent, Icon, IconMoreV2, IconOpenedArrow, Label, tooltip } from '@hcengineering/ui'
+  import view from '@hcengineering/view'
+  import setting from '../plugin'
+
+  export let attribute: AnyAttribute
+  export let attributeType: IntlString | undefined = undefined
+  export let selected: boolean = false
+  export let hovered: boolean = false
+
+  export let attributeMapper:
+  | {
+    component: AnySvelteComponent
+    label: IntlString
+    props: Record<string, any>
+  }
+  | undefined = undefined
+
+  const client = getClient()
+
+  async function getEnumName (type: Type<any>): Promise<string | undefined> {
+    const ref = (type as EnumOf).of
+    const res = await client.findOne(core.class.Enum, { _id: ref })
+    return res?.name
+  }
+  function getArrayName (type: Type<any>): IntlString | undefined {
+    const ref = (type as ArrOf<any>).of
+    if (client.getHierarchy().hasClass((ref as RefTo<Doc>).to)) {
+      const res = client.getHierarchy().getClass((ref as RefTo<Doc>).to)
+      return res?.label
+    }
+  }
+</script>
+
+<button class="hulyTableAttr-content__row w-full" class:hovered class:selected on:contextmenu on:click>
+  <button class="hulyTableAttr-content__row-dragMenu">
+    <IconMoreV2 size={'small'} />
+  </button>
+  {#if attribute.automationOnly === true}
+    <div class="hulyTableAttr-content__row-icon" use:tooltip={{ label: view.string.AutomationOnly }}>
+      <Icon icon={view.icon.Setting} size={'small'} />
+    </div>
+  {/if}
+  {#if attribute.icon !== undefined && attribute.icon !== null}
+    <div class="hulyTableAttr-content__row-icon">
+      <Icon icon={attribute.icon} size={'small'} />
+    </div>
+  {/if}
+  <div class="hulyTableAttr-content__row-label font-regular-14 grow" class:accent={!attribute.hidden}>
+    <Label label={attribute.label} />
+    {#if attribute.required === true}
+      <span class="required-marker font-medium-12" use:tooltip={{ label: setting.string.Required }}>*</span>
+    {/if}
+  </div>
+  {#if attributeMapper}
+    <svelte:component this={attributeMapper.component} {...attributeMapper.props} {attribute} />
+  {/if}
+  <div class="hulyTableAttr-content__row-type font-medium-12">
+    <Label label={attribute.type.label} />
+    {#if attributeType !== undefined}
+      : <Label label={attributeType} />
+    {/if}
+    {#if attribute.type._class === core.class.EnumOf}
+      {#await getEnumName(attribute.type) then name}
+        {#if name}
+          : {name}
+        {/if}
+      {/await}
+    {/if}
+    {#if attribute.type._class === core.class.ArrOf}
+      {@const name = getArrayName(attribute.type)}
+      {#if name}
+        : <Label label={name} />
+      {/if}
+    {/if}
+  </div>
+  <div class="hulyTableAttr-content__row-arrow">
+    <IconOpenedArrow size={'small'} />
+  </div>
+</button>
+
+<style lang="scss">
+  .hulyTableAttr-content__row-label {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--spacing-0_5);
+  }
+
+  .required-marker {
+    flex-shrink: 0;
+    color: var(--global-error-TextColor);
+    line-height: 1;
+  }
+</style>

@@ -1,0 +1,421 @@
+//
+// Copyright © 2023, 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import textEditor, { type ActionContext } from '@hcengineering/text-editor'
+import { getEventPositionElement, SelectPopup, showPopup } from '@hcengineering/ui'
+import { type Editor } from '@tiptap/core'
+import TiptapTable from '@tiptap/extension-table'
+import { CellSelection, TableMap } from '@tiptap/pm/tables'
+
+import { type EditorState, Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import AddColAfter from '../../icons/table/AddColAfter.svelte'
+import AddColBefore from '../../icons/table/AddColBefore.svelte'
+import AddRowAfter from '../../icons/table/AddRowAfter.svelte'
+import AddRowBefore from '../../icons/table/AddRowBefore.svelte'
+import DeleteCol from '../../icons/table/DeleteCol.svelte'
+import DeleteRow from '../../icons/table/DeleteRow.svelte'
+import DeleteTable from '../../icons/table/DeleteTable.svelte'
+import { SvelteNodeViewRenderer } from '../../node-view'
+import {
+  getToolbarCursor,
+  type NodeWithPos,
+  registerToolbarProvider,
+  type ResolveCursorProps,
+  type ToolbarCursor
+} from '../toolbar/toolbar'
+import TableNodeView from './TableNodeView.svelte'
+import { TableSelection } from './types'
+import { findTable, isTableSelected, selectTable as selectTableNode } from './utils'
+import { getTableMetadata } from './tableMetadata'
+import { refreshTable, showTableDiff, seeOriginalTableData } from './actions'
+
+export const Table = TiptapTable.extend({
+  draggable: true,
+
+  addAttributes () {
+    return {
+      ...this.parent?.(),
+      tableMetadata: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-table-metadata'),
+        renderHTML: (attributes) => {
+          const metadata = attributes.tableMetadata
+          if (metadata === null || metadata === undefined || metadata === '') {
+            return {}
+          }
+          return {
+            'data-table-metadata': metadata
+          }
+        }
+      }
+    }
+  },
+
+  addKeyboardShortcuts () {
+    return {
+      Tab: () => {
+        if (this.editor.commands.goToNextCell()) {
+          return true
+        }
+
+        if (!this.editor.can().addRowAfter()) {
+          return false
+        }
+
+        return this.editor.chain().addRowAfter().goToNextCell().run()
+      },
+      'Shift-Tab': () => this.editor.commands.goToPreviousCell(),
+      Backspace: () => handleDelete(this.editor),
+      Delete: () => handleDelete(this.editor),
+      'Mod-Backspace': () => handleModDelete(this.editor),
+      'Mod-Delete': () => handleModDelete(this.editor)
+    }
+  },
+  addNodeView () {
+    return SvelteNodeViewRenderer(TableNodeView, {})
+  },
+  addProseMirrorPlugins () {
+    return [...(this.parent?.() ?? []), tableSelectionHighlight(), cleanupBrokenTables(), TableToolbarPlugin()]
+  }
+})
+
+function TableToolbarPlugin (): Plugin {
+  return new Plugin({
+    view: (view) => {
+      registerToolbarProvider<any>(view, { name: 'table', resolveCursor, priority: 30 })
+
+      return {}
+    }
+  })
+}
+
+export interface TableCursorProps {
+  tableScrollOffset?: number
+}
+
+export type TableCursor = ToolbarCursor<TableCursorProps>
+
+export function getTableCursor (state: EditorState): TableCursor | null {
+  const cursor = getToolbarCursor<TableCursorProps>(state)
+  if (cursor === null || cursor.tag !== 'table') {
+    return null
+  }
+  return cursor
+}
+
+function resolveCursor (props: ResolveCursorProps): TableCursor | null {
+  const selection = props.editorState.selection
+  const table = findTable(selection)
+  if (table === undefined) return null
+
+  if (selection instanceof TextSelection && !selection.empty) {
+    return null
+  }
+
+  const range =
+    selection instanceof CellSelection
+      ? { from: selection.from, to: selection.to }
+      : { from: table.pos, to: table.pos + table.node.nodeSize }
+
+  let nodes: NodeWithPos[] = [{ node: table.node, pos: table.pos }]
+  if (selection instanceof CellSelection) {
+    nodes = []
+    selection.forEachCell((node, pos) => {
+      nodes.push({ node, pos })
+    })
+  }
+
+  const cursor: TableCursor = {
+    source: props.source,
+    tag: 'table',
+    range,
+    props: {},
+    nodes,
+    viewOptions: {
+      offset: selection instanceof CellSelection ? [0, 12] : [0, -12]
+    }
+  }
+
+  return cursor
+}
+
+function handleDelete (editor: Editor): boolean {
+  const { selection } = editor.state.tr
+  if (selection instanceof TableSelection && isTableSelected(selection)) {
+    return editor.commands.deleteTable()
+  }
+  return false
+}
+
+export const tableSelectionHighlight = (): Plugin<DecorationSet> => {
+  return new Plugin<DecorationSet>({
+    props: {
+      decorations (state) {
+        return this.getState(state)
+      }
+    },
+    state: {
+      init: () => {
+        return DecorationSet.empty
+      },
+      apply (tr, value, oldState, newState) {
+        const selection = newState.selection
+        if (!(selection instanceof TableSelection)) return DecorationSet.empty
+
+        const table = findTable(newState.selection)
+        if (table === undefined) return DecorationSet.empty
+
+        const decorations: Decoration[] = [
+          Decoration.node(table.pos, table.pos + table.node.nodeSize, { class: 'table-node-selected' })
+        ]
+        return DecorationSet.create(newState.doc, decorations)
+      }
+    }
+  })
+}
+
+export const cleanupBrokenTables = (): Plugin<DecorationSet> => {
+  return new Plugin<DecorationSet>({
+    appendTransaction: (transactions, oldState, newState) => {
+      const lastTx = transactions[0]
+      if (!lastTx?.docChanged) return
+
+      let tr: Transaction | undefined
+      newState.doc.descendants((node, pos) => {
+        if (node.type.name !== 'table') return
+
+        const map = TableMap.get(node)
+
+        const isBroken = map.width === 0 || map.height === 0
+        if (!isBroken) return
+
+        tr = tr ?? newState.tr
+        const mpos = tr.mapping.map(pos)
+
+        tr = tr.delete(mpos, mpos + node.nodeSize)
+      })
+
+      return tr
+    }
+  })
+}
+
+function handleModDelete (editor: Editor): boolean {
+  const { selection } = editor.state.tr
+  if (selection instanceof CellSelection) {
+    if (isTableSelected(selection)) {
+      return editor.commands.deleteTable()
+    } else if (selection.isColSelection()) {
+      return editor.commands.deleteColumn()
+    } else if (selection.isRowSelection()) {
+      return editor.commands.deleteRow()
+    }
+  }
+
+  return false
+}
+
+interface TableAction {
+  id: string
+  icon?: any
+  label: any
+  action: () => boolean | undefined
+  category?: {
+    label: any
+  }
+}
+
+export async function openTableOptions (editor: Editor, event: MouseEvent): Promise<void> {
+  // Check if table has metadata
+  const table = findTable(editor.state.selection)
+  const metadata = table !== undefined ? getTableMetadata(table.node) : null
+
+  const ops: TableAction[] = []
+
+  // Add refreshable table actions first if metadata exists
+  if (metadata !== null && metadata !== undefined) {
+    ops.push(
+      {
+        id: '#refreshTable',
+        icon: textEditor.icon.Refresh,
+        label: textEditor.string.RefreshTable,
+        action: () => {
+          refreshTable(editor).catch(() => {})
+          return true
+        },
+        category: {
+          label: textEditor.string.CategoryVersioning
+        }
+      },
+      {
+        id: '#showDiff',
+        icon: textEditor.icon.ShowDiff,
+        label: textEditor.string.ShowDiff,
+        action: () => {
+          showTableDiff(editor).catch(() => {})
+          return true
+        },
+        category: {
+          label: textEditor.string.CategoryVersioning
+        }
+      },
+      {
+        id: '#seeOriginalData',
+        icon: textEditor.icon.SeeOriginalData,
+        label: textEditor.string.SeeOriginalData,
+        action: () => {
+          seeOriginalTableData(editor).catch(() => {})
+          return true
+        },
+        category: {
+          label: textEditor.string.CategoryVersioning
+        }
+      }
+    )
+  }
+
+  ops.push(
+    {
+      id: '#addColumnBefore',
+      icon: AddColBefore,
+      label: textEditor.string.AddColumnBefore,
+      action: () => editor.commands.addColumnBefore(),
+      category: {
+        label: textEditor.string.CategoryColumn
+      }
+    },
+    {
+      id: '#addColumnAfter',
+      icon: AddColAfter,
+      label: textEditor.string.AddColumnAfter,
+      action: () => editor.commands.addColumnAfter(),
+      category: {
+        label: textEditor.string.CategoryColumn
+      }
+    },
+
+    {
+      id: '#deleteColumn',
+      icon: DeleteCol,
+      label: textEditor.string.DeleteColumn,
+      action: () => editor.commands.deleteColumn(),
+      category: {
+        label: textEditor.string.CategoryColumn
+      }
+    },
+    {
+      id: '#addRowBefore',
+      icon: AddRowBefore,
+      label: textEditor.string.AddRowBefore,
+      action: () => editor.commands.addRowBefore(),
+      category: {
+        label: textEditor.string.CategoryRow
+      }
+    },
+    {
+      id: '#addRowAfter',
+      icon: AddRowAfter,
+      label: textEditor.string.AddRowAfter,
+      action: () => editor.commands.addRowAfter(),
+      category: {
+        label: textEditor.string.CategoryRow
+      }
+    },
+    {
+      id: '#deleteRow',
+      icon: DeleteRow,
+      label: textEditor.string.DeleteRow,
+      action: () => editor.commands.deleteRow(),
+      category: {
+        label: textEditor.string.CategoryRow
+      }
+    },
+    {
+      id: '#mergeCells',
+      icon: textEditor.icon.MergeCells,
+      label: textEditor.string.MergeCells,
+      action: () => editor.commands.mergeCells(),
+      category: {
+        label: textEditor.string.CategoryCell
+      }
+    },
+    {
+      id: '#splitCell',
+      icon: textEditor.icon.SplitCells,
+      label: textEditor.string.SplitCells,
+      action: () => editor.commands.splitCell(),
+      category: {
+        label: textEditor.string.CategoryCell
+      }
+    }
+  )
+
+  // Add delete table action at the end
+  ops.push({
+    id: '#deleteTable',
+    icon: DeleteTable,
+    label: textEditor.string.DeleteTable,
+    action: () => editor.commands.deleteTable(),
+    category: {
+      label: textEditor.string.Table
+    }
+  })
+
+  await new Promise<void>((resolve) => {
+    showPopup(
+      SelectPopup,
+      {
+        value: ops
+      },
+      getEventPositionElement(event),
+      (val) => {
+        if (val !== undefined) {
+          const op = ops.find((it) => it.id === val)
+          if (op !== undefined) {
+            op.action()
+          }
+        }
+        resolve()
+      }
+    )
+  })
+}
+export async function selectTable (editor: Editor, event: MouseEvent): Promise<void> {
+  const table = findTable(editor.state.selection)
+  if (table === undefined) return
+
+  event.preventDefault()
+
+  editor.view.dispatch(selectTableNode(table, editor.state.tr))
+}
+
+export async function isEditableTableActive (editor: Editor): Promise<boolean> {
+  return editor.isEditable && getTableCursor(editor.state) !== null
+}
+
+export async function isTableToolbarContext (editor: Editor, context: ActionContext): Promise<boolean> {
+  return editor.isEditable && getTableCursor(editor.state) !== null
+}
+
+export async function isRefreshableTableActive (editor: Editor, context: ActionContext): Promise<boolean> {
+  if (!editor.isEditable) return false
+  const table = findTable(editor.state.selection)
+  if (table === undefined) return false
+  const metadata = getTableMetadata(table.node)
+  return metadata !== null && metadata !== undefined
+}
+
+export { refreshTable, showTableDiff, seeOriginalTableData } from './actions'

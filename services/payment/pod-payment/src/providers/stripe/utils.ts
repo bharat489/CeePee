@@ -1,0 +1,193 @@
+//
+// Copyright © 2025 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+import { type AccountUuid, type WorkspaceUuid, type MeasureContext } from '@hcengineering/core'
+import type { SubscriptionData } from '@hcengineering/account-client'
+import { SubscriptionStatus, SubscriptionType } from '@hcengineering/account-client'
+import type Stripe from 'stripe'
+
+/**
+ * Map Stripe subscription status to our SubscriptionStatus
+ */
+function mapStripeStatus (stripeStatus: Stripe.Subscription.Status): SubscriptionStatus | null {
+  switch (stripeStatus) {
+    case 'active':
+      return SubscriptionStatus.Active
+    case 'trialing':
+      return SubscriptionStatus.Trialing
+    case 'past_due':
+      return SubscriptionStatus.PastDue
+    case 'canceled':
+      return SubscriptionStatus.Canceled
+    case 'paused':
+      return SubscriptionStatus.Paused
+    // Stripe-only intermediate/error states we currently ignore
+    case 'unpaid':
+    case 'incomplete':
+    case 'incomplete_expired':
+    default:
+      return null
+  }
+}
+
+/**
+ * Transform a Stripe subscription to our SubscriptionData format
+ * Extracts metadata and maps status
+ * Returns null if subscription is in an irrelevant state
+ */
+export function transformStripeSubscriptionToData (
+  ctx: MeasureContext,
+  subscription: Stripe.Subscription
+): SubscriptionData | null {
+  const metadata = subscription.metadata ?? {}
+  const workspaceUuid = metadata.workspaceUuid as WorkspaceUuid | undefined
+  const subscriptionType = metadata.subscriptionType as SubscriptionType | undefined
+  const subscriptionPlan = metadata.subscriptionPlan as string | undefined
+
+  // accountUuid is set in subscription_data.metadata when creating checkout; prefer subscription.metadata
+  let accountUuid: AccountUuid | undefined = metadata.accountUuid as AccountUuid | undefined
+  if (
+    accountUuid === undefined &&
+    typeof subscription.customer !== 'string' &&
+    subscription.customer !== null &&
+    subscription.customer.deleted !== true
+  ) {
+    accountUuid = subscription.customer.metadata?.accountUuid as AccountUuid | undefined
+  }
+
+  // For Stripe, customer can be a string ID or expanded Customer object
+  let customerId: string | undefined
+  if (typeof subscription.customer === 'string') {
+    customerId = subscription.customer
+  } else if (subscription.customer !== null && subscription.customer.deleted !== true) {
+    customerId = subscription.customer.id
+  }
+
+  if (
+    accountUuid === undefined ||
+    workspaceUuid === undefined ||
+    subscriptionType === undefined ||
+    subscriptionPlan === undefined
+  ) {
+    const missing: string[] = []
+    if (accountUuid === undefined) missing.push('accountUuid')
+    if (workspaceUuid === undefined) missing.push('workspaceUuid')
+    if (subscriptionType === undefined) missing.push('subscriptionType')
+    if (subscriptionPlan === undefined) missing.push('subscriptionPlan')
+
+    ctx.warn('Stripe subscription missing required metadata, ignoring update', {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      missingFields: missing
+    })
+
+    return null
+  }
+
+  // Get the price amount from the subscription
+  const price = subscription.items.data[0]?.price
+  const amount = price?.unit_amount ?? undefined
+
+  // Map Stripe status to our SubscriptionStatus
+  const status = mapStripeStatus(subscription.status)
+
+  if (status === null) {
+    // Ignore updates for subscriptions in irrelevant states
+    ctx.warn('Stripe subscription status is missing', {
+      subscriptionId: subscription.id,
+      status: subscription.status
+    })
+    return null
+  }
+
+  // Handle optional periodEnd field
+  let periodEnd: number | undefined
+  if (subscription.current_period_end != null) {
+    periodEnd = subscription.current_period_end * 1000 // Convert from Unix timestamp to milliseconds
+  }
+
+  let trialEnd: number | undefined
+  if (subscription.trial_end != null) {
+    trialEnd = subscription.trial_end * 1000 // Convert from Unix timestamp to milliseconds
+  }
+
+  let canceledAt: number | undefined
+  if (subscription.canceled_at != null) {
+    canceledAt = subscription.canceled_at * 1000 // Convert from Unix timestamp to milliseconds
+  }
+
+  const subscriptionData: SubscriptionData = {
+    id: `stripe_${subscription.id}`, // Composite ID with provider prefix to avoid conflicts
+    workspaceUuid,
+    accountUuid,
+    provider: 'stripe',
+    providerSubscriptionId: subscription.id,
+    providerCheckoutId: subscription.latest_invoice as string | undefined,
+    type: subscriptionType,
+    status,
+    plan: subscriptionPlan,
+    amount, // Amount paid in cents (e.g. 9999 for $99.99)
+    periodStart: subscription.current_period_start * 1000, // Convert from Unix timestamp to milliseconds
+    periodEnd,
+    trialEnd,
+    canceledAt,
+    providerData: {
+      modifiedAt: subscription.created * 1000, // Convert from Unix timestamp to milliseconds (using created as updated doesn't exist)
+      customerId,
+      status: subscription.status,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      endedAt: subscription.ended_at != null ? subscription.ended_at * 1000 : undefined,
+      cancelReason: subscription.cancellation_details?.reason ?? undefined,
+      cancelComment: subscription.cancellation_details?.comment ?? undefined
+    }
+  }
+
+  return subscriptionData
+}
+
+/**
+ * For invoice.* events, load the related subscription from Stripe and
+ * return a new Event whose data.object is the Subscription.
+ *
+ * Returns null when the invoice has no subscription.
+ */
+export async function createSubscriptionEventFromInvoiceEvent (
+  ctx: MeasureContext,
+  stripe: Stripe,
+  event: Stripe.Event
+): Promise<Stripe.Event | null> {
+  // Stripe sends the invoice in data.object for invoice.* events
+  const invoice = event.data.object as Stripe.Invoice
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+
+  if (subscriptionId === undefined) {
+    ctx.info('Invoice event without subscription, skipping', {
+      invoiceId: invoice.id,
+      status: invoice.status
+    })
+    return null
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+
+  // We only care that data.object is a Subscription; the exact event
+  // subtype is not used by the subscription handler.
+  return {
+    ...event,
+    data: {
+      ...event.data,
+      object: subscription
+    }
+  } as unknown as Stripe.Event
+}

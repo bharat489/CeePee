@@ -1,0 +1,113 @@
+//
+// Copyright © 2025 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import {
+  type Class,
+  type Doc,
+  type DocumentQuery,
+  type Hierarchy,
+  type LowLevelStorage,
+  type MeasureContext,
+  type Ref,
+  type Space,
+  type TxOperations,
+  type WorkspaceIds
+} from '@hcengineering/core'
+import { type Pipeline } from '@hcengineering/server-core'
+
+export type PipelineFactory = (ctx: MeasureContext, workspace: WorkspaceIds) => Promise<Pipeline>
+
+export interface CustomExportHandlerContext {
+  context: MeasureContext
+  targetClient: TxOperations
+  state: ExportState
+  spaceExporter: {
+    getOrCreateTargetSpace: (
+      sourceSpaceId: Ref<Space>,
+      sourceHierarchy: Hierarchy,
+      sourceLowLevel: LowLevelStorage
+    ) => Promise<Ref<Space>>
+  }
+  sourceHierarchy: Hierarchy
+  sourceLowLevel: LowLevelStorage
+}
+
+/**
+ * Hook for class-specific export behavior.
+ *
+ * When the exporter encounters a document derived from `class`, it calls
+ * `resolve` instead of the default duplicate-and-remap flow. The handler is
+ * responsible for finding or creating the appropriate target document and
+ * returning its id.
+ */
+export interface CustomExportHandler<T extends Doc = Doc> {
+  class: Ref<Class<T>>
+  resolve: (sourceDoc: T, ctx: CustomExportHandlerContext) => Promise<Ref<Doc> | undefined>
+}
+
+export interface RelationDefinition {
+  /** When set, this relation applies only to documents of this class (or its subclasses). */
+  sourceClass?: Ref<Class<Doc>>
+  field: string
+  class: Ref<Class<Doc>>
+  direction?: 'forward' | 'inverse'
+}
+
+export interface ExportOptions {
+  sourceWorkspace: WorkspaceIds
+  targetWorkspace: WorkspaceIds
+  sourceQuery: DocumentQuery<Doc>
+  _class: Ref<Class<Doc>>
+  // Strategy for handling conflicts
+  conflictStrategy?: 'skip' | 'duplicate'
+  // Whether to include attachments
+  includeAttachments?: boolean
+  // Optional mapper function to transform documents before export
+  mapper?: (doc: Doc) => Doc | Promise<Doc>
+  relations?: RelationDefinition[]
+  // Field mappers per class: { classA: { fieldA: value, fieldB: '$currentUser' }, ... }
+  // Special value '$currentUser' will be replaced with current account's employee ID
+  fieldMappers?: Record<string, Record<string, any>>
+  // Whether to skip documents and templates in deleted or obsolete state
+  skipDeletedObsolete?: boolean
+  // Whether to export only documents with effective status
+  exportOnlyEffective?: boolean
+  // Whether to recursively export child (collection) documents of each exported doc.
+  // When false, only the documents matched by the top-level query are exported and
+  // their attached collection items are skipped.
+  includeChildren?: boolean
+  // Class-specific export handlers, applied before the default flow. Useful
+  // for collapsing or deduplicating documents (e.g. ProductVersion).
+  customHandlers?: CustomExportHandler[]
+}
+
+export interface ExportResult {
+  success: boolean
+  exportedCount: number
+  skippedCount: number
+  errors: Array<{ docId: string, error: string }>
+  exportedDocuments: Array<{ docId: Ref<Doc>, name: string }>
+}
+
+/**
+ * Shared export state used across all exporter components
+ */
+export interface ExportState {
+  idMapping: Map<Ref<Doc>, Ref<Doc>>
+  spaceMapping: Map<Ref<Space>, Ref<Space>>
+  processingDocs: Set<Ref<Doc>>
+  // Track unique field values per class: { className: { fieldName: Set<values> } }
+  uniqueFieldValues: Map<string, Map<string, Set<string | number>>>
+}

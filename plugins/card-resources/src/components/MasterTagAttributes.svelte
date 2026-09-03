@@ -1,0 +1,164 @@
+<!--
+// Copyright © 2025 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<script lang="ts">
+  import { Card, MasterTag } from '@hcengineering/card'
+  import { getClient } from '@hcengineering/presentation'
+  import setting, { settingId } from '@hcengineering/setting'
+  import {
+    Button,
+    Chevron,
+    ExpandCollapse,
+    getCurrentResolvedLocation,
+    IconAdd,
+    Label,
+    navigate,
+    showPopup
+  } from '@hcengineering/ui'
+  import CardAttributes from './CardAttributes.svelte'
+  import { AccountRole, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
+  import CardIcon from './CardIcon.svelte'
+  import { canLockSection, canUnlockSection } from '../utils'
+  import { permissionsStore } from '@hcengineering/contact-resources'
+  import Lock from './icons/Lock.svelte'
+  import Unlock from './icons/Unlock.svelte'
+  import card from '../plugin'
+  import MarkupProperties from './MarkupProperties.svelte'
+
+  export let value: Card
+  export let readonly: boolean = false
+  export let ignoreKeys: string[]
+  export let fourRows: boolean = true
+
+  const client = getClient()
+  const hierarchy = client.getHierarchy()
+  $: clazz = hierarchy.getClass(value._class) as MasterTag
+  $: label = clazz.label
+
+  let isCollapsed = false
+
+  export function collapse (): void {
+    isCollapsed = true
+  }
+
+  export function expand (): void {
+    isCollapsed = false
+  }
+
+  $: isLocked = hierarchy.getAncestors(value._class).some((p) => value.readonlySections?.includes(p)) ?? false
+  $: _readonly = readonly || isLocked
+  $: canLock = canLockSection(value.space, $permissionsStore)
+  $: canUnlock = canUnlockSection(value.space, $permissionsStore)
+
+  async function toggleLock (ev: MouseEvent): Promise<void> {
+    ev.stopPropagation()
+    const op = isLocked ? '$pull' : '$push'
+    const targets = isLocked
+      ? hierarchy.getAncestors(value._class).filter((p) => value.readonlySections?.includes(p))
+      : [value._class]
+    for (const target of targets) {
+      await client.update(value, { [op]: { readonlySections: target } })
+    }
+  }
+</script>
+
+<div class="header flex flex-gap-2">
+  <div class="label flex flex-gap-2" on:click={isCollapsed ? expand : collapse}>
+    <CardIcon {value} size="large" buttonSize={'x-large'} editable={!readonly} />
+    <Label {label} />
+    <Chevron expanded={!isCollapsed} outline fill={'var(--content-color)'} />
+  </div>
+  <div class="btns">
+    {#if (isLocked && canUnlock) || (!isLocked && canLock)}
+      <div class="lock-btn">
+        <Button
+          icon={isLocked ? Lock : Unlock}
+          kind={'link'}
+          size={'medium'}
+          disabled={readonly}
+          showTooltip={{ label: isLocked ? card.string.UnLockSection : card.string.LockSection }}
+          on:click={toggleLock}
+        />
+      </div>
+    {/if}
+    {#if hasAccountRole(getCurrentAccount(), AccountRole.Maintainer)}
+      <Button
+        icon={IconAdd}
+        kind={'link'}
+        size={'medium'}
+        showTooltip={{ label: setting.string.AddAttribute }}
+        on:click={() => {
+          showPopup(setting.component.CreateAttributePopup, { _class: value._class, isCard: true }, 'top')
+        }}
+      />
+      <Button
+        icon={setting.icon.Setting}
+        kind={'link'}
+        size={'medium'}
+        showTooltip={{ label: setting.string.Setting }}
+        on:click={(ev) => {
+          ev.stopPropagation()
+          const loc = getCurrentResolvedLocation()
+          loc.path[2] = settingId
+          loc.path[3] = 'types'
+          loc.path[4] = value._class
+          loc.path.length = 5
+          loc.fragment = undefined
+          navigate(loc)
+        }}
+      />
+    {/if}
+  </div>
+</div>
+<ExpandCollapse isExpanded={!isCollapsed}>
+  <CardAttributes object={value} _class={value._class} readonly={_readonly} {ignoreKeys} {fourRows} showCollaborators />
+  <MarkupProperties doc={value} readonly={_readonly} tag={undefined} />
+</ExpandCollapse>
+
+<style lang="scss">
+  .label {
+    font-size: 1.25rem;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--theme-caption-color);
+  }
+
+  .header {
+    width: fit-content;
+    align-items: center;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+
+    &:hover {
+      .btns {
+        visibility: visible;
+      }
+    }
+
+    .btns {
+      display: flex;
+      align-items: center;
+      visibility: hidden;
+
+      .lock-btn {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+  }
+</style>

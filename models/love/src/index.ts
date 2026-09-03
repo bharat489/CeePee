@@ -1,0 +1,704 @@
+//
+// Copyright © 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import contact, { type Employee, type Person } from '@hcengineering/contact'
+import {
+  AccountRole,
+  type CollectionSize,
+  type Doc,
+  type Domain,
+  type MarkupBlobRef,
+  type Ref,
+  type Timestamp,
+  DOMAIN_TRANSIENT,
+  DateRangeMode,
+  IndexKind,
+  type ClassCollaborators,
+  type AccountUuid
+} from '@hcengineering/core'
+import {
+  type DevicesPreference,
+  type Floor,
+  loveId,
+  type Meeting,
+  type MeetingMinutes,
+  type MeetingStatus,
+  type MeetingSchedule,
+  type Office,
+  type ParticipantInfo,
+  type Room,
+  type RoomAccess,
+  type RoomInfo,
+  type RoomLanguage,
+  type RoomType
+} from '@hcengineering/love'
+import {
+  type Builder,
+  Collection,
+  Collection as PropCollection,
+  Index,
+  Mixin,
+  Model,
+  Prop,
+  ReadOnly,
+  TypeAny,
+  TypeCollaborativeDoc,
+  TypeDate,
+  TypeRef,
+  TypeString,
+  UX,
+  TypeBoolean,
+  Hidden
+} from '@hcengineering/model'
+import calendar, { TEvent, TSchedule } from '@hcengineering/model-calendar'
+import core, { TAttachedDoc, TDoc } from '@hcengineering/model-core'
+import preference, { TPreference } from '@hcengineering/model-preference'
+import presentation from '@hcengineering/model-presentation'
+import view, { createAction, createAttributePresenter } from '@hcengineering/model-view'
+import media from '@hcengineering/media'
+import notification from '@hcengineering/notification'
+import { getEmbeddedLabel } from '@hcengineering/platform'
+import setting from '@hcengineering/setting'
+import workbench, { WidgetType } from '@hcengineering/workbench'
+import activity from '@hcengineering/activity'
+import chunter from '@hcengineering/chunter'
+import attachment from '@hcengineering/attachment'
+import time, { type ToDo, type Todoable } from '@hcengineering/time'
+
+import love from './plugin'
+
+export { loveId } from '@hcengineering/love'
+export * from './migration'
+export const DOMAIN_LOVE = 'love' as Domain
+export const DOMAIN_MEETING_MINUTES = 'meeting-minutes' as Domain
+
+@Model(love.class.Room, core.class.Doc, DOMAIN_LOVE)
+@UX(love.string.Room, love.icon.Love)
+export class TRoom extends TDoc implements Room {
+  @Prop(TypeString(), core.string.Name)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeCollaborativeDoc(), core.string.Description)
+  @Index(IndexKind.FullText)
+    description!: MarkupBlobRef | null
+
+  type!: RoomType
+
+  access!: RoomAccess
+
+  @Prop(TypeRef(love.class.Floor), love.string.Floor)
+  @ReadOnly()
+  // @Index(IndexKind.Indexed)
+    floor!: Ref<Floor>
+
+  width!: number
+  height!: number
+  x!: number
+  y!: number
+
+  @Prop(TypeString(), love.string.Language, { editor: love.component.RoomLanguageEditor })
+  @Hidden()
+    language!: RoomLanguage
+
+  @Prop(TypeBoolean(), love.string.StartWithTranscription)
+    startWithTranscription!: boolean
+
+  @Prop(TypeBoolean(), love.string.StartWithRecording)
+    startWithRecording!: boolean
+
+  @Prop(Collection(attachment.class.Attachment), attachment.string.Attachments, { shortLabel: attachment.string.Files })
+    attachments?: number
+
+  @Prop(PropCollection(love.class.MeetingMinutes), love.string.MeetingMinutes)
+    meetings?: number
+
+  @Prop(PropCollection(chunter.class.ChatMessage), activity.string.Messages)
+    messages?: number
+}
+
+@Model(love.class.Office, love.class.Room)
+@UX(love.string.Office, love.icon.Love)
+export class TOffice extends TRoom implements Office {
+  @Prop(TypeRef(contact.mixin.Employee), contact.string.Employee)
+  @Index(IndexKind.Indexed)
+  @ReadOnly()
+    person!: Ref<Employee> | null
+}
+
+@Model(love.class.Floor, core.class.Doc, DOMAIN_LOVE)
+export class TFloor extends TDoc implements Floor {
+  name!: string
+}
+
+@Model(love.class.ParticipantInfo, core.class.Doc, DOMAIN_TRANSIENT)
+export class TParticipantInfo extends TDoc implements ParticipantInfo {
+  name!: string
+  @Prop(TypeRef(contact.class.Person), getEmbeddedLabel('Person'))
+    person!: Ref<Person>
+
+  @Prop(TypeRef(love.class.Room), love.string.Room)
+    room!: Ref<Room>
+
+  x!: number
+  y!: number
+
+  sessionId!: string | null
+
+  account!: AccountUuid | null
+}
+
+@Model(love.class.DevicesPreference, preference.class.Preference)
+export class TDevicesPreference extends TPreference implements DevicesPreference {
+  blurRadius!: number
+  noiseCancellation!: boolean
+  micEnabled!: boolean
+  camEnabled!: boolean
+}
+
+@Model(love.class.RoomInfo, core.class.Doc, DOMAIN_TRANSIENT)
+export class TRoomInfo extends TDoc implements RoomInfo {
+  persons!: Ref<Person>[]
+  room!: Ref<Room>
+  isOffice!: boolean
+}
+
+@Mixin(love.mixin.Meeting, calendar.class.Event)
+export class TMeeting extends TEvent implements Meeting {
+  room!: Ref<Room>
+}
+
+@Model(love.class.MeetingMinutes, core.class.Doc, DOMAIN_MEETING_MINUTES)
+@UX(
+  love.string.MeetingMinutes,
+  love.icon.MeetingMinutes,
+  undefined,
+  'createdOn',
+  undefined,
+  love.string.MeetingsMinutes
+)
+export class TMeetingMinutes extends TAttachedDoc implements MeetingMinutes, Todoable {
+  @Prop(TypeRef(core.class.Doc), love.string.Room, { editor: love.component.MeetingMinutesDocEditor })
+  @Index(IndexKind.Indexed)
+  @ReadOnly()
+  declare attachedTo: Ref<Doc>
+
+  @Prop(TypeString(), view.string.Title)
+  @Index(IndexKind.FullText)
+    title!: string
+
+  @Prop(TypeCollaborativeDoc(), core.string.Description)
+  @Index(IndexKind.FullText)
+    description!: MarkupBlobRef | null
+
+  @Prop(TypeAny(love.component.MeetingMinutesStatusPresenter, love.string.Status), love.string.Status, {
+    editor: love.component.MeetingMinutesStatusPresenter
+  })
+  @ReadOnly()
+    status!: MeetingStatus
+
+  @Prop(Collection(attachment.class.Attachment), attachment.string.Attachments, { shortLabel: attachment.string.Files })
+    attachments?: number
+
+  @Prop(PropCollection(chunter.class.ChatMessage), love.string.Transcription)
+    transcription?: number
+
+  @Prop(PropCollection(chunter.class.ChatMessage), activity.string.Messages)
+    messages?: number
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), love.string.MeetingStart, { editor: view.component.DateTimePresenter })
+  @ReadOnly()
+  @Index(IndexKind.IndexedDsc)
+  declare createdOn: Timestamp
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), love.string.MeetingEnd, { editor: view.component.DateTimePresenter })
+  @ReadOnly()
+    meetingEnd?: Timestamp
+
+  @Prop(Collection(time.class.ToDo), getEmbeddedLabel('Action Items'))
+    todos?: CollectionSize<ToDo>
+}
+
+@Mixin(love.mixin.MeetingSchedule, calendar.class.Schedule)
+export class TMeetingSchedule extends TSchedule implements MeetingSchedule {
+  room!: Ref<Room>
+}
+
+export default love
+
+export function createModel (builder: Builder): void {
+  builder.createModel(
+    TRoom,
+    TFloor,
+    TOffice,
+    TParticipantInfo,
+    TDevicesPreference,
+    TRoomInfo,
+    TMeeting,
+    TMeetingMinutes,
+    TMeetingSchedule
+  )
+
+  builder.createDoc(
+    workbench.class.Application,
+    core.space.Model,
+    {
+      label: love.string.Office,
+      icon: love.icon.Love,
+      alias: loveId,
+      hidden: false,
+      position: 'top',
+      component: love.component.Main,
+      order: 400
+    },
+    love.app.Love
+  )
+
+  builder.createDoc(
+    core.class.ModulePermissionGroup,
+    core.space.Model,
+    {
+      application: love.app.Love,
+      role: AccountRole.Guest,
+      permissions: [],
+      enabled: true,
+      order: 50
+    },
+    love.ids.ModulePermissionGroup
+  )
+
+  builder.createDoc(
+    core.class.ModulePermissionGroup,
+    core.space.Model,
+    {
+      application: love.app.Love,
+      role: AccountRole.ReadOnlyGuest,
+      permissions: [],
+      enabled: false,
+      order: 50
+    },
+    love.ids.ModulePermissionGroupReadOnlyGuest
+  )
+
+  builder.createDoc(
+    workbench.class.Widget,
+    core.space.Model,
+    {
+      label: love.string.Office,
+      type: WidgetType.Fixed,
+      icon: love.icon.Love,
+      component: love.component.LoveWidget,
+      accessLevel: AccountRole.DocGuest
+    },
+    love.ids.LoveWidget
+  )
+
+  builder.createDoc(
+    workbench.class.Widget,
+    core.space.Model,
+    {
+      label: love.string.Meeting,
+      type: WidgetType.Flexible,
+      icon: love.icon.Cam,
+      component: love.component.MeetingWidget,
+      switcherComponent: love.component.WidgetSwitcher
+    },
+    love.ids.MeetingWidget
+  )
+
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: workbench.extensions.WorkbenchExtensions,
+    component: love.component.WorkbenchExtension
+  })
+
+  builder.createDoc(presentation.class.DocCreateExtension, core.space.Model, {
+    ofClass: calendar.class.Event,
+    apply: love.function.CreateMeeting,
+    components: {
+      body: love.component.MeetingData
+    }
+  })
+
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: calendar.extensions.EditEventExtensions,
+    component: love.component.EditMeetingData
+  })
+
+  builder.createDoc(presentation.class.DocCreateExtension, core.space.Model, {
+    ofClass: calendar.class.Schedule,
+    apply: love.function.CreateMeetingSchedule,
+    components: {
+      body: love.component.MeetingScheduleData
+    }
+  })
+
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: calendar.extensions.EditScheduleExtensions,
+    component: love.component.EditMeetingScheduleData
+  })
+
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: media.extension.StateContext,
+    component: love.component.MediaPopupItemExt
+  })
+
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: media.extension.StateIndicator,
+    component: love.component.SharingStateIndicator
+  })
+
+  builder.createDoc(
+    setting.class.SettingsCategory,
+    core.space.Model,
+    {
+      name: loveId,
+      label: love.string.Office,
+      icon: love.icon.Love,
+      component: love.component.Settings,
+      group: 'settings-account',
+      role: AccountRole.Guest,
+      feature: 'love',
+      order: 1600
+    },
+    love.ids.Settings
+  )
+
+  builder.createDoc(
+    notification.class.NotificationGroup,
+    core.space.Model,
+    {
+      label: love.string.Office,
+      icon: love.icon.Love
+    },
+    love.ids.LoveNotificationGroup
+  )
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.SoundNotificationProvider,
+    excludeIgnore: [love.ids.KnockNotification],
+    ignoredTypes: [],
+    enabledTypes: []
+  })
+
+  builder.createDoc(core.class.DomainIndexConfiguration, core.space.Model, {
+    domain: DOMAIN_LOVE,
+    disabled: [{ space: 1 }, { modifiedOn: 1 }, { modifiedBy: 1 }, { createdBy: 1 }, { createdOn: -1 }]
+  })
+
+  builder.createDoc(
+    view.class.ActionCategory,
+    core.space.Model,
+    { label: love.string.Office, visible: true },
+    love.category.Office
+  )
+
+  createAction(
+    builder,
+    {
+      action: love.actionImpl.ToggleMic,
+      label: love.string.Microphone,
+      icon: love.icon.Mic,
+      keyBinding: ['Meta + keyD'],
+      category: love.category.Office,
+      allowedForEditableContent: 'always',
+      input: 'none',
+      target: core.class.Doc,
+      context: {
+        mode: ['workbench', 'browser', 'panel', 'editor', 'input']
+      }
+    },
+    love.action.ToggleMic
+  )
+
+  createAction(
+    builder,
+    {
+      action: love.actionImpl.ToggleVideo,
+      label: love.string.Camera,
+      icon: love.icon.Cam,
+      allowedForEditableContent: 'always',
+      keyBinding: ['Meta + keyE'],
+      category: love.category.Office,
+      input: 'none',
+      target: core.class.Doc,
+      context: {
+        mode: ['workbench', 'browser', 'panel', 'editor', 'input']
+      }
+    },
+    love.action.ToggleVideo
+  )
+
+  createAction(builder, {
+    action: love.actionImpl.CopyGuestLink,
+    label: love.string.CopyGuestLink,
+    icon: view.icon.Copy,
+    category: love.category.Office,
+    input: 'focus',
+    target: love.class.Room,
+    visibilityTester: love.function.CanCopyGuestLink,
+    context: {
+      mode: 'context'
+    }
+  })
+
+  createAction(builder, {
+    action: love.actionImpl.ShowRoomSettings,
+    label: love.string.Settings,
+    icon: view.icon.Setting,
+    category: love.category.Office,
+    input: 'focus',
+    target: love.class.Room,
+    visibilityTester: love.function.CanShowRoomSettings,
+    context: {
+      mode: 'context'
+    }
+  })
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: love.class.Room,
+    components: { input: { component: chunter.component.ChatMessageInput, props: { collection: 'messages' } } }
+  })
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: love.class.Office,
+    components: { input: { component: chunter.component.ChatMessageInput, props: { collection: 'messages' } } }
+  })
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: love.class.MeetingMinutes,
+    components: { input: { component: chunter.component.ChatMessageInput, props: { collection: 'messages' } } }
+  })
+
+  builder.mixin(love.class.ParticipantInfo, core.class.Class, core.mixin.TxAccessLevel, {
+    createAccessLevel: AccountRole.Guest,
+    updateAccessLevel: AccountRole.Guest
+  })
+
+  builder.mixin(love.class.MeetingMinutes, core.class.Class, activity.mixin.ActivityDoc, {})
+
+  builder.mixin(love.class.Room, core.class.Class, activity.mixin.ActivityDoc, {})
+
+  builder.mixin(love.class.MeetingMinutes, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: love.component.MeetingMinutesPresenter
+  })
+
+  builder.mixin(love.class.Room, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: love.component.RoomPresenter
+  })
+
+  builder.mixin(love.class.MeetingMinutes, core.class.Class, view.mixin.CollectionEditor, {
+    editor: love.component.MeetingMinutesSection
+  })
+
+  builder.mixin(love.class.MeetingMinutes, core.class.Class, view.mixin.ObjectTitle, {
+    titleProvider: love.function.MeetingMinutesTitleProvider
+  })
+
+  builder.mixin(love.class.Room, core.class.Class, view.mixin.ObjectEditor, {
+    editor: love.component.EditRoom
+  })
+
+  builder.mixin(love.class.MeetingMinutes, core.class.Class, view.mixin.ObjectEditor, {
+    editor: love.component.EditMeetingMinutes
+  })
+
+  builder.mixin(love.class.Floor, core.class.Class, view.mixin.AttributeEditor, {
+    inlineEditor: love.component.FloorAttributePresenter
+  })
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: love.class.MeetingMinutes,
+      descriptor: view.viewlet.Table,
+      config: [
+        '',
+        { key: 'status', presenter: love.component.MeetingMinutesStatusPresenter, label: love.string.Status },
+        { key: 'messages', displayProps: { key: 'messages', suffix: true } },
+        { key: 'transcription', displayProps: { key: 'transcription', suffix: true } },
+        'createdOn',
+        'meetingEnd'
+      ],
+      configOptions: {
+        hiddenKeys: ['description'],
+        sortable: true
+      },
+      options: {}
+    },
+    love.viewlet.TableMeetingMinutes
+  )
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: love.class.MeetingMinutes,
+      descriptor: view.viewlet.Table,
+      config: [
+        '',
+        { key: 'status', presenter: love.component.MeetingMinutesStatusPresenter, label: love.string.Status },
+        { key: 'messages', displayProps: { key: 'messages', suffix: true } },
+        { key: 'transcription', displayProps: { key: 'transcription', suffix: true } },
+        'createdOn',
+        'meetingEnd'
+      ],
+      configOptions: {
+        hiddenKeys: ['description'],
+        sortable: true
+      },
+      variant: 'embedded'
+    },
+    love.viewlet.TableMeetingMinutesEmbedded
+  )
+
+  builder.createDoc(
+    view.class.ViewletDescriptor,
+    core.space.Model,
+    {
+      label: love.string.Floor,
+      icon: love.icon.Love,
+      component: love.component.FloorView
+    },
+    love.viewlet.FloorDescriptor
+  )
+
+  builder.createDoc(
+    view.class.ViewletDescriptor,
+    core.space.Model,
+    {
+      label: love.string.MeetingMinutes,
+      icon: view.icon.Table,
+      component: love.component.MeetingMinutesTable
+    },
+    love.viewlet.MeetingMinutesDescriptor
+  )
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: love.class.Floor,
+      descriptor: love.viewlet.FloorDescriptor,
+      config: []
+    },
+    love.viewlet.Floor
+  )
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: love.class.Floor,
+      descriptor: love.viewlet.MeetingMinutesDescriptor,
+      config: []
+    },
+    love.viewlet.FloorMeetingMinutes
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      label: chunter.string.Chat,
+      generated: false,
+      hidden: false,
+      txClasses: [core.class.TxCreateDoc],
+      objectClass: chunter.class.ChatMessage,
+      attachedToClass: love.class.MeetingMinutes,
+      txMatch: {
+        'attributes.collection': 'messages'
+      },
+      defaultEnabled: false,
+      group: love.ids.LoveNotificationGroup
+    },
+    love.ids.MeetingMinutesChatNotification
+  )
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.InboxNotificationProvider,
+    ignoredTypes: [],
+    enabledTypes: [love.ids.MeetingMinutesChatNotification]
+  })
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.PushNotificationProvider,
+    ignoredTypes: [],
+    enabledTypes: [love.ids.MeetingMinutesChatNotification]
+  })
+
+  builder.createDoc<ClassCollaborators<MeetingMinutes>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: love.class.MeetingMinutes,
+    fields: ['createdBy'],
+    provideSecurity: true
+  })
+
+  builder.mixin(love.class.Room, core.class.Class, core.mixin.IndexConfiguration, {
+    indexes: [],
+    searchDisabled: true
+  })
+
+  builder.mixin(love.class.Office, core.class.Class, core.mixin.IndexConfiguration, {
+    indexes: [],
+    searchDisabled: true
+  })
+
+  builder.mixin(love.class.Floor, core.class.Class, core.mixin.IndexConfiguration, {
+    indexes: [],
+    searchDisabled: true
+  })
+
+  builder.createDoc(core.class.FullTextSearchContext, core.space.Model, {
+    toClass: love.class.MeetingMinutes,
+    fullTextSummary: true,
+    forceIndex: true
+  })
+
+  builder.createDoc(
+    presentation.class.ObjectSearchCategory,
+    core.space.Model,
+    {
+      icon: love.icon.MeetingMinutes,
+      label: love.string.SearchMeetingMinutes,
+      title: love.string.MeetingMinutes,
+      query: love.completion.MeetingMinutesQuery,
+      context: ['search', 'mention', 'spotlight'],
+      classToSearch: love.class.MeetingMinutes,
+      priority: 600
+    },
+    love.completion.MeetingMinutesCategory
+  )
+
+  // Extensions
+  builder.createDoc(presentation.class.ComponentPointExtension, core.space.Model, {
+    extension: contact.extension.EmployeePopupActions,
+    component: love.component.InviteEmployeeButton
+  })
+
+  createAttributePresenter(
+    builder,
+    view.component.DateTimePresenter,
+    love.class.MeetingMinutes,
+    'createdOn',
+    'attribute'
+  )
+  createAttributePresenter(
+    builder,
+    view.component.DateTimePresenter,
+    love.class.MeetingMinutes,
+    'meetingEnd',
+    'attribute'
+  )
+}

@@ -1,0 +1,1406 @@
+//
+// Copyright © 2023 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import activity from '@hcengineering/activity'
+import contact from '@hcengineering/contact'
+import documentsPlugin, {
+  type ControlledDocument,
+  documentsId,
+  DocumentState,
+  type Document,
+  type DocumentSpace,
+  type DocumentTemplate,
+  type ProjectDocument,
+  type ChangeControl,
+  type DocumentRequest
+} from '@hcengineering/controlled-documents'
+import exportPlugin from '@hcengineering/export'
+import { type Builder } from '@hcengineering/model'
+import chunter from '@hcengineering/model-chunter'
+import core from '@hcengineering/model-core'
+import { generateClassNotificationTypes } from '@hcengineering/model-notification'
+import presentation from '@hcengineering/model-presentation'
+import print from '@hcengineering/model-print'
+import request from '@hcengineering/model-request'
+import tracker from '@hcengineering/model-tracker'
+import view, { classPresenter, createAction } from '@hcengineering/model-view'
+import workbench from '@hcengineering/model-workbench'
+import converter from '@hcengineering/converter'
+import notification from '@hcengineering/notification'
+import contacts from '@hcengineering/model-contact'
+import setting from '@hcengineering/setting'
+import tags from '@hcengineering/tags'
+import textEditor from '@hcengineering/text-editor'
+
+import { AccountRole, type ClassCollaborators, type Class, type Doc, type Lookup, type Ref } from '@hcengineering/core'
+import { type Action } from '@hcengineering/view'
+import { definePermissions } from './permissions'
+import documents from './plugin'
+import { defineSpaceType } from './spaceType'
+import {
+  TChangeControl,
+  TControlledDocument,
+  TControlledDocumentSnapshot,
+  TDocument,
+  TDocumentApprovalRequest,
+  TDocumentCategory,
+  TDocumentComment,
+  TDocumentMeta,
+  TDocumentRequest,
+  TDocumentReviewRequest,
+  TDocumentSnapshot,
+  TDocumentSpace,
+  TDocumentSpaceType,
+  TDocumentSpaceTypeDescriptor,
+  TDocumentTemplate,
+  TDocumentTraining,
+  TExternalSpace,
+  THierarchyDocument,
+  TOrgSpace,
+  TProject,
+  TProjectDocument,
+  TProjectMeta,
+  TTypeControlledDocumentState,
+  TTypeDocumentState
+} from './types'
+
+export { documentsId } from '@hcengineering/controlled-documents/src/index'
+export * from './types'
+
+function defineRelationMetadata (builder: Builder): void {
+  const rel = (
+    ref: Ref<Class<Doc>>,
+    field: string,
+    targetClass: Ref<Class<Doc>>,
+    direction: 'forward' | 'inverse' = 'forward'
+  ): void => {
+    builder.createDoc(core.class.RelationMetadata, core.space.Model, {
+      sourceClass: ref,
+      field,
+      targetClass,
+      direction
+    })
+  }
+
+  rel(documents.class.Document, 'category', documents.class.DocumentCategory, 'forward')
+  rel(documents.class.Document, 'template', documents.class.Document, 'forward')
+  rel(documents.class.Document, 'document', documents.class.ProjectDocument, 'inverse')
+  rel(documents.class.HierarchyDocument, 'attachedTo', documents.class.DocumentMeta, 'forward')
+  rel(documents.class.ControlledDocument, 'changeControl', documents.class.ChangeControl, 'forward')
+  rel(documents.class.DocumentMeta, 'meta', documents.class.ProjectMeta, 'inverse')
+  rel(documents.class.Project, 'project', documents.class.ProjectMeta, 'inverse')
+  rel(documents.class.ProjectMeta, 'meta', documents.class.DocumentMeta, 'forward')
+  rel(documents.class.ProjectMeta, 'parent', documents.class.DocumentMeta, 'forward')
+  rel(documents.class.ProjectMeta, 'path', documents.class.DocumentMeta, 'forward')
+  rel(documents.class.ProjectMeta, 'project', documents.class.Project, 'forward')
+  rel(documents.class.ProjectDocument, 'project', documents.class.Project, 'forward')
+  rel(documents.class.ProjectDocument, 'initial', documents.class.Project, 'forward')
+  rel(documents.class.ProjectDocument, 'attachedTo', documents.class.ProjectMeta, 'forward')
+  rel(documents.class.ProjectDocument, 'document', documents.class.Document, 'forward')
+}
+
+export function createModel (builder: Builder): void {
+  builder.createModel(
+    TDocumentSpace,
+    TDocumentSpaceType,
+    TDocumentSpaceTypeDescriptor,
+    TExternalSpace,
+    TOrgSpace,
+    TProject,
+    TDocumentMeta,
+    TProjectDocument,
+    TProjectMeta,
+    TDocument,
+    TDocumentSnapshot,
+    TControlledDocumentSnapshot,
+    THierarchyDocument,
+    TDocumentTemplate,
+    TDocumentTraining,
+    TDocumentCategory,
+    TControlledDocument,
+    TChangeControl,
+    TDocumentRequest,
+    TDocumentReviewRequest,
+    TDocumentApprovalRequest,
+
+    TTypeDocumentState,
+    TTypeControlledDocumentState,
+
+    TDocumentComment
+  )
+
+  defineRelationMetadata(builder)
+
+  builder.mixin(documents.class.ControlledDocument, core.class.Class, view.mixin.ObjectTitle, {
+    titleProvider: documents.function.ControlledDocumentTitleProvider
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, converter.mixin.MarkdownValueFormatter, {
+    formatter: documents.function.FormatDocumentMarkdownValue
+  })
+
+  builder.mixin(documents.class.DocumentApprovalRequest, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.DocumentApprovalRequestPresenter
+  })
+
+  builder.mixin(documents.class.DocumentReviewRequest, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.DocumentReviewRequestPresenter
+  })
+
+  builder.createDoc(activity.class.DocUpdateMessageViewlet, core.space.Model, {
+    objectClass: documents.class.DocumentApprovalRequest,
+    action: 'create',
+    icon: documents.icon.Document
+  })
+
+  builder.createDoc(activity.class.DocUpdateMessageViewlet, core.space.Model, {
+    objectClass: documents.class.DocumentReviewRequest,
+    action: 'create',
+    icon: documents.icon.Document
+  })
+
+  builder.createDoc(
+    workbench.class.Application,
+    core.space.Model,
+    {
+      label: documents.string.DocumentApplication,
+      icon: documents.icon.DocumentApplication,
+      locationResolver: documents.resolver.Location,
+      alias: documentsId,
+      hidden: false,
+      navigatorModel: {
+        specials: [
+          {
+            id: 'my-documents',
+            position: 'top',
+            label: documents.string.MyDocuments,
+            icon: documents.icon.Document,
+            component: documents.component.MyDocuments,
+            componentProps: {
+              query: {
+                [documents.mixin.DocumentTemplate]: { $exists: false }
+              },
+              config: [
+                ['inProgress', documents.string.InProgress, {}],
+                ['effective', documents.string.Effective, {}],
+                ['archived', documents.string.Archived, {}],
+                ['obsolete', documents.string.Obsolete, {}],
+                ['all', documents.string.All, {}]
+              ]
+            }
+          },
+          {
+            id: 'library',
+            position: 'top',
+            label: documents.string.Library,
+            icon: documents.icon.Library,
+            component: documents.component.DocumentsContainer,
+            componentProps: {
+              query: {
+                [documents.mixin.DocumentTemplate]: { $exists: false }
+              },
+              icon: documents.icon.Library,
+              title: documents.string.Documents,
+              config: [
+                ['effective', documents.string.Effective, {}],
+                ['inProgress', documents.string.InProgress, {}],
+                ['archived', documents.string.Archived, {}],
+                ['obsolete', documents.string.Obsolete, {}],
+                ['all', documents.string.All, {}]
+              ]
+            }
+          },
+          {
+            id: 'templates',
+            position: 'top',
+            label: documents.string.DocumentTemplates,
+            icon: documents.icon.Library,
+            component: documents.component.DocumentTemplates
+          },
+          {
+            id: 'categories',
+            position: 'top',
+            label: documents.string.Categories,
+            icon: documents.icon.Library,
+            component: documents.component.Categories,
+            componentProps: {
+              space: documents.space.QualityDocuments
+            }
+          },
+          {
+            id: 'space-browser',
+            accessLevel: AccountRole.User,
+            label: documents.string.AllDocumentSpaces,
+            icon: view.icon.List,
+            component: workbench.component.SpecialView,
+            componentProps: {
+              _class: documents.class.DocumentSpace,
+              icon: view.icon.List,
+              label: documents.string.AllDocumentSpaces
+            },
+            position: 'bottom'
+          }
+        ],
+        spaces: [
+          {
+            id: 'orgspaces',
+            label: documents.string.GeneralDocumentation,
+            spaceClass: documents.class.OrgSpace,
+            addSpaceLabel: documents.string.CreateOrgSpace,
+            createComponent: documents.component.CreateDocumentsSpace,
+            specials: [
+              {
+                id: 'projects',
+                label: documents.string.Projects,
+                icon: documents.icon.Document,
+                component: documents.component.Projects
+              }
+            ]
+          },
+          {
+            id: 'projectspaces',
+            label: documents.string.TechnicalDocumentation,
+            spaceClass: documents.class.ExternalSpace,
+            specials: [
+              {
+                id: 'projects',
+                label: documents.string.Projects,
+                icon: documents.icon.Document,
+                component: documents.component.Projects
+              }
+            ]
+          }
+        ]
+      },
+      navHeaderComponent: documents.component.NewDocumentHeader
+    },
+    documents.app.Documents
+  )
+
+  // Workflow
+  const documentTableLookup: Lookup<Document> = {
+    owner: contact.mixin.Employee,
+    category: documents.class.DocumentCategory,
+    template: documents.mixin.DocumentTemplate
+  }
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: documents.class.Document,
+      descriptor: view.viewlet.Table,
+      configOptions: {
+        sortable: true,
+        strict: true
+      },
+      config: [
+        {
+          key: '',
+          label: documents.string.ID,
+          presenter: documents.component.DocumentPresenter,
+          props: { isGray: true }
+        },
+        { key: '', label: documents.string.Title, presenter: documents.component.TitlePresenter },
+        {
+          key: '',
+          label: documents.string.Status,
+          presenter: documents.component.StatePresenter,
+          sortingKey: 'state'
+        },
+        { key: '', label: documents.string.Version, presenter: documents.component.DocumentVersionPresenter },
+        { key: 'space', sortingKey: 'space' },
+        { key: '$lookup.category.title', label: documents.string.Category, sortingKey: '$lookup.category.title' },
+        { key: '$lookup.template', label: documents.string.Template, presenter: documents.component.DocumentPresenter },
+        {
+          key: '$lookup.template',
+          label: documents.string.TemplateVersion,
+          presenter: documents.component.DocumentVersionPresenter
+        },
+        {
+          key: '$lookup.owner',
+          label: documents.string.Author,
+          presenter: documents.component.OwnerPresenter,
+          props: { shouldShowLabel: true, isEditable: false },
+          sortingKey: '$lookup.owner.name'
+        },
+        {
+          key: '',
+          presenter: tags.component.TagsPresenter,
+          label: documents.string.Labels,
+          sortingKey: 'labels',
+          props: {
+            _class: documents.class.Document,
+            key: 'labels'
+          }
+        },
+        'modifiedOn'
+      ],
+      options: {
+        lookup: documentTableLookup
+      }
+    },
+    documents.viewlet.TableDocument
+  )
+
+  builder.createDoc(
+    view.class.ViewletViewAction,
+    core.space.Model,
+    {
+      descriptor: view.viewlet.Table,
+      extension: converter.extensions.CopyAsMarkdownAction,
+      applicableToClass: documents.class.Document
+    },
+    documents.specialViewAction.TableDocument
+  )
+
+  const documentTemplateTableLookup: Lookup<DocumentTemplate> = {
+    owner: contact.mixin.Employee,
+    category: documents.class.DocumentCategory
+  }
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: documents.mixin.DocumentTemplate,
+      descriptor: view.viewlet.Table,
+      config: [
+        {
+          key: '',
+          label: documents.string.ID,
+          presenter: documents.component.DocumentPresenter,
+          props: { isGray: true }
+        },
+        'title',
+        {
+          key: '',
+          label: documents.string.Status,
+          presenter: documents.component.StatePresenter
+        },
+        { key: '', label: documents.string.Version, presenter: documents.component.DocumentVersionPresenter },
+        'docPrefix',
+        { key: '$lookup.category.title', label: documents.string.Category, sortingKey: '$lookup.category.title' },
+        {
+          key: '',
+          presenter: tags.component.TagsPresenter,
+          label: documents.string.Labels,
+          sortingKey: 'labels',
+          props: {
+            _class: documents.class.Document,
+            key: 'labels',
+            icon: documents.icon.Document
+          }
+        },
+        {
+          key: '$lookup.owner',
+          label: documents.string.Author,
+          presenter: documents.component.OwnerPresenter,
+          props: { shouldShowLabel: true, isEditable: false },
+          sortingKey: '$lookup.owner.name'
+        },
+        { key: 'space', sortingKey: 'space' }
+      ],
+      baseQuery: {
+        hidden: { $ne: true }
+      },
+      configOptions: {
+        hiddenKeys: ['attachedTo']
+      },
+      options: {
+        lookup: documentTemplateTableLookup
+      }
+    },
+    documents.viewlet.TableDocumentTemplate
+  )
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: documents.class.DocumentCategory,
+      descriptor: view.viewlet.Table,
+      config: ['', 'title', 'attachments', 'modifiedOn'],
+      configOptions: {
+        hiddenKeys: ['description']
+      },
+      options: {}
+    },
+    documents.viewlet.TableDocumentDomain
+  )
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ObjectFactory, {
+    component: documents.component.CreateDocument
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ObjectEditor, {
+    editor: documents.component.EditDoc
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ObjectPanel, {
+    component: documents.component.EditDoc
+  })
+
+  builder.mixin(documents.class.ProjectDocument, core.class.Class, view.mixin.ObjectEditor, {
+    editor: documents.component.EditProjectDoc
+  })
+
+  builder.mixin(documents.class.ProjectDocument, core.class.Class, view.mixin.ObjectPanel, {
+    component: documents.component.EditProjectDoc
+  })
+
+  builder.mixin(documents.class.ControlledDocument, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [tracker.action.NewRelatedIssue]
+  })
+
+  builder.mixin(documents.class.DocumentMeta, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.DocumentMetaPresenter
+  })
+
+  builder.mixin(documents.class.DocumentMeta, core.class.Class, view.mixin.ObjectTitle, {
+    titleProvider: documents.function.DocumentMetaTitleProvider
+  })
+
+  builder.mixin(documents.class.DocumentMeta, core.class.Class, view.mixin.ReferenceVersionsProvider, {
+    provider: documents.function.DocumentMetaReferenceVersionsProvider
+  })
+
+  builder.mixin(documents.class.DocumentMeta, core.class.Class, view.mixin.LinkProvider, {
+    encode: documents.function.GetDocumentMetaLinkFragment
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.DocumentPresenter
+  })
+
+  builder.mixin(documents.class.ControlledDocument, core.class.Class, view.mixin.LinkProvider, {
+    encode: documents.function.GetControlledDocumentLinkFragment
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [view.action.Delete]
+  })
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.ShowPopup,
+      actionProps: {
+        component: documentsPlugin.component.ChangeOwnerPopup,
+        fillProps: {
+          _object: 'object'
+        }
+      },
+      visibilityTester: documentsPlugin.function.CanChangeDocumentOwner,
+      label: documentsPlugin.string.ChangeOwner,
+      icon: contact.icon.Person,
+      category: view.category.General,
+      input: 'none',
+      target: documents.class.Document,
+      context: { mode: ['context'], group: 'edit' }
+    },
+    documentsPlugin.action.ChangeDocumentOwner
+  )
+
+  createAction<Document>(
+    builder,
+    {
+      action: documents.actionImpl.CreateChildDocument,
+      label: documentsPlugin.string.CreateChildDocument,
+      icon: documents.icon.NewDocument,
+      category: view.category.General,
+      input: 'focus', // should only work for one document, not bulk
+      query: {
+        space: { $ne: documents.space.UnsortedTemplates }
+      },
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanCreateChildDocument,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateChildDocument
+  )
+
+  createAction<Document>(
+    builder,
+    {
+      action: documents.actionImpl.CreateChildTemplate,
+      label: documentsPlugin.string.CreateChildTemplate,
+      icon: documents.icon.NewDocument,
+      category: view.category.General,
+      input: 'focus', // should only work for one document, not bulk
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanCreateChildTemplate,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateChildTemplate
+  )
+
+  createAction<Document>(
+    builder,
+    {
+      action: documents.actionImpl.CreateChildFolder,
+      label: documentsPlugin.string.CreateChildFolder,
+      icon: documents.icon.Folder,
+      category: view.category.General,
+      input: 'focus', // should only work for one document, not bulk
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanCreateChildFolder,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateChildFolder
+  )
+
+  createAction<Document>(
+    builder,
+    {
+      action: documents.actionImpl.RenameFolder,
+      label: view.string.Rename,
+      icon: view.icon.Edit,
+      category: view.category.General,
+      input: 'focus', // should only work for one document, not bulk
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanRenameFolder,
+      context: { mode: ['context'], group: 'edit' }
+    },
+    documentsPlugin.action.RenameFolder
+  )
+
+  createAction<Document>(
+    builder,
+    {
+      action: documents.actionImpl.DeleteFolder,
+      label: view.string.Delete,
+      icon: view.icon.Delete,
+      category: view.category.General,
+      input: 'focus', // should only work for one document, not bulk
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanDeleteFolder,
+      context: { mode: ['context'], group: 'remove' }
+    },
+    documentsPlugin.action.DeleteFolder
+  )
+
+  createAction<DocumentSpace>(
+    builder,
+    {
+      action: documents.actionImpl.CreateDocument,
+      label: documentsPlugin.string.CreateDocument,
+      icon: documents.icon.NewDocument,
+      category: view.category.General,
+      input: 'none',
+      target: documents.class.DocumentSpace,
+      visibilityTester: documents.function.CanCreateDocument,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateDocument
+  )
+
+  createAction<DocumentSpace>(
+    builder,
+    {
+      action: documents.actionImpl.CreateTemplate,
+      label: documentsPlugin.string.CreateTemplate,
+      icon: documents.icon.NewDocument,
+      category: view.category.General,
+      input: 'none',
+      target: documents.class.OrgSpace,
+      visibilityTester: documents.function.CanCreateTemplate,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateTemplate
+  )
+
+  createAction<DocumentSpace>(
+    builder,
+    {
+      action: documents.actionImpl.CreateFolder,
+      label: documentsPlugin.string.CreateFolder,
+      icon: documents.icon.Folder,
+      category: view.category.General,
+      input: 'none',
+      target: documents.class.DocumentSpace,
+      visibilityTester: documents.function.CanCreateFolder,
+      context: { mode: ['context'], group: 'create' }
+    },
+    documentsPlugin.action.CreateFolder
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.ShowPopup,
+      actionProps: {
+        component: documentsPlugin.component.DeleteCategoryPopup,
+        fillProps: {
+          _object: 'object'
+        }
+      },
+      visibilityTester: documentsPlugin.function.CanDeleteDocumentCategory,
+      label: view.string.Delete,
+      icon: view.icon.Delete,
+      category: view.category.General,
+      input: 'none',
+      target: documents.class.DocumentCategory,
+      context: { mode: ['context', 'browser'], group: 'remove' }
+    },
+    documentsPlugin.action.DeleteDocumentCategory
+  )
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, activity.mixin.ActivityDoc, {})
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: documents.class.DocumentCategory,
+    components: { input: { component: chunter.component.ChatMessageInput } }
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.CategoryPresenter
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.AttributePresenter, {
+    presenter: documents.component.CategoryPresenter
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.AttributeEditor, {
+    inlineEditor: documents.component.CategoryPresenter
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.ClassFilters, {
+    filters: ['code', 'title', 'modifiedOn']
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.ObjectEditor, {
+    editor: documents.component.EditDocumentCategory
+  })
+
+  builder.mixin(documents.class.DocumentCategory, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [view.action.Delete]
+  })
+
+  builder.mixin(documents.class.TypeDocumentState, core.class.Class, view.mixin.SortFuncs, {
+    func: documents.function.DocumentStateSort
+  })
+
+  builder.mixin(documents.class.TypeDocumentState, core.class.Class, view.mixin.AllValuesFunc, {
+    func: documents.function.GetAllDocumentStates
+  })
+
+  builder.createDoc(core.class.FullTextSearchContext, core.space.Model, {
+    toClass: documents.class.Document,
+    fullTextSummary: true
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ClassFilters, {
+    filters: [
+      'prefix',
+      'title',
+      'state',
+      'space',
+      'template',
+      {
+        _class: documents.class.Document,
+        component: contacts.component.EmployeeFilter,
+        key: 'owner',
+        label: documents.string.Author
+      },
+      'category',
+      'modifiedOn',
+      'labels',
+      'major',
+      'minor',
+      {
+        _class: documents.class.Document,
+        component: contacts.component.EmployeeFilter,
+        key: 'author',
+        label: documents.string.Creator
+      }
+    ],
+    getVisibleFilters: documents.function.GetVisibleFilters
+  })
+
+  builder.mixin(documents.class.TypeDocumentState, core.class.Class, view.mixin.AttributeFilterPresenter, {
+    presenter: documents.component.StateFilterValuePresenter
+  })
+
+  builder.mixin(documents.class.TypeDocumentState, core.class.Class, view.mixin.AttributeFilter, {
+    component: view.component.ValueFilter
+  })
+
+  builder.mixin(documents.class.TypeControlledDocumentState, core.class.Class, view.mixin.AttributeFilterPresenter, {
+    presenter: documents.component.ControlledStateFilterValuePresenter
+  })
+
+  builder.mixin(documents.class.TypeControlledDocumentState, core.class.Class, view.mixin.AttributeFilter, {
+    component: view.component.ValueFilter
+  })
+
+  builder.mixin(documents.mixin.DocumentTemplate, core.class.Class, view.mixin.ClassFilters, {
+    filters: ['prefix', 'title', 'modifiedOn', 'category', 'space']
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, setting.mixin.Editable, {
+    value: true
+  })
+
+  classPresenter(builder, documents.class.TypeDocumentState, documents.component.StatePresenter)
+  classPresenter(builder, documents.class.TypeControlledDocumentState, documents.component.StatePresenter)
+
+  // DocumentReviewRequest
+  builder.mixin(documents.class.DocumentReviewRequest, core.class.Class, view.mixin.ObjectEditor, {
+    editor: documents.component.DocumentReviewRequest
+  })
+
+  builder.mixin(documents.class.DocumentReviewRequest, core.class.Class, request.mixin.RequestPresenter, {
+    presenter: documents.component.DocumentReviewRequestPresenter
+  })
+
+  builder.mixin(documents.class.DocumentReviewRequest, core.class.Class, view.mixin.ObjectPanel, {
+    component: documents.component.DocumentReviewRequest
+  })
+
+  builder.mixin(
+    documents.class.DocumentReviewRequest,
+    core.class.Class,
+    notification.mixin.NotificationObjectPresenter,
+    {
+      presenter: documents.component.DocumentReviewRequestPresenter
+    }
+  )
+
+  // DocumentApprovalRequest
+  builder.mixin(documents.class.DocumentApprovalRequest, core.class.Class, view.mixin.ObjectEditor, {
+    editor: documents.component.DocumentApprovalRequest
+  })
+
+  builder.mixin(documents.class.DocumentApprovalRequest, core.class.Class, request.mixin.RequestPresenter, {
+    presenter: documents.component.DocumentApprovalRequestPresenter
+  })
+
+  builder.mixin(documents.class.DocumentApprovalRequest, core.class.Class, view.mixin.ObjectPanel, {
+    component: documents.component.DocumentApprovalRequest
+  })
+
+  builder.mixin(
+    documents.class.DocumentApprovalRequest,
+    core.class.Class,
+    notification.mixin.NotificationObjectPresenter,
+    {
+      presenter: documents.component.DocumentApprovalRequestPresenter
+    }
+  )
+
+  builder.mixin(documents.class.DocumentSpace, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [tracker.action.EditRelatedTargets]
+  })
+
+  builder.mixin(documents.class.DocumentSpace, core.class.Class, view.mixin.SpacePresenter, {
+    presenter: documents.component.DocumentSpacePresenter
+  })
+
+  builder.mixin(documents.class.OrgSpace, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [view.action.Archive]
+  })
+
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: documents.class.DocumentSpace,
+      descriptor: view.viewlet.Table,
+      configOptions: {
+        hiddenKeys: ['name', 'description']
+      },
+      config: ['', 'members', 'private', 'owners', 'archived'],
+      viewOptions: {
+        groupBy: [],
+        orderBy: [],
+        other: [
+          {
+            key: 'hideArchived',
+            type: 'toggle',
+            defaultValue: true,
+            actionTarget: 'options',
+            action: view.function.HideArchived,
+            label: view.string.HideArchived
+          }
+        ]
+      }
+    },
+    documents.viewlet.DocumentSpaceTable
+  )
+
+  builder.mixin(documents.class.Project, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: documents.component.ProjectPresenter
+  })
+
+  builder.mixin(documents.class.Project, core.class.Class, view.mixin.AttributePresenter, {
+    presenter: documents.component.ProjectRefPresenter
+  })
+
+  builder.mixin(documents.class.Project, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [view.action.Delete, view.action.Open, view.action.OpenInNewTab, tracker.action.NewRelatedIssue]
+  })
+
+  builder.mixin(documents.class.ProjectDocument, core.class.Class, view.mixin.IgnoreActions, {
+    actions: [view.action.Delete, tracker.action.NewRelatedIssue]
+  })
+
+  builder.mixin(documents.class.Document, core.class.Class, view.mixin.ObjectIdentifier, {
+    provider: documents.function.DocumentIdentifierProvider
+  })
+
+  builder.mixin(documents.class.ControlledDocument, core.class.Class, view.mixin.ReferenceObjectProvider, {
+    provider: documents.function.ControlledDocumentReferenceObjectProvider
+  })
+
+  builder.mixin(documents.class.ProjectDocument, core.class.Class, view.mixin.ReferenceObjectProvider, {
+    provider: documents.function.ProjectDocumentReferenceObjectProvider
+  })
+
+  createAction(
+    builder,
+    {
+      action: documents.actionImpl.TransferDocument,
+      label: documents.string.Transfer,
+      icon: view.icon.Move,
+      input: 'any',
+      category: view.category.General,
+      target: documents.class.ProjectDocument,
+      visibilityTester: documents.function.CanTransferDocument,
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.TransferDocument
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.ShowPopup,
+      actionProps: {
+        component: exportPlugin.component.ExportToWorkspaceModal,
+        fillProps: {
+          _objects: 'value'
+        }
+      },
+      label: exportPlugin.string.ExportToWorkspace,
+      icon: exportPlugin.icon.Export,
+      input: 'any',
+      category: view.category.General,
+      target: documents.class.Document,
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.ExportDocuments
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.ShowPopup,
+      actionProps: {
+        component: exportPlugin.component.ExportToWorkspaceModal,
+        fillProps: {
+          _objects: 'value'
+        },
+        props: {
+          projectDocExport: true,
+          docClass: documents.class.ControlledDocument
+        }
+      },
+      label: exportPlugin.string.ExportToWorkspace,
+      icon: exportPlugin.icon.Export,
+      input: 'any',
+      category: view.category.General,
+      target: documents.class.ProjectDocument,
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.ExportProjectDocuments
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.ShowPopup,
+      actionProps: {
+        component: exportPlugin.component.ExportToWorkspaceModal,
+        fillProps: {
+          _object: 'value'
+        },
+        props: {
+          spaceExport: true,
+          docClass: documents.class.ControlledDocument
+        }
+      },
+      label: exportPlugin.string.ExportToWorkspace,
+      icon: exportPlugin.icon.Export,
+      input: 'none',
+      category: view.category.General,
+      target: documents.class.DocumentSpace,
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.ExportDocumentsFromSpace
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.CopyAsMarkdownTable,
+      actionProps: {
+        cardClass: documents.class.ControlledDocument
+      },
+      label: view.string.CopyAsMarkdownTable,
+      icon: view.icon.Print,
+      input: 'selection',
+      category: view.category.General,
+      target: documents.class.Document,
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.CopyAsMarkdownTable
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.CopyDocumentMarkdown,
+      actionProps: {
+        contentClass: documents.class.Document,
+        contentField: 'content'
+      },
+      label: view.string.CopyDocumentMarkdown,
+      icon: view.icon.Print,
+      input: 'focus',
+      category: view.category.General,
+      target: documents.class.Document,
+      query: {},
+      context: {
+        mode: ['context', 'browser'],
+        group: 'copy'
+      }
+    },
+    documents.action.CopyDocumentMarkdown
+  )
+
+  createAction(
+    builder,
+    {
+      action: documents.actionImpl.DeleteDocument,
+      label: view.string.Delete,
+      icon: view.icon.Delete,
+      input: 'any',
+      category: view.category.General,
+      target: documents.class.Document,
+      visibilityTester: documents.function.CanDeleteDocument,
+      query: {
+        state: DocumentState.Draft
+      },
+      context: {
+        mode: ['context', 'browser'],
+        group: 'remove'
+      }
+    },
+    documents.action.DeleteDocument
+  )
+
+  // createAction(
+  //   builder,
+  //   {
+  //     action: documents.actionImpl.ArchiveDocument,
+  //     label: view.string.Archive,
+  //     icon: view.icon.Archive,
+  //     input: 'any',
+  //     category: view.category.General,
+  //     target: documents.class.Document,
+  //     visibilityTester: documents.function.CanArchiveDocument,
+  //     query: {
+  //       state: DocumentState.Effective
+  //     },
+  //     context: {
+  //       mode: ['context', 'browser'],
+  //       group: 'remove'
+  //     }
+  //   },
+  //   documents.action.ArchiveDocument
+  // )
+
+  createAction(
+    builder,
+    {
+      action: documents.actionImpl.MakeDocumentObsolete,
+      label: documents.string.MakeDocumentObsolete,
+      icon: view.icon.Archive,
+      input: 'any',
+      category: view.category.General,
+      target: documents.class.Document,
+      visibilityTester: documents.function.CanMakeDocumentObsolete,
+      query: {
+        state: DocumentState.Effective
+      },
+      context: {
+        mode: ['context', 'browser'],
+        group: 'remove'
+      }
+    },
+    documents.action.MakeDocumentObsolete
+  )
+
+  createAction(
+    builder,
+    {
+      action: documents.actionImpl.EditDocSpace,
+      label: documents.string.EditDocumentSpace,
+      icon: view.icon.Edit,
+      input: 'focus',
+      category: documents.category.Document,
+      target: documents.class.DocumentSpace,
+      visibilityTester: view.function.CanEditSpace,
+      query: {},
+      context: {
+        mode: ['context', 'browser'],
+        group: 'edit'
+      }
+    },
+    documents.action.EditDocSpace
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.Open,
+      label: view.string.Open,
+      icon: view.icon.Open,
+      keyBinding: ['Enter'],
+      input: 'focus',
+      category: view.category.General,
+      target: documents.class.ProjectDocument,
+      context: { mode: ['browser', 'context'], group: 'edit' },
+      visibilityTester: documents.function.CanOpenDocument,
+      override: [view.action.Open]
+    },
+    documents.action.OpenDocument
+  )
+
+  createAction(
+    builder,
+    {
+      action: view.actionImpl.OpenInNewTab,
+      label: view.string.OpenInNewTab,
+      icon: view.icon.Open,
+      input: 'focus',
+      category: view.category.General,
+      target: documents.class.ProjectDocument,
+      context: { mode: ['browser', 'context'], group: 'edit' },
+      visibilityTester: documents.function.CanOpenDocument,
+      override: [view.action.OpenInNewTab]
+    },
+    documents.action.OpenDocumentInNewTab
+  )
+
+  function createPrintAction<T extends Doc = Doc> (target: Ref<Class<T>>, id?: Ref<Action<T, any>>): void {
+    createAction(
+      builder,
+      {
+        action: print.actionImpl.Print,
+        actionProps: {
+          signed: true
+        },
+        label: print.string.PrintToPDF,
+        icon: print.icon.Print,
+        category: view.category.General,
+        input: 'any',
+        target,
+        context: { mode: ['context', 'browser'], group: 'tools' },
+        visibilityTester: documents.function.CanPrintDocument,
+        override: [print.action.Print]
+      },
+      id
+    )
+  }
+
+  createPrintAction(documents.class.ProjectDocument, documents.action.PrintProjectDocument)
+  createPrintAction(documents.class.Document, documents.action.Print)
+
+  defineSpaceType(builder)
+  builder.createDoc(
+    core.class.ModulePermissionGroup,
+    core.space.Model,
+    {
+      application: documents.app.Documents,
+      role: AccountRole.Guest,
+      permissions: [],
+      spaceClass: documents.class.OrgSpace,
+      enabled: true,
+      order: 42
+    },
+    documents.ids.ModulePermissionGroup
+  )
+
+  builder.createDoc(
+    core.class.ModulePermissionGroup,
+    core.space.Model,
+    {
+      application: documents.app.Documents,
+      role: AccountRole.ReadOnlyGuest,
+      permissions: [],
+      spaceClass: documents.class.OrgSpace,
+      enabled: false,
+      order: 42
+    },
+    documents.ids.ModulePermissionGroupReadOnlyGuest
+  )
+  definePermissions(builder)
+  defineNotifications(builder)
+  defineSearch(builder)
+  defineTextActions(builder)
+}
+
+export function defineNotifications (builder: Builder): void {
+  builder.mixin(documents.class.ControlledDocument, core.class.Class, activity.mixin.ActivityDoc, {})
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: documents.class.ControlledDocument,
+    components: { input: { component: chunter.component.ChatMessageInput } }
+  })
+
+  builder.createDoc(activity.class.ActivityExtension, core.space.Model, {
+    ofClass: documents.class.DocumentComment,
+    components: { input: { component: chunter.component.ChatMessageInput } }
+  })
+
+  builder.createDoc<ClassCollaborators<Document>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: documents.class.Document,
+    fields: ['author', 'owner'],
+    provideSecurity: true
+  })
+
+  builder.createDoc<ClassCollaborators<ProjectDocument>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: documents.class.ProjectDocument,
+    fields: [],
+    provideSecurity: true
+  })
+
+  builder.createDoc<ClassCollaborators<ChangeControl>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: documents.class.ChangeControl,
+    fields: [],
+    provideSecurity: true
+  })
+
+  builder.createDoc<ClassCollaborators<DocumentRequest>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: documents.class.DocumentRequest,
+    fields: ['requested', 'createdBy'],
+    provideSecurity: true
+  })
+
+  builder.mixin(documents.class.DocumentApprovalRequest, core.class.Class, core.mixin.TxAccessLevel, {
+    updateAccessLevel: AccountRole.Guest
+  })
+
+  builder.createDoc<ClassCollaborators<ControlledDocument>>(core.class.ClassCollaborators, core.space.Model, {
+    attachedTo: documents.class.ControlledDocument,
+    fields: ['author', 'owner', 'reviewers', 'approvers', 'coAuthors', 'externalApprovers'],
+    provideSecurity: true
+  })
+
+  builder.createDoc(
+    notification.class.NotificationGroup,
+    core.space.Model,
+    {
+      label: documents.string.DocumentApplication,
+      icon: documents.icon.DocumentApplication
+    },
+    documents.notification.DocumentsNotificationGroup
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      hidden: false,
+      generated: false,
+      allowedForAuthor: false,
+      label: documents.string.Document,
+      group: documents.notification.DocumentsNotificationGroup,
+      field: 'content',
+      txClasses: [core.class.TxUpdateDoc],
+      objectClass: documents.class.ControlledDocument,
+      defaultEnabled: false,
+      templates: {
+        textTemplate: '{body}',
+        htmlTemplate: '<p>{body}</p>',
+        subjectTemplate: '{title}'
+      }
+    },
+    documents.notification.ContentNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      hidden: false,
+      generated: false,
+      allowedForAuthor: false,
+      label: documents.string.Status,
+      group: documents.notification.DocumentsNotificationGroup,
+      field: 'state',
+      txClasses: [core.class.TxUpdateDoc],
+      objectClass: documents.class.ControlledDocument,
+      defaultEnabled: false,
+      templates: {
+        textTemplate: '{sender} changed {doc} status',
+        htmlTemplate: '<p>{sender} changed {doc} status</p>',
+        subjectTemplate: '{doc} status changed'
+      }
+    },
+    documents.notification.StateNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      hidden: false,
+      generated: false,
+      allowedForAuthor: true,
+      label: documents.string.Review,
+      group: documents.notification.DocumentsNotificationGroup,
+      field: 'controlledState',
+      txClasses: [core.class.TxUpdateDoc],
+      objectClass: documents.class.ControlledDocument,
+      defaultEnabled: true,
+      templates: {
+        textTemplate: '{sender} marked {doc} as reviewed',
+        htmlTemplate: '<p>{sender} marked {doc} as reviewed</p>',
+        subjectTemplate: '{doc} reviewed'
+      }
+    },
+    documents.notification.ReviewNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      hidden: false,
+      generated: false,
+      allowedForAuthor: false,
+      label: documents.string.CoAuthors,
+      group: documents.notification.DocumentsNotificationGroup,
+      field: 'coAuthors',
+      txClasses: [core.class.TxCreateDoc, core.class.TxUpdateDoc],
+      objectClass: documents.class.ControlledDocument,
+      defaultEnabled: true,
+      templates: {
+        textTemplate: '{sender} assigned you as a co-author of {doc}',
+        htmlTemplate: '<p>{sender} assigned you as a co-author of {doc}</p>',
+        subjectTemplate: 'Co-authoring assignment for {doc}'
+      }
+    },
+    documents.notification.CoAuthorsNotification
+  )
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.InboxNotificationProvider,
+    ignoredTypes: [],
+    enabledTypes: [
+      documents.notification.StateNotification,
+      documents.notification.ContentNotification,
+      documents.notification.ReviewNotification
+    ]
+  })
+
+  generateClassNotificationTypes(
+    builder,
+    documents.class.ControlledDocument,
+    documents.notification.DocumentsNotificationGroup,
+    [
+      'state',
+      'code',
+      'prefix',
+      'seqNumber',
+      'major',
+      'minor',
+      'category',
+      'author',
+      'content',
+      'labels',
+      'abstract',
+      'snapshots',
+      'requests',
+      'reviewInterval',
+      'controlledState',
+      'effectiveDate',
+      'plannedEffectiveDate',
+      'changeControl',
+      'coAuthors',
+      'reviewers',
+      'approvers'
+    ],
+    ['owner', 'comments']
+  )
+}
+
+export function defineSearch (builder: Builder): void {
+  builder.createDoc(core.class.FullTextSearchContext, core.space.Model, {
+    toClass: documents.class.Document
+  })
+
+  builder.createDoc(core.class.FullTextSearchContext, core.space.Model, {
+    toClass: documents.class.DocumentMeta,
+    fullTextSummary: true
+  })
+
+  builder.createDoc(
+    presentation.class.ObjectSearchCategory,
+    core.space.Model,
+    {
+      title: documents.string.Documents,
+      icon: documents.icon.Document,
+      label: documents.string.SearchDocument,
+      query: documents.completion.DocumentMetaQuery,
+      context: ['search', 'mention', 'spotlight'],
+      classToSearch: documents.class.DocumentMeta,
+      priority: 800
+    },
+    documents.completion.DocumentMetaCategory
+  )
+}
+
+export function defineTextActions (builder: Builder): void {
+  // Comment category
+  builder.createDoc(textEditor.class.TextEditorAction, core.space.Model, {
+    tags: ['text'],
+    action: documents.function.Comment,
+    icon: chunter.icon.Chunter,
+    visibilityTester: documents.function.IsCommentVisible,
+    label: chunter.string.Message,
+    category: 100,
+    index: 5
+  })
+}
+
+export { documentsOperation } from './migration'
+export { documents as default }

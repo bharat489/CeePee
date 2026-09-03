@@ -1,0 +1,257 @@
+//
+// Copyright © 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { type EditorView } from '@tiptap/pm/view'
+import { type Asset, getMetadata } from '@hcengineering/platform'
+import { SelectPopup, getEventPositionElement, showPopup } from '@hcengineering/ui'
+
+export interface LeftMenuOptions {
+  width: number
+  height: number
+  marginX: number
+  className: string
+  icon: Asset
+  iconProps: any
+  items: Array<{ id: string, label: string, icon: Asset }>
+  handleSelect: (id: string, pos: number, event: MouseEvent) => Promise<void>
+}
+
+function nodeDOMAtCoords (coords: { x: number, y: number }): Element | undefined {
+  if (!Number.isFinite(coords.x) || !Number.isFinite(coords.y)) {
+    return undefined
+  }
+  return document
+    .elementsFromPoint(coords.x, coords.y)
+    .find((elem: Element) => elem.parentElement?.matches?.('.ProseMirror') === true)
+}
+
+function posAtLeftMenuElement (view: EditorView, leftMenuElement: HTMLElement, offsetX: number): number {
+  const rect = leftMenuElement.getBoundingClientRect()
+
+  const position = view.posAtCoords({
+    left: rect.left + offsetX,
+    top: rect.top + rect.height / 2
+  })
+
+  if (position === null) {
+    return 0
+  }
+
+  const pos = position.inside >= 0 ? position.inside : position.pos
+  const $pos = view.state.doc.resolve(pos)
+  return $pos.depth === 0 ? $pos.pos : $pos.before($pos.depth)
+}
+
+function LeftMenu (options: LeftMenuOptions): Plugin {
+  let leftMenuElement: HTMLElement | null = null
+  const offsetX = options.width + options.marginX
+  let rafId: number | null = null
+  let styleCache = new WeakMap<HTMLElement, { lineHeight: number, paddingTop: number, marginTop: number }>()
+
+  function hideLeftMenu (): void {
+    if (leftMenuElement !== null) {
+      leftMenuElement.classList.add('hidden')
+    }
+  }
+
+  function showLeftMenu (): void {
+    if (leftMenuElement !== null) {
+      leftMenuElement.classList.remove('hidden')
+    }
+  }
+
+  function getCachedStyle (node: HTMLElement): { lineHeight: number, paddingTop: number, marginTop: number } {
+    let cached = styleCache.get(node)
+    if (cached === undefined) {
+      const compStyle = window.getComputedStyle(node)
+      const lineHeight = parseInt(compStyle.lineHeight, 10)
+      const paddingTop = parseInt(compStyle.paddingTop, 10)
+      const marginTop = parseInt(compStyle.marginTop, 10)
+      cached = { lineHeight, paddingTop, marginTop }
+      styleCache.set(node, cached)
+    }
+    return cached
+  }
+
+  return new Plugin({
+    key: new PluginKey('left-menu'),
+    view: (view) => {
+      leftMenuElement = document.createElement('div')
+      leftMenuElement.classList.add(options.className) // Style externally with CSS
+      leftMenuElement.style.position = 'absolute'
+      hideLeftMenu()
+
+      const svgNs = 'http://www.w3.org/2000/svg'
+      const icon = document.createElementNS(svgNs, 'svg')
+      const { className: iconClassName, ...restIconProps } = options.iconProps ?? {}
+      if (iconClassName !== undefined) {
+        icon.classList.add(iconClassName)
+      }
+      Object.entries(restIconProps).forEach(([key, value]) => {
+        icon.setAttribute(key, value as string)
+      })
+
+      const use = document.createElementNS(svgNs, 'use')
+      const href = options.icon !== undefined ? getMetadata(options.icon) : undefined
+
+      if (href !== undefined) {
+        use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href)
+      }
+
+      icon.appendChild(use)
+      leftMenuElement.appendChild(icon)
+
+      leftMenuElement.addEventListener('mousedown', (e) => {
+        // Prevent default in order for the popup to take focus for keyboard events
+        e.preventDefault()
+        e.stopPropagation()
+        showPopup(
+          SelectPopup,
+          {
+            value: options.items
+          },
+          getEventPositionElement(e),
+          (val) => {
+            if (leftMenuElement === null) return
+            const pos = posAtLeftMenuElement(view, leftMenuElement, offsetX)
+            void options.handleSelect(val, pos, e)
+          }
+        )
+      })
+
+      view?.dom?.parentElement?.appendChild(leftMenuElement)
+
+      return {
+        destroy: () => {
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId)
+            rafId = null
+          }
+          leftMenuElement?.remove?.()
+          leftMenuElement = null
+          styleCache = new WeakMap()
+        }
+      }
+    },
+    props: {
+      handleDOMEvents: {
+        mousemove: (view, event) => {
+          if (!view.editable) {
+            return
+          }
+
+          if (rafId !== null) {
+            return
+          }
+
+          rafId = requestAnimationFrame(() => {
+            rafId = null
+
+            const node = nodeDOMAtCoords({
+              x: event.clientX + offsetX,
+              y: event.clientY
+            })
+
+            if (
+              !(node instanceof HTMLElement) ||
+              node.nodeName === 'HR' ||
+              options.items === undefined ||
+              options.items.length === 0
+            ) {
+              hideLeftMenu()
+              return
+            }
+
+            const parent = node?.parentElement
+            if (!(parent instanceof HTMLElement)) {
+              hideLeftMenu()
+              return
+            }
+
+            // For some reason the offsetTop value for all elements is shifted by the first element's margin
+            // so taking it into account here
+            let firstMargin = 0
+            const firstChild = parent.firstChild
+            if (firstChild !== null && firstChild instanceof HTMLElement) {
+              const { marginTop } = getCachedStyle(firstChild)
+              firstMargin = marginTop
+            }
+
+            const { lineHeight, paddingTop } = getCachedStyle(node)
+            const left = -offsetX
+            let top = node.offsetTop
+            top += (lineHeight - options.height) / 2
+            top += paddingTop
+            top += firstMargin
+
+            if (leftMenuElement === null) return
+
+            leftMenuElement.style.left = `${left}px`
+            leftMenuElement.style.top = `${top}px`
+
+            showLeftMenu()
+          })
+        },
+        keydown: () => {
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId)
+            rafId = null
+          }
+          hideLeftMenu()
+        },
+        mousewheel: () => {
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId)
+            rafId = null
+          }
+          hideLeftMenu()
+        },
+        mouseleave: (view, event) => {
+          if (!view.editable) {
+            return
+          }
+
+          const node = nodeDOMAtCoords({
+            x: event.clientX + offsetX,
+            y: event.clientY
+          })
+
+          if (!(node instanceof HTMLElement) || node.nodeName === 'HR') {
+            hideLeftMenu()
+            return
+          }
+
+          const parent = node?.parentElement
+          if (!(parent instanceof HTMLElement)) {
+            hideLeftMenu()
+          }
+        }
+      }
+    }
+  })
+}
+
+/*
+ * @public
+ */
+export const LeftMenuExtension = Extension.create<LeftMenuOptions>({
+  name: 'leftMenu',
+
+  addProseMirrorPlugins () {
+    return [LeftMenu(this.options)]
+  }
+})
