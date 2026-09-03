@@ -10,21 +10,23 @@
     "links": [
       {
         "rel": "manifest",
-        "href": "/huly/site.webmanifest"
+        "href": "/ceepee/site.webmanifest"
       },
       {
         "rel": "icon",
-        "href": "/huly/favicon.svg",
-        "type": "image/svg+xml"
+        "href": "/ceepee/favicon-32.png",
+        "type": "image/png",
+        "sizes": "32x32"
       },
       {
-        "rel": "shortcut icon",
-        "href": "/huly/favicon.ico",
-        "sizes": "any"
+        "rel": "icon",
+        "href": "/ceepee/favicon-16.png",
+        "type": "image/png",
+        "sizes": "16x16"
       },
       {
         "rel": "apple-touch-icon",
-        "href": "/huly/apple-touch-icon.png"
+        "href": "/ceepee/apple-touch-icon.png"
       }
     ]
   },
@@ -39,21 +41,23 @@
     "links": [
       {
         "rel": "manifest",
-        "href": "/huly/site.webmanifest"
+        "href": "/ceepee/site.webmanifest"
       },
       {
         "rel": "icon",
-        "href": "/huly/favicon.svg",
-        "type": "image/svg+xml"
+        "href": "/ceepee/favicon-32.png",
+        "type": "image/png",
+        "sizes": "32x32"
       },
       {
-        "rel": "shortcut icon",
-        "href": "/huly/favicon.ico",
-        "sizes": "any"
+        "rel": "icon",
+        "href": "/ceepee/favicon-16.png",
+        "type": "image/png",
+        "sizes": "16x16"
       },
       {
         "rel": "apple-touch-icon",
-        "href": "/huly/apple-touch-icon.png"
+        "href": "/ceepee/apple-touch-icon.png"
       }
     ]
   },

@@ -1,6 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 512 512">
-  <path
-    d="M477.867 341.333c18.851 0 34.133 15.282 34.133 34.134v102.4C512 496.718 496.718 512 477.867 512h-102.4c-18.852 0-34.134-15.282-34.134-34.133v-102.4c0-18.852 15.282-34.134 34.134-34.134zM136.533 0c18.852 0 34.134 15.282 34.134 34.133v102.4c0 18.852-15.282 34.134-34.134 34.134h-102.4C15.282 170.667 0 155.385 0 136.533v-102.4C0 15.282 15.282 0 34.133 0zm365.47 180.664A34.13 34.13 0 0 0 512 156.528V34.133C512 15.282 496.718 0 477.867 0h-102.4c-18.852 0-34.134 15.282-34.134 34.133v102.4c0 18.852-15.282 34.134-34.133 34.134H184.805a34.13 34.13 0 0 0-24.136 9.997L9.997 331.336A34.13 34.13 0 0 0 0 355.472v122.395C0 496.718 15.282 512 34.133 512h102.4c18.852 0 34.134-15.282 34.134-34.133v-102.4c0-18.852 15.282-34.134 34.133-34.134h122.395a34.13 34.13 0 0 0 24.136-9.997z"
-    fill="white"
-  />
-</svg>
+<!--
+// Copyright © 2026 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
+<!--
+  Brand mark for the login and onboarding headers.
+
+  Served from the front's public assets (dev/prod/public/ceepee) rather than
+  inlined as a path, because the mark is a 3D render and cannot be reduced to
+  clean vector geometry.
+
+  It sits on a white tile on purpose: the mark itself is white with a green
+  inner ring, so on the dark login background it would otherwise disappear.
+-->
+<img class="brand-mark" src="/ceepee/icon-192.png" alt="" width="20" height="20" />
+
+<style lang="scss">
+  .brand-mark {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.3rem;
+    background-color: #ffffff;
+    object-fit: contain;
+  }
+</style>
