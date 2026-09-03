@@ -40,6 +40,8 @@ import {
   TComponent,
   TDependencyShiftedNotification,
   TDependencyShiftRequest,
+  TDepartmentRole,
+  TDepartmentSegment,
   TIssue,
   TIssueRelation,
   TIssueStatus,
@@ -487,11 +489,54 @@ export function createModel (builder: Builder): void {
     TTypeRemainingTime,
     TProjectTargetPreference,
     TDependencyShiftedNotification,
-    TDependencyShiftRequest
+    TDependencyShiftRequest,
+    TDepartmentRole,
+    TDepartmentSegment
+  )
+
+  // Settings → Department roles. Sits just after Spaces (1100), where the
+  // space-type roles already live, so both role vocabularies are adjacent.
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'departmentRoles',
+    label: tracker.string.DepartmentRoles,
+    icon: tracker.icon.Issues,
+    component: tracker.component.DepartmentRolesSetting,
+    order: 1150,
+    role: AccountRole.Maintainer
+  })
+
+  // Seed the two roles the model depends on. Teams add their own alongside
+  // these from Settings → Department roles; only these two are protected from
+  // deletion, because the accountable/contributing distinction is structural.
+  builder.createDoc(
+    tracker.class.DepartmentRole,
+    core.space.Model,
+    {
+      name: 'Accountable',
+      kind: 'accountable',
+      color: 10,
+      blocksCompletion: true,
+      readonly: true
+    },
+    tracker.ids.RoleAccountable
+  )
+
+  builder.createDoc(
+    tracker.class.DepartmentRole,
+    core.space.Model,
+    {
+      name: 'Contributing',
+      kind: 'contributing',
+      color: 6,
+      blocksCompletion: true,
+      readonly: true
+    },
+    tracker.ids.RoleContributing
   )
 
   builder.mixin(tracker.class.Project, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.Issue, core.class.Class, activity.mixin.ActivityDoc, {})
+  builder.mixin(tracker.class.DepartmentSegment, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.Milestone, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.Component, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.IssueTemplate, core.class.Class, activity.mixin.ActivityDoc, {})

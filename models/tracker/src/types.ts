@@ -47,6 +47,7 @@ import {
   TypeRecord,
   TypeRef,
   TypeString,
+  TypeBoolean,
   UX
 } from '@hcengineering/model'
 import attachment from '@hcengineering/model-attachment'
@@ -56,12 +57,17 @@ import task, { TTask, TProject as TTaskProject } from '@hcengineering/model-task
 import { getEmbeddedLabel, type IntlString } from '@hcengineering/platform'
 import tags, { type TagElement } from '@hcengineering/tags'
 import time, { type ToDo } from '@hcengineering/time'
+import { type Department } from '@hcengineering/hr'
+import hr from '@hcengineering/model-hr'
 import {
   type ProjectTargetPreference,
   type Component,
   type DependencyKind,
   type DependencyShiftedNotification,
   type DependencyShiftRequest,
+  type DepartmentRole,
+  type DepartmentRoleKind,
+  type DepartmentSegment,
   type Issue,
   type IssueChildInfo,
   type IssueParentInfo,
@@ -226,6 +232,20 @@ export class TIssue extends TTask implements Issue {
   @Prop(Collection(tracker.class.Issue), tracker.string.SubIssues)
     subIssues!: number
 
+  // Department orchestration. Optional throughout, so issues created before
+  // this feature keep working with no migration: an issue with no
+  // owningDepartment behaves exactly as it did previously.
+  @Prop(TypeRef(hr.class.Department), tracker.string.OwningDepartment, { icon: tracker.icon.Issues })
+  @Index(IndexKind.Indexed)
+    owningDepartment?: Ref<Department> | null
+
+  @Prop(ArrOf(TypeRef(hr.class.Department)), tracker.string.ContributingDepartments)
+  @Index(IndexKind.Indexed)
+    contributingDepartments?: Ref<Department>[]
+
+  @Prop(Collection(tracker.class.DepartmentSegment), tracker.string.DepartmentSegments)
+    segments?: number
+
   @Prop(ArrOf(TypeRef(core.class.TypeRelatedDocument)), tracker.string.BlockedBy)
     blockedBy!: RelatedDocument[]
 
@@ -357,6 +377,80 @@ export class TIssueTemplate extends TDoc implements IssueTemplate {
 /**
  * @public
  */
+
+/**
+ * A role a department can play on an issue.
+ *
+ * Stored in DOMAIN_MODEL-adjacent tracker domain rather than the model domain
+ * so teams can create roles at runtime from Settings, not only at build time.
+ * @public
+ */
+@Model(tracker.class.DepartmentRole, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.DepartmentRole, tracker.icon.Issues)
+export class TDepartmentRole extends TDoc implements DepartmentRole {
+  @Prop(TypeString(), tracker.string.RoleName)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Description)
+    description?: string
+
+  @Prop(TypeString(), tracker.string.RoleKind)
+  @Index(IndexKind.Indexed)
+    kind!: DepartmentRoleKind
+
+  @Prop(TypeNumber(), tracker.string.Color)
+    color!: number
+
+  @Prop(TypeBoolean(), tracker.string.BlocksCompletion)
+    blocksCompletion!: boolean
+
+  @Prop(TypeBoolean(), tracker.string.RoleKind)
+  @Hidden()
+    readonly?: boolean
+}
+
+/**
+ * One department's share of a single issue — its own status, assignee and clock.
+ * @public
+ */
+@Model(tracker.class.DepartmentSegment, core.class.AttachedDoc, DOMAIN_TRACKER)
+@UX(tracker.string.DepartmentSegment, tracker.icon.Issues)
+export class TDepartmentSegment extends TAttachedDoc implements DepartmentSegment {
+  @Prop(TypeRef(tracker.class.Issue), tracker.string.Issue)
+  declare attachedTo: Ref<Issue>
+
+  declare collection: 'segments'
+
+  @Prop(TypeRef(hr.class.Department), tracker.string.Department)
+  @Index(IndexKind.Indexed)
+    department!: Ref<Department>
+
+  @Prop(TypeRef(tracker.class.DepartmentRole), tracker.string.DepartmentRole)
+  @Index(IndexKind.Indexed)
+    role!: Ref<DepartmentRole>
+
+  @Prop(TypeRef(tracker.class.IssueStatus), tracker.string.Status)
+  @Index(IndexKind.Indexed)
+    status!: Ref<IssueStatus>
+
+  @Prop(TypeRef(contact.class.Person), tracker.string.Assignee)
+  @Index(IndexKind.Indexed)
+    assignee!: Ref<Person> | null
+
+  @Prop(TypeIssuePriority(), tracker.string.LocalPriority)
+    localPriority!: IssuePriority
+
+  @Prop(TypeEstimation(), tracker.string.Estimation)
+    estimation!: number
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.DueDate)
+    dueDate!: Timestamp | null
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.CreatedDate)
+  @ReadOnly()
+    enteredStatusAt!: Timestamp
+}
 
 @Model(tracker.class.TimeSpendReport, core.class.AttachedDoc, DOMAIN_TRACKER)
 @UX(tracker.string.TimeSpendReport, tracker.icon.TimeReport)

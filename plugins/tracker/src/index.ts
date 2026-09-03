@@ -14,6 +14,7 @@
 //
 
 import { Employee, Person } from '@hcengineering/contact'
+import { Department } from '@hcengineering/hr'
 import {
   AttachedDoc,
   Attribute,
@@ -317,6 +318,97 @@ export interface Issue extends Task {
    * cleanly defaults to auto.
    */
   schedulingMode?: 'auto' | 'manual'
+
+  /**
+   * Department orchestration.
+   *
+   * `assignee` keeps its existing meaning: the individual carrying the
+   * accountable department's share. These fields sit *above* it and answer
+   * "which team is answerable", which a single `Ref<Person>` cannot.
+   *
+   * All three are optional so issues created before this feature keep
+   * working unchanged — an issue with no `owningDepartment` behaves exactly
+   * as it did before, and no migration is required.
+   */
+  owningDepartment?: Ref<Department> | null
+  contributingDepartments?: Ref<Department>[]
+  segments?: CollectionSize<DepartmentSegment>
+}
+
+/**
+ * How a department participates in an issue.
+ *
+ * `accountable` is the answerable team — at most one per issue.
+ * `contributing` teams do work and report progress but cannot close the
+ * issue or change its global priority.
+ * @public
+ */
+export type DepartmentRoleKind = 'accountable' | 'contributing'
+
+/**
+ * A role a department can play on an issue.
+ *
+ * Seeded with Accountable and Contributing, but teams may add their own
+ * (Consulted, Informed, Reviewer…) from Settings → Department roles, so the
+ * vocabulary is not hard-coded to one org's process.
+ * @public
+ */
+export interface DepartmentRole extends Doc {
+  name: string
+  description?: string
+
+  /** Only one role of kind `accountable` may be assigned per issue. */
+  kind: DepartmentRoleKind
+
+  /** Palette index, shared with the platform colour scheme. */
+  color: number
+
+  /**
+   * Whether an unfinished segment in this role prevents the issue from
+   * reaching a terminal status. Advisory roles (Informed) set this false.
+   */
+  blocksCompletion: boolean
+
+  /** Seeded roles cannot be deleted, only renamed. */
+  readonly?: boolean
+}
+
+/**
+ * One department's share of a single issue.
+ *
+ * This is the record that makes "Design is done but Legal hasn't started"
+ * representable without forking the issue. Global issue status becomes a
+ * roll-up over these, rather than a field that loses local truth.
+ * @public
+ */
+export interface DepartmentSegment extends AttachedDoc {
+  attachedTo: Ref<Issue>
+  collection: 'segments'
+
+  department: Ref<Department>
+  role: Ref<DepartmentRole>
+
+  /** This department's own state, independent of the issue's roll-up. */
+  status: Ref<IssueStatus>
+
+  /** The member of this department doing the work. */
+  assignee: Ref<Person> | null
+
+  /**
+   * Orders this department's own queue only. Never overrides the issue's
+   * global priority, which belongs solely to the accountable department.
+   */
+  localPriority: IssuePriority
+
+  estimation: number
+  dueDate: Timestamp | null
+
+  /**
+   * Set whenever `status` changes. Powers dwell-time and stall detection —
+   * a task can sit untouched in one team's column for weeks while its due
+   * date is still comfortably in the future.
+   */
+  enteredStatusAt: Timestamp
 }
 
 /**
@@ -583,7 +675,9 @@ const pluginState = plugin(trackerId, {
     RelatedIssueTarget: '' as Ref<Class<RelatedIssueTarget>>,
     ProjectTargetPreference: '' as Ref<Class<ProjectTargetPreference>>,
     DependencyShiftedNotification: '' as Ref<Class<DependencyShiftedNotification>>,
-    DependencyShiftRequest: '' as Ref<Class<DependencyShiftRequest>>
+    DependencyShiftRequest: '' as Ref<Class<DependencyShiftRequest>>,
+    DepartmentRole: '' as Ref<Class<DepartmentRole>>,
+    DepartmentSegment: '' as Ref<Class<DepartmentSegment>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -593,7 +687,10 @@ const pluginState = plugin(trackerId, {
     NoParent: '' as Ref<Issue>,
     IssueDraft: '',
     IssueDraftChild: '',
-    ClassingProjectType: '' as Ref<ProjectType>
+    ClassingProjectType: '' as Ref<ProjectType>,
+    // Seeded department roles. Teams add their own alongside these.
+    RoleAccountable: '' as Ref<DepartmentRole>,
+    RoleContributing: '' as Ref<DepartmentRole>
   },
   status: {
     Backlog: '' as Ref<Status>,
@@ -618,7 +715,12 @@ const pluginState = plugin(trackerId, {
     CreateIssueTemplate: '' as AnyComponent,
     CreateProject: '' as AnyComponent,
     IssueStatusPresenter: '' as AnyComponent,
-    LabelsView: '' as AnyComponent
+    LabelsView: '' as AnyComponent,
+    DepartmentSegments: '' as AnyComponent,
+    DepartmentSegmentsSection: '' as AnyComponent,
+    AddDepartmentPopup: '' as AnyComponent,
+    DepartmentRolesSetting: '' as AnyComponent,
+    DepartmentRolePresenter: '' as AnyComponent
   },
   attribute: {
     IssueStatus: '' as Ref<Attribute<Status>>
@@ -718,6 +820,34 @@ const pluginState = plugin(trackerId, {
   string: {
     TrackerApplication: '' as IntlString,
     ConfigLabel: '' as IntlString,
+    Departments: '' as IntlString,
+    Department: '' as IntlString,
+    DepartmentSegment: '' as IntlString,
+    DepartmentSegments: '' as IntlString,
+    DepartmentRole: '' as IntlString,
+    DepartmentRoles: '' as IntlString,
+    AddDepartment: '' as IntlString,
+    AddRole: '' as IntlString,
+    NewRole: '' as IntlString,
+    RoleName: '' as IntlString,
+    RoleKind: '' as IntlString,
+    Accountable: '' as IntlString,
+    Contributing: '' as IntlString,
+    OwningDepartment: '' as IntlString,
+    ContributingDepartments: '' as IntlString,
+    LocalPriority: '' as IntlString,
+    BlocksCompletion: '' as IntlString,
+    BlocksCompletionHint: '' as IntlString,
+    NoDepartments: '' as IntlString,
+    NoDepartmentsHint: '' as IntlString,
+    RemoveDepartment: '' as IntlString,
+    MakeAccountable: '' as IntlString,
+    AccountableAlreadySet: '' as IntlString,
+    DepartmentAlreadyAdded: '' as IntlString,
+    SegmentsBlockingCompletion: '' as IntlString,
+    WaitingOn: '' as IntlString,
+    CancelRole: '' as IntlString,
+    RemoveRole: '' as IntlString,
     NewRelatedIssue: '' as IntlString,
     IssueNotificationTitle: '' as IntlString,
     IssueNotificationBody: '' as IntlString,

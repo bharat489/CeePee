@@ -109,7 +109,7 @@
       "summary": "Do a format and show errors after it",
       "description": "Do a format and show errors after it",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "(rush format && true) && bash ./common/scripts/format-show.sh"
+      "shellCommand": "bash -c \"(rush format && true) && bash ./common/scripts/format-show.sh\""
     },
     {
       "commandKind": "phased",
@@ -261,7 +261,7 @@
       "summary": "Build docker with platform",
       "description": "use to build all docker containers required for platform",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "bash ./common/scripts/docker-server.sh && rush docker:up:server"
+      "shellCommand": "bash -c \"bash ./common/scripts/docker-server.sh && rush docker:up:server\""
     },
     {
       "commandKind": "global",
@@ -269,7 +269,7 @@
       "summary": "Up development build",
       "description": "Up development build",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev && docker compose up -d --force-recreate"
+      "shellCommand": "docker compose --project-directory ./dev -f ./dev/docker-compose.yaml up -d --force-recreate"
     },
     {
       "commandKind": "global",
@@ -277,7 +277,7 @@
       "summary": "Up development build",
       "description": "Up development build",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev && docker compose up -d --force-recreate transactor_cockroach"
+      "shellCommand": "docker compose --project-directory ./dev -f ./dev/docker-compose.yaml up -d --force-recreate transactor_cockroach"
     },
     {
       "commandKind": "global",
@@ -293,7 +293,7 @@
       "summary": "Up minified development stack",
       "description": "Start minified docker compose (docker-compose.yaml + docker-compose.min.yaml) for resource-constrained machines",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev && docker compose -f docker-compose.yaml -f docker-compose.min.yaml up -d --force-recreate"
+      "shellCommand": "docker compose --project-directory ./dev -f ./dev/docker-compose.yaml -f ./dev/docker-compose.min.yaml up -d --force-recreate"
     },
     {
       "commandKind": "global",
@@ -301,7 +301,7 @@
       "summary": "Up extended development stack with billing + payment",
       "description": "Start extended docker compose (docker-compose.yaml + docker-compose.ext.yaml) with the optional billing and payment services enabled. Required env: STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SUBSCRIPTION_PLANS (or POLAR_* equivalents).",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev && docker compose -f docker-compose.yaml -f docker-compose.ext.yaml up -d --force-recreate"
+      "shellCommand": "docker compose --project-directory ./dev -f ./dev/docker-compose.yaml -f ./dev/docker-compose.ext.yaml up -d --force-recreate"
     },
     {
       "commandKind": "global",
@@ -309,7 +309,7 @@
       "summary": "Up development stack with PostgreSQL",
       "description": "Start dev docker compose with PostgreSQL override (docker-compose.yaml + docker-compose.pg.yaml, profile=postgres)",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev && docker compose -f docker-compose.yaml -f docker-compose.pg.yaml --profile postgres up -d --force-recreate"
+      "shellCommand": "docker compose --project-directory ./dev -f ./dev/docker-compose.yaml -f ./dev/docker-compose.pg.yaml --profile postgres up -d --force-recreate"
     },
     {
       "commandKind": "global",
@@ -317,7 +317,7 @@
       "summary": "Up development build",
       "description": "Up development build",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev/local-mongo && docker compose -p dev up -d --force-recreate"
+      "shellCommand": "docker compose -p dev --project-directory ./dev/local-mongo -f ./dev/local-mongo/docker-compose.yaml up -d --force-recreate"
     },
     {
       "commandKind": "global",
@@ -325,7 +325,7 @@
       "summary": "Upgrade all local models",
       "description": "Upgrade all local models",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./dev/tool && rushx run-local upgrade -f"
+      "shellCommand": "bash -c \"cd ./dev/tool && rushx run-local upgrade -f\""
     },
     {
       "commandKind": "global",
@@ -349,7 +349,7 @@
       "summary": "Clean Validate cache and to validate again",
       "description": "Clean typescript incremental cache",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "find .|grep tsBuildInfoFile.info | xargs rm | pwd && rush dorevalidate"
+      "shellCommand": "bash -c \"find .|grep tsBuildInfoFile.info | xargs rm | pwd && rush dorevalidate\""
     },
     {
       "commandKind": "bulk",
@@ -378,7 +378,7 @@
       "summary": "show model",
       "description": "show model",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "cd ./models/all && rushx show-model"
+      "shellCommand": "bash -c \"cd ./models/all && rushx show-model\""
     },
     {
       "commandKind": "global",
@@ -402,7 +402,7 @@
       "summary": "Build desktop build",
       "description": "use to build all docker containers required for platform",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "rush package -p 20 --to desktop && cd ./desktop-package && rushx dist"
+      "shellCommand": "bash -c \"rush package -p 20 --to desktop && cd ./desktop-package && rushx dist\""
     },
     {
       "commandKind": "global",

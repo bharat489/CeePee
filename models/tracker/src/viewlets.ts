@@ -64,6 +64,10 @@ export const issuesOptions = (kanban: boolean): ViewOptionsModel => ({
     'space',
     'component',
     'milestone',
+    // Departmental swimlanes. Groups by the accountable department, which is
+    // the single answerable team — grouping by contributingDepartments would
+    // place one issue in several lanes at once.
+    'owningDepartment',
     'createdBy',
     'modifiedBy',
     'estimation',

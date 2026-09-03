@@ -1092,6 +1092,13 @@ export function createModel (builder: Builder): void {
     value: true
   })
 
+  // Employee is listed in Settings → Classes in its own right, so custom
+  // attributes (job discipline, skills…) can target team members rather than
+  // every Contact — which would put staff-only fields on companies too.
+  builder.mixin(contact.mixin.Employee, core.class.Class, setting.mixin.Editable, {
+    value: true
+  })
+
   builder.mixin(contact.class.Contact, core.class.Class, view.mixin.ObjectTitle, {
     titleProvider: contact.function.ContactTitleProvider
   })

@@ -84,6 +84,9 @@ import MilestoneDatePresenter from './components/milestones/MilestoneDatePresent
 import MyIssues from './components/myissues/MyIssues.svelte'
 import NewIssueHeader from './components/NewIssueHeader.svelte'
 import NopeComponent from './components/NopeComponent.svelte'
+import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
+import DepartmentRolesSetting from './components/departments/DepartmentRolesSetting.svelte'
+import DepartmentSegments from './components/departments/DepartmentSegments.svelte'
 import MembersArrayEditor from './components/projects/MembersArrayEditor.svelte'
 import ProjectFilterValuePresenter from './components/projects/ProjectFilterValuePresenter.svelte'
 import RelationsPopup from './components/RelationsPopup.svelte'
@@ -412,6 +415,9 @@ export default async (): Promise<Resources> => ({
   },
   component: {
     NopeComponent,
+    DepartmentSegments,
+    AddDepartmentPopup,
+    DepartmentRolesSetting,
     Issues,
     MyIssues,
     Components,
