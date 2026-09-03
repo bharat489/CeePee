@@ -12,3 +12,7 @@ yarn.lock                    merge=binary
 # For more information, see this issue: https://github.com/microsoft/rushstack/issues/1088
 #
 *.json                       linguist-language=JSON-with-Comments
+
+# Build scripts must keep LF endings, otherwise they break on Windows checkouts
+# that have core.autocrlf=true (bash fails with: $'\r': command not found).
+*.sh                         text eol=lf

@@ -109,7 +109,7 @@
       "summary": "Do a format and show errors after it",
       "description": "Do a format and show errors after it",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "(rush format && true) && ./common/scripts/format-show.sh"
+      "shellCommand": "(rush format && true) && bash ./common/scripts/format-show.sh"
     },
     {
       "commandKind": "phased",
@@ -245,7 +245,7 @@
       "summary": "Build docker with platform",
       "description": "Build all docker containers required for platform. Use --minified for resource-constrained dev (or rush docker:min).",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "./common/scripts/docker.sh"
+      "shellCommand": "bash ./common/scripts/docker.sh"
     },
     {
       "commandKind": "global",
@@ -253,7 +253,7 @@
       "summary": "Build and push docker images with a custom version",
       "description": "Allows building and pushing docker images with a manually specified version tag. Usage: rush docker:patch --version <version> [rush-args]",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "./common/scripts/docker_patch.sh"
+      "shellCommand": "bash ./common/scripts/docker_patch.sh"
     },
     {
       "commandKind": "global",
@@ -261,7 +261,7 @@
       "summary": "Build docker with platform",
       "description": "use to build all docker containers required for platform",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "./common/scripts/docker-server.sh && rush docker:up:server"
+      "shellCommand": "bash ./common/scripts/docker-server.sh && rush docker:up:server"
     },
     {
       "commandKind": "global",
@@ -285,7 +285,7 @@
       "summary": "Build minified docker images for resource-constrained dev",
       "description": "Build docker images excluding optional services (hulypulse, redis, process, backup, rating, preview, link-preview, elastic, fulltext, payment, stats, print, sign, hulygun, hulykvs). Use with rush docker:up:min",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "./common/scripts/docker.sh --minified"
+      "shellCommand": "bash ./common/scripts/docker.sh --minified"
     },
     {
       "commandKind": "global",
@@ -394,7 +394,7 @@
       "summary": "Format changed projects",
       "description": "Format and autofix linting issues in changed projects",
       "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "./common/scripts/fast-format.sh"
+      "shellCommand": "bash ./common/scripts/fast-format.sh"
     },
     {
       "commandKind": "global",
