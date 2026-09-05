@@ -88,6 +88,7 @@
   import SetParentIssueActionPopup from './SetParentIssueActionPopup.svelte'
   import SubIssues from './SubIssues.svelte'
   import SimilarIssues from './SimilarIssues.svelte'
+  import IssueRelationsPicker from './IssueRelationsPicker.svelte'
   import ComponentSelector from './components/ComponentSelector.svelte'
   import AssigneeEditor from './issues/AssigneeEditor.svelte'
   import IssueNotification from './issues/IssueNotification.svelte'
@@ -233,6 +234,9 @@
   }
   fillDefaults(hierarchy, object, tracker.class.Issue)
 
+  // Collected while the ticket is written, applied onto the doc at save time.
+  let pickedBlockedBy: RelatedDocument[] = []
+  let pickedRelations: RelatedDocument[] = []
   let currentProject: Project | undefined
 
   let descriptionBox: AttachmentStyledBox | undefined
@@ -514,7 +518,12 @@
         remainingTime: 0,
         estimation: object.estimation,
         reports: 0,
-        relations: relatedTo !== undefined ? [{ _id: relatedTo._id, _class: relatedTo._class }] : [],
+        // The doc this dialog was opened from, plus anything picked by hand.
+        relations: [
+          ...(relatedTo !== undefined ? [{ _id: relatedTo._id, _class: relatedTo._class }] : []),
+          ...pickedRelations
+        ],
+        blockedBy: pickedBlockedBy,
         childInfo: [],
         kind,
         identifier
@@ -1012,6 +1021,14 @@
         kind={'regular'}
         size={'large'}
         short
+      />
+    </div>
+    <div id="relations-picker" class="new-line">
+      <IssueRelationsPicker
+        bind:blockedBy={pickedBlockedBy}
+        bind:relations={pickedRelations}
+        space={_space}
+        exclude={object._id}
       />
     </div>
     <div id="duedate-editor" class="new-line">
