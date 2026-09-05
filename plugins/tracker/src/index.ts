@@ -412,6 +412,68 @@ export interface DepartmentSegment extends AttachedDoc {
 }
 
 /**
+ * Where a decision is in its life.
+ *
+ * `proposed` exists so AI can draft one without asserting it. Only a human
+ * moves a decision to `ratified`; an AI that could ratify would eventually
+ * ratify something wrong, and the first time it did the feature would lose
+ * the credibility it depends on.
+ * @public
+ */
+export type DecisionState = 'proposed' | 'ratified' | 'superseded'
+
+/**
+ * A decision, as a first-class object.
+ *
+ * Every other tool stores decisions as prose inside a message or a document,
+ * which is why "why did we choose this?" is unanswerable in all of them six
+ * months later. Making it typed costs little and is the difference between a
+ * searchable organisation and an archive of chat.
+ *
+ * Deliberately records what was rejected. The rejected options are the part
+ * people actually need later -- a decision without its alternatives reads as
+ * arbitrary, and teams re-litigate it.
+ * @public
+ */
+export interface Decision extends Doc {
+  space: Ref<Project>
+
+  title: string
+
+  /** Why. Free prose: this is the field people come back for. */
+  rationale: MarkupBlobRef | null
+
+  /** What was considered and not chosen, so the choice reads as reasoned. */
+  rejectedOptions: string[]
+
+  state: DecisionState
+
+  /** The human accountable for it. Never an AI, by construction. */
+  decidedBy: Ref<Person> | null
+
+  /** When it was ratified, which is not when the record was created. */
+  decidedOn: Timestamp | null
+
+  /** People whose input was sought, for auditability rather than approval. */
+  consulted: Ref<Person>[]
+
+  /** Issues, documents or conversations this decision governs. */
+  affects: RelatedDocument[]
+
+  /**
+   * Decisions are never edited into a new meaning and never deleted -- that
+   * would rewrite history. A reversal is a new decision that supersedes.
+   */
+  supersededBy?: Ref<Decision> | null
+
+  /**
+   * Set when AI drafted the proposal, so a reader can weigh it accordingly.
+   * Cleared on ratification: once a human ratifies, the human owns it.
+   */
+  aiDrafted?: boolean
+}
+
+/**
  * Notification on Dependency-Shift.
  * One entry per shifted issue in a cascade bundle.
  * @public
@@ -677,7 +739,8 @@ const pluginState = plugin(trackerId, {
     DependencyShiftedNotification: '' as Ref<Class<DependencyShiftedNotification>>,
     DependencyShiftRequest: '' as Ref<Class<DependencyShiftRequest>>,
     DepartmentRole: '' as Ref<Class<DepartmentRole>>,
-    DepartmentSegment: '' as Ref<Class<DepartmentSegment>>
+    DepartmentSegment: '' as Ref<Class<DepartmentSegment>>,
+    Decision: '' as Ref<Class<Decision>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -717,6 +780,9 @@ const pluginState = plugin(trackerId, {
     IssueStatusPresenter: '' as AnyComponent,
     LabelsView: '' as AnyComponent,
     DepartmentSegments: '' as AnyComponent,
+    Decisions: '' as AnyComponent,
+    DecisionPresenter: '' as AnyComponent,
+    CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
     AddDepartmentPopup: '' as AnyComponent,
     DepartmentRolesSetting: '' as AnyComponent,
@@ -820,6 +886,27 @@ const pluginState = plugin(trackerId, {
   string: {
     TrackerApplication: '' as IntlString,
     ConfigLabel: '' as IntlString,
+    Decision: '' as IntlString,
+    Decisions: '' as IntlString,
+    NewDecision: '' as IntlString,
+    DecisionTitle: '' as IntlString,
+    Rationale: '' as IntlString,
+    RejectedOptions: '' as IntlString,
+    AddRejectedOption: '' as IntlString,
+    Ratify: '' as IntlString,
+    Ratified: '' as IntlString,
+    Proposed: '' as IntlString,
+    Superseded: '' as IntlString,
+    DecidedBy: '' as IntlString,
+    DecidedOn: '' as IntlString,
+    Consulted: '' as IntlString,
+    Affects: '' as IntlString,
+    NoDecisions: '' as IntlString,
+    NoDecisionsHint: '' as IntlString,
+    DraftedByAI: '' as IntlString,
+    SupersededBy: '' as IntlString,
+    RatifyHint: '' as IntlString,
+    WhyThisWasDecided: '' as IntlString,
     Departments: '' as IntlString,
     Department: '' as IntlString,
     DepartmentSegment: '' as IntlString,

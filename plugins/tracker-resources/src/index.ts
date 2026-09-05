@@ -84,6 +84,8 @@ import MilestoneDatePresenter from './components/milestones/MilestoneDatePresent
 import MyIssues from './components/myissues/MyIssues.svelte'
 import NewIssueHeader from './components/NewIssueHeader.svelte'
 import NopeComponent from './components/NopeComponent.svelte'
+import Decisions from './components/decisions/Decisions.svelte'
+import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
 import DepartmentRolesSetting from './components/departments/DepartmentRolesSetting.svelte'
 import DepartmentSegments from './components/departments/DepartmentSegments.svelte'
@@ -414,6 +416,8 @@ export default async (): Promise<Resources> => ({
     StatusIcon
   },
   component: {
+    Decisions,
+    CreateDecisionPopup,
     NopeComponent,
     DepartmentSegments,
     AddDepartmentPopup,

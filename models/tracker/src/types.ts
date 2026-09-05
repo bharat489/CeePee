@@ -67,6 +67,8 @@ import {
   type DependencyShiftRequest,
   type DepartmentRole,
   type DepartmentRoleKind,
+  type Decision,
+  type DecisionState,
   type DepartmentSegment,
   type Issue,
   type IssueChildInfo,
@@ -450,6 +452,54 @@ export class TDepartmentSegment extends TAttachedDoc implements DepartmentSegmen
   @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.CreatedDate)
   @ReadOnly()
     enteredStatusAt!: Timestamp
+}
+
+/**
+ * A decision, recorded so nobody reconstructs it from chat six months later.
+ * @public
+ */
+@Model(tracker.class.Decision, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Decision, tracker.icon.Issue, undefined, 'decidedOn', undefined, tracker.string.Decisions)
+export class TDecision extends TDoc implements Decision {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.DecisionTitle)
+  @Index(IndexKind.FullText)
+    title!: string
+
+  @Prop(TypeCollaborativeDoc(), tracker.string.Rationale)
+  @Index(IndexKind.FullText)
+    rationale!: MarkupBlobRef | null
+
+  @Prop(ArrOf(TypeString()), tracker.string.RejectedOptions)
+  @Index(IndexKind.FullText)
+    rejectedOptions!: string[]
+
+  @Prop(TypeString(), tracker.string.Decision)
+  @Index(IndexKind.Indexed)
+    state!: DecisionState
+
+  @Prop(TypeRef(contact.class.Person), tracker.string.DecidedBy)
+  @Index(IndexKind.Indexed)
+    decidedBy!: Ref<Person> | null
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.DecidedOn)
+    decidedOn!: Timestamp | null
+
+  @Prop(ArrOf(TypeRef(contact.class.Person)), tracker.string.Consulted)
+    consulted!: Ref<Person>[]
+
+  @Prop(ArrOf(TypeRef(core.class.TypeRelatedDocument)), tracker.string.Affects)
+    affects!: RelatedDocument[]
+
+  @Prop(TypeRef(tracker.class.Decision), tracker.string.SupersededBy)
+    supersededBy?: Ref<Decision> | null
+
+  @Prop(TypeBoolean(), tracker.string.DraftedByAI)
+  @Hidden()
+    aiDrafted?: boolean
 }
 
 @Model(tracker.class.TimeSpendReport, core.class.AttachedDoc, DOMAIN_TRACKER)
