@@ -30,6 +30,7 @@
     makeDocCollabId,
     type PersonId,
     Ref,
+    type RelatedDocument,
     SortingOrder,
     toIdMap
   } from '@hcengineering/core'

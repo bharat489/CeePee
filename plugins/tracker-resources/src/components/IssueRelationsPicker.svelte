@@ -35,6 +35,8 @@
   /** The issue being created/edited, so it can never relate to itself. */
   export let exclude: Ref<Issue> | undefined = undefined
 
+  type RelationKind = 'blockedBy' | 'relations'
+
   const client = getClient()
 
   let titles = new Map<Ref<Issue>, string>()
@@ -52,7 +54,14 @@
 
   $: void resolve([...blockedBy, ...relations])
 
-  function pick (kind: 'blockedBy' | 'relations', ev: MouseEvent): void {
+  // Declared as a typed array so `group.kind` narrows to the union rather than
+  // widening to string when the template passes it back into pick/remove.
+  $: groups = [
+    { kind: 'blockedBy' as RelationKind, label: tracker.string.BlockedBy, docs: blockedBy },
+    { kind: 'relations' as RelationKind, label: tracker.string.RelatedTo, docs: relations }
+  ]
+
+  function pick (kind: RelationKind, ev: MouseEvent): void {
     const current = kind === 'blockedBy' ? blockedBy : relations
     const ignore = [
       ...current.map((d) => d._id),
@@ -87,14 +96,18 @@
     )
   }
 
-  function remove (kind: 'blockedBy' | 'relations', id: Ref<any>): void {
+  function titleOf (doc: RelatedDocument): string {
+    return titles.get(doc._id as Ref<Issue>) ?? '…'
+  }
+
+  function remove (kind: RelationKind, id: Ref<any>): void {
     if (kind === 'blockedBy') blockedBy = blockedBy.filter((d) => d._id !== id)
     else relations = relations.filter((d) => d._id !== id)
   }
 </script>
 
 <div class="relations">
-  {#each [{ kind: 'blockedBy', label: tracker.string.BlockedBy, docs: blockedBy }, { kind: 'relations', label: tracker.string.RelatedTo, docs: relations }] as group (group.kind)}
+  {#each groups as group (group.kind)}
     <div class="relations__group">
       <Button
         kind={'regular'}
@@ -123,7 +136,7 @@
                 remove(group.kind, doc._id)
               }}
             >
-              {titles.get(doc._id) ?? '…'}
+              {titleOf(doc)}
               <span class="relations__x">×</span>
             </button>
           {/each}
