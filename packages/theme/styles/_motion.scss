@@ -1,0 +1,123 @@
+//
+// Copyright © 2026 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// ---------------------------------------------------------------------------
+// Motion system.
+//
+// Before this file every transition in the product was hand-picked -- 0.15s,
+// 0.2s, 0.5s and 0.6s all appear, with `ease` throughout. Inconsistent timing
+// is what makes an interface feel homemade even when each screen is fine on
+// its own; a coherent motion scale is most of the difference between "fine"
+// and "considered".
+//
+// Three durations, deliberately few. If a fourth seems necessary the
+// interaction is usually wrong, not the scale.
+// ---------------------------------------------------------------------------
+
+:root {
+  // Instant feedback: hover, focus, colour and background changes. Fast enough
+  // that it reads as response rather than animation.
+  --motion-fast: 120ms;
+
+  // The default. Popovers, dropdowns, panels, anything that appears.
+  --motion-base: 180ms;
+
+  // Larger surfaces travelling further -- side panels, sheets, modals.
+  --motion-slow: 280ms;
+
+  // Standard easing: quick to leave, gentle to arrive. Applies to almost
+  // everything, because most motion is an element settling into place.
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  // Entering the screen. Decelerates so the element feels caught rather than
+  // stopped.
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  // Leaving. Accelerates away; nobody needs to watch something exit slowly.
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  // A single overshoot for affirmative moments only -- a task completing, a
+  // decision ratified. Used sparingly; overshoot everywhere reads as toy-like.
+  --ease-emphasis: cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+// Composed shorthands, so components declare intent instead of numbers.
+:root {
+  --transition-interactive: color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+  --transition-surface: opacity var(--motion-base) var(--ease-enter),
+    transform var(--motion-base) var(--ease-enter);
+}
+
+// ---------------------------------------------------------------------------
+// Accessibility.
+//
+// The product previously honoured prefers-reduced-motion in exactly two
+// components. For people with vestibular disorders, animation is not a
+// preference -- it can cause nausea. This is enforced globally rather than
+// left to each component, because per-component compliance is compliance that
+// silently lapses.
+//
+// Motion is reduced to near-zero rather than removed: a 0.01ms transition
+// still fires transitionend, so components that sequence work off it keep
+// functioning instead of hanging.
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared keyframes, so components stop redefining the same three animations.
+// ---------------------------------------------------------------------------
+@keyframes surfaceIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// A restrained pulse for "this changed while you were looking elsewhere".
+// Colour is left to the caller so it can carry semantic meaning.
+@keyframes attentionPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

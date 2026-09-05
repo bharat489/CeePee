@@ -358,7 +358,8 @@
   background-color: transparent;
   border: 1px solid transparent;
   transition-property: border, background-color, color, box-shadow;
-  transition-duration: .15s;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
   &.testing {
     transition-duration: 0;
   }
@@ -395,7 +396,7 @@
   &.iconR:not(.iconL, .only-icon) { padding: 0 .75rem 0 1rem; }
   .btn-icon {
     color: var(--theme-content-color);
-    transition: color .15s;
+    transition: color var(--motion-fast) var(--ease-standard);
     pointer-events: none;
   }
   .btn-right-icon {

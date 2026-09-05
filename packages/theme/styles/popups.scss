@@ -314,7 +314,7 @@
     display: flex;
     flex-direction: column;
     height: 0;
-    transition: height .5s ease;
+    transition: height var(--motion-slow) var(--ease-standard);
 
     &__header {
       position: sticky;
@@ -344,7 +344,7 @@
         color: var(--theme-trans-color);
         transform-origin: center;
         transform: rotate(-90deg);
-        transition: transform .2s ease;
+        transition: transform var(--motion-base) var(--ease-standard);
       }
       &.show {
         .icon { transform: rotate(90deg); }
