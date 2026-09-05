@@ -87,6 +87,7 @@
   import tracker from '../plugin'
   import SetParentIssueActionPopup from './SetParentIssueActionPopup.svelte'
   import SubIssues from './SubIssues.svelte'
+  import SimilarIssues from './SimilarIssues.svelte'
   import ComponentSelector from './components/ComponentSelector.svelte'
   import AssigneeEditor from './issues/AssigneeEditor.svelte'
   import IssueNotification from './issues/IssueNotification.svelte'
@@ -876,6 +877,7 @@
       fullSize
     />
   </div>
+  <SimilarIssues title={object.title} space={_space} />
   <div id="issue-description">
     {#key [objectId, appliedTemplateId]}
       <AttachmentStyledBox
