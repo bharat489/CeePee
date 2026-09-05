@@ -1,5 +1,5 @@
 <!--
-// Copyright © 2025 Hardcore Engineering Inc.
+// Copyright © 2026 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -12,356 +12,115 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 -->
+<!--
+  Loading indicator: an open arc echoing the brand's C mark.
+
+  Two motions run at once so the spinner reads as alive rather than
+  mechanical: the whole ring rotates at a constant rate, while the arc
+  itself lengthens and shortens. The offset periods (1.5s against 2s)
+  mean the two never resolve into an obvious loop.
+
+  The component name is unchanged so every existing call site keeps
+  working; only the visual differs.
+-->
 <script lang="ts">
   export let size: 'small' | 'medium' | 'large' = 'medium'
 </script>
 
 <div
-  class="square-spinner-container {size === 'small' ? 'size-small' : size === 'medium' ? 'size-medium' : 'size-large'}"
+  class="spinner {size === 'small' ? 'size-small' : size === 'medium' ? 'size-medium' : 'size-large'}"
+  role="progressbar"
+  aria-label="Loading"
 >
-  <div class="loader"></div>
+  <svg class="spinner__svg" viewBox="0 0 50 50" aria-hidden="true">
+    <circle class="spinner__track" cx="25" cy="25" r="20" fill="none" />
+    <circle class="spinner__arc" cx="25" cy="25" r="20" fill="none" stroke-linecap="round" />
+  </svg>
 </div>
 
 <style lang="scss">
-  .square-spinner-container {
+  .spinner {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 2.1875rem;
     height: 2.1875rem;
   }
-
   .size-small {
     width: 1.75rem;
     height: 1.75rem;
   }
-
+  .size-medium {
+    width: 2.1875rem;
+    height: 2.1875rem;
+  }
   .size-large {
     width: 3.5rem;
     height: 3.5rem;
   }
 
-  .loader {
-    height: 0.3125rem;
-    width: 0.3125rem;
-    color: var(--theme-trans-color);
-    box-shadow:
-      -0.625rem -0.625rem 0 0.3125rem,
-      -0.625rem -0.625rem 0 0.3125rem,
-      -0.625rem -0.625rem 0 0.3125rem,
-      -0.625rem -0.625rem 0 0.3125rem;
-    animation: squareSpinner 6s infinite;
+  .spinner__svg {
+    width: 100%;
+    height: 100%;
+    animation: spinnerRotate 1.5s linear infinite;
+    transform-origin: center;
   }
 
-  /* Size variations */
-  .size-small .loader {
-    height: 0.25rem;
-    width: 0.25rem;
-    box-shadow:
-      -0.5rem -0.5rem 0 0.25rem,
-      -0.5rem -0.5rem 0 0.25rem,
-      -0.5rem -0.5rem 0 0.25rem,
-      -0.5rem -0.5rem 0 0.25rem;
+  .spinner__track {
+    stroke: var(--theme-divider-color, rgba(128, 128, 128, 0.22));
+    stroke-width: 3.5;
   }
 
-  .size-large .loader {
-    height: 0.5rem;
-    width: 0.5rem;
-    box-shadow:
-      -1rem -1rem 0 0.5rem,
-      -1rem -1rem 0 0.5rem,
-      -1rem -1rem 0 0.5rem,
-      -1rem -1rem 0 0.5rem;
+  .spinner__arc {
+    // Brand chartreuse, overridable per surface. Deepened slightly from the
+    // logo's lightest green so it still carries on a white background.
+    stroke: var(--brand-accent-color, #c0f010);
+    stroke-width: 3.5;
+    stroke-dasharray: 1 126;
+    // 2πr with r=20 is ~125.7, so the dash pattern is expressed against 126.
+    animation: spinnerDash 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    filter: drop-shadow(0 0 5px rgba(192, 240, 16, 0.4));
   }
 
-  @keyframes squareSpinner {
+  @keyframes spinnerRotate {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spinnerDash {
     0% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem;
+      stroke-dasharray: 1 126;
+      stroke-dashoffset: 0;
     }
-    8.33% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem;
-    }
-    16.66% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem;
-    }
-    24.99% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
-    }
-    33.32% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem;
-    }
-    41.65% {
-      box-shadow:
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem;
-    }
-    49.98% {
-      box-shadow:
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem;
-    }
-    58.31% {
-      box-shadow:
-        -0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
-    }
-    66.64% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
-    }
-    74.97% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
-    }
-    83.3% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
-    }
-    91.63% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem,
-        -0.625rem 0.625rem 0 0.3125rem;
+    50% {
+      stroke-dasharray: 84 126;
+      stroke-dashoffset: -30;
     }
     100% {
-      box-shadow:
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem,
-        -0.625rem -0.625rem 0 0.3125rem;
+      stroke-dasharray: 84 126;
+      stroke-dashoffset: -124;
     }
   }
 
-  /* Size-specific animations */
-  .size-small .loader {
-    animation: squareSpinnerSmall 6s infinite;
-  }
-
-  .size-large .loader {
-    animation: squareSpinnerLarge 6s infinite;
-  }
-
-  @keyframes squareSpinnerSmall {
-    0% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem;
+  // Motion is decorative here; the arc still communicates "busy" without it.
+  @media (prefers-reduced-motion: reduce) {
+    .spinner__svg {
+      animation: none;
     }
-    8.33% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem;
+    .spinner__arc {
+      animation: spinnerPulse 1.8s ease-in-out infinite;
+      stroke-dasharray: 84 126;
+      stroke-dashoffset: -30;
     }
-    16.66% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem;
-    }
-    24.99% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    33.32% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem;
-    }
-    41.65% {
-      box-shadow:
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem;
-    }
-    49.98% {
-      box-shadow:
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem;
-    }
-    58.31% {
-      box-shadow:
-        -0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    66.64% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    74.97% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    83.3% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    91.63% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem,
-        -0.5rem 0.5rem 0 0.25rem;
-    }
-    100% {
-      box-shadow:
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem,
-        -0.5rem -0.5rem 0 0.25rem;
-    }
-  }
-
-  @keyframes squareSpinnerLarge {
-    0% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem;
-    }
-    8.33% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem;
-    }
-    16.66% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem;
-    }
-    24.99% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    33.32% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem;
-    }
-    41.65% {
-      box-shadow:
-        1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem;
-    }
-    49.98% {
-      box-shadow:
-        1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem;
-    }
-    58.31% {
-      box-shadow:
-        -1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    66.64% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    74.97% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    83.3% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    91.63% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem,
-        -1rem 1rem 0 0.5rem;
-    }
-    100% {
-      box-shadow:
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem,
-        -1rem -1rem 0 0.5rem;
+    @keyframes spinnerPulse {
+      0%,
+      100% {
+        opacity: 0.35;
+      }
+      50% {
+        opacity: 1;
+      }
     }
   }
 </style>

@@ -15,9 +15,18 @@
 <script lang="ts">
   import contact, { Employee, formatName } from '@hcengineering/contact'
   import { EmployeePresenter } from '@hcengineering/contact-resources'
-  import { Account, AccountRole, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
+  import core, { Account, AccountRole, Enum, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import { Breadcrumb, DropdownIntlItem, DropdownLabelsIntl, Header, Scroller, SearchInput } from '@hcengineering/ui'
+  import {
+    Breadcrumb,
+    DropdownIntlItem,
+    DropdownLabels,
+    DropdownLabelsIntl,
+    DropdownTextItem,
+    Header,
+    Scroller,
+    SearchInput
+  } from '@hcengineering/ui'
   import { onMount } from 'svelte'
 
   import setting from '../plugin'
@@ -77,6 +86,53 @@
   }
   let search = ''
 
+  // Job titles are workspace data, not code. They come from an Enum the team
+  // manages in Settings -> Enums, so new roles need no release. The names below
+  // are matched case-insensitively; the first match wins.
+  const JOB_ENUM_NAMES = ['job role', 'job title', 'job roles', 'discipline', 'team role', 'position']
+
+  // Used only until such an Enum exists, so the control is never empty.
+  const FALLBACK_TITLES = [
+    'Frontend Developer',
+    'Backend Developer',
+    'Full Stack Developer',
+    'QA / Tester',
+    'DevOps',
+    'Designer',
+    'Product Manager',
+    'Team Lead'
+  ]
+
+  const enumQuery = createQuery()
+  let enums: Enum[] = []
+  enumQuery.query(core.class.Enum, {}, (res) => {
+    enums = res
+  })
+
+  $: jobEnum = enums.find((e) => JOB_ENUM_NAMES.includes(e.name.trim().toLowerCase()))
+
+  // Any title already saved on someone stays selectable even if it was later
+  // removed from the Enum, so an existing assignment never silently disappears.
+  $: assignedTitles = employees.map((e) => e.position).filter((p): p is string => p != null && p !== '')
+
+  $: jobTitles = Array.from(new Set([...(jobEnum?.enumValues ?? FALLBACK_TITLES), ...assignedTitles]))
+
+  const NO_TITLE = '$none'
+  $: jobItems = [
+    { id: NO_TITLE, label: '—' },
+    ...jobTitles.map((t): DropdownTextItem => ({ id: t, label: t }))
+  ] as DropdownTextItem[]
+
+  async function changeJobTitle (employee: Employee, value: string): Promise<void> {
+    const position = value === NO_TITLE ? null : value
+    if ((employee.position ?? null) === position) return
+    try {
+      await client.update(employee, { position })
+    } catch (e: any) {
+      Analytics.handleError(e)
+    }
+  }
+
   $: ownersCount = employees.filter(
     (e) => e.personUuid != null && workspaceMembers[e.personUuid] === AccountRole.Owner
   ).length
@@ -103,6 +159,18 @@
             <div class="flex-row-center p-2 flex-no-shrink" data-id="owners-member-row">
               <div class="p-1 min-w-80">
                 <EmployeePresenter value={employee} disabled={false} />
+              </div>
+              <div class="mr-2">
+                <DropdownLabels
+                  label={setting.string.JobTitle}
+                  kind={'regular'}
+                  size={'medium'}
+                  items={jobItems}
+                  selected={employee.position ?? NO_TITLE}
+                  on:selected={(e) => {
+                    void changeJobTitle(employee, e.detail)
+                  }}
+                />
               </div>
               <DropdownLabelsIntl
                 label={setting.string.Role}

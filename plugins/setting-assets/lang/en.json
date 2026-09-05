@@ -281,6 +281,7 @@
     "ApiEndpointAccount": "Get account info",
     "ApiBaseUrl": "Base URL",
     "ApiWorkspaceId": "Your workspace ID (UUID) is included in the token. Pass it as :workspaceId in the URL.",
-    "ApiTokenRevokeError": "Failed to revoke token. Please try again."
+    "ApiTokenRevokeError": "Failed to revoke token. Please try again.",
+    "JobTitle": "Job title"
   }
 }

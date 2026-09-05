@@ -109,6 +109,7 @@
   import AccountPopup from './AccountPopup.svelte'
   import AppItem from './AppItem.svelte'
   import AppSwitcher from './AppSwitcher.svelte'
+  import CommandPalette from './CommandPalette.svelte'
   import Applications from './Applications.svelte'
   import Logo from './Logo.svelte'
   import NavFooter from './NavFooter.svelte'
@@ -821,7 +822,25 @@
       return false
     }
   }
+
+  // Command palette (Ctrl/Cmd-K). Ignored while typing so the shortcut never
+  // steals a keystroke from an input, textarea or rich-text editor.
+  let paletteOpen = false
+  function onGlobalKeydown (evt: KeyboardEvent): void {
+    if (!(evt.ctrlKey || evt.metaKey) || evt.key.toLowerCase() !== 'k') return
+    const t = evt.target as HTMLElement | null
+    const tag = t?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable === true) return
+    evt.preventDefault()
+    if (paletteOpen) return
+    paletteOpen = true
+    showPopup(CommandPalette, {}, 'top', () => {
+      paletteOpen = false
+    })
+  }
 </script>
+
+<svelte:window on:keydown={onGlobalKeydown} />
 
 {#if $myEmployeeStore && deactivated && !isAdminUser()}
   <div class="flex-col-center justify-center h-full flex-grow">
