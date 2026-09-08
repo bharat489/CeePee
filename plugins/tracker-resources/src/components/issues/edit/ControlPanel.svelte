@@ -34,6 +34,7 @@
   import AssigneeEditor from '../AssigneeEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
   import DeadlineEditor from '../DeadlineEditor.svelte'
+  import ResolutionEditor from '../ResolutionEditor.svelte'
   import PriorityEditor from '../PriorityEditor.svelte'
   import RelationEditor from '../RelationEditor.svelte'
   import IssueDependenciesPanel from '../IssueDependenciesPanel.svelte'
@@ -222,6 +223,8 @@
     <Label label={tracker.string.DueDate} />
   </span>
   <DueDateEditor value={issue} width={'100%'} editable={!readonly} />
+
+  <ResolutionEditor value={issue} {readonly} />
 
   <span class="labelOnPanel">
     <Label label={tracker.string.Deadline} />

@@ -85,6 +85,7 @@ import MyIssues from './components/myissues/MyIssues.svelte'
 import NewIssueHeader from './components/NewIssueHeader.svelte'
 import NopeComponent from './components/NopeComponent.svelte'
 import Decisions from './components/decisions/Decisions.svelte'
+import ResolutionEditor from './components/issues/ResolutionEditor.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
 import DepartmentRolesSetting from './components/departments/DepartmentRolesSetting.svelte'
@@ -418,6 +419,7 @@ export default async (): Promise<Resources> => ({
   component: {
     Decisions,
     CreateDecisionPopup,
+    ResolutionEditor,
     NopeComponent,
     DepartmentSegments,
     AddDepartmentPopup,

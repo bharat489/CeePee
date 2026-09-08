@@ -593,7 +593,16 @@
     "DraftedByAI": "Drafted by AI",
     "SupersededBy": "Superseded by",
     "RatifyHint": "Only a person can ratify a decision.",
-    "WhyThisWasDecided": "Why this was decided"
+    "WhyThisWasDecided": "Why this was decided",
+    "Resolution": "Resolution",
+    "Resolutions": "Resolutions",
+    "NoResolution": "No resolution",
+    "ResolutionFixed": "Fixed",
+    "ResolutionWontDo": "Won’t do",
+    "ResolutionDuplicate": "Duplicate",
+    "ResolutionCannotReproduce": "Cannot reproduce",
+    "SetResolution": "Set resolution",
+    "SuccessfulResolution": "Counts as delivered"
   },
   "status": {}
 }

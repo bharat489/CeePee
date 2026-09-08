@@ -41,6 +41,7 @@ import {
   TDependencyShiftedNotification,
   TDependencyShiftRequest,
   TDecision,
+  TResolution,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -493,7 +494,8 @@ export function createModel (builder: Builder): void {
     TDependencyShiftRequest,
     TDepartmentRole,
     TDepartmentSegment,
-    TDecision
+    TDecision,
+    TResolution
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the
@@ -540,6 +542,24 @@ export function createModel (builder: Builder): void {
   builder.mixin(tracker.class.Issue, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.DepartmentSegment, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.Decision, core.class.Class, activity.mixin.ActivityDoc, {})
+
+  // Seeded resolutions. `successful` is the field that matters: velocity
+  // computed over abandoned work is a lie, so reporting must be able to tell
+  // delivery from closure.
+  for (const r of [
+    { id: tracker.ids.ResolutionFixed, name: 'Fixed', successful: true, color: 10 },
+    { id: tracker.ids.ResolutionWontDo, name: 'Won’t do', successful: false, color: 8 },
+    { id: tracker.ids.ResolutionDuplicate, name: 'Duplicate', successful: false, color: 6 },
+    { id: tracker.ids.ResolutionCannotReproduce, name: 'Cannot reproduce', successful: false, color: 4 }
+  ]) {
+    builder.createDoc(
+      tracker.class.Resolution,
+      core.space.Model,
+      { name: r.name, successful: r.successful, color: r.color, readonly: true },
+      r.id
+    )
+  }
+
   builder.mixin(tracker.class.Milestone, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.Component, core.class.Class, activity.mixin.ActivityDoc, {})
   builder.mixin(tracker.class.IssueTemplate, core.class.Class, activity.mixin.ActivityDoc, {})

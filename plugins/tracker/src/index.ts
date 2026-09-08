@@ -333,6 +333,13 @@ export interface Issue extends Task {
   owningDepartment?: Ref<Department> | null
   contributingDepartments?: Ref<Department>[]
   segments?: CollectionSize<DepartmentSegment>
+
+  /**
+   * Why the issue closed. Meaningful only for terminal statuses; cleared when
+   * an issue is reopened so a stale reason never outlives the closure it
+   * described.
+   */
+  resolution?: Ref<Resolution> | null
 }
 
 /**
@@ -471,6 +478,37 @@ export interface Decision extends Doc {
    * Cleared on ratification: once a human ratifies, the human owns it.
    */
   aiDrafted?: boolean
+}
+
+/**
+ * Why an issue stopped being open.
+ *
+ * Status and resolution answer different questions and conflating them loses
+ * information that only matters later: "Done" and "Won't do" are both terminal
+ * statuses, but a report that cannot separate them cannot tell you how much
+ * work was actually delivered versus abandoned.
+ *
+ * A document rather than an enum so teams can add their own (Cannot
+ * reproduce, Superseded, Out of scope) without a release, in the same way
+ * DepartmentRole works.
+ * @public
+ */
+export interface Resolution extends Doc {
+  name: string
+  description?: string
+
+  /**
+   * Whether this resolution means the work was actually delivered. Reporting
+   * needs this: "Fixed" and "Duplicate" are both closures, but only one
+   * represents output, and velocity computed over both is a lie.
+   */
+  successful: boolean
+
+  /** Palette index, shared with the platform colour scheme. */
+  color: number
+
+  /** Seeded resolutions can be renamed but not deleted. */
+  readonly?: boolean
 }
 
 /**
@@ -740,7 +778,8 @@ const pluginState = plugin(trackerId, {
     DependencyShiftRequest: '' as Ref<Class<DependencyShiftRequest>>,
     DepartmentRole: '' as Ref<Class<DepartmentRole>>,
     DepartmentSegment: '' as Ref<Class<DepartmentSegment>>,
-    Decision: '' as Ref<Class<Decision>>
+    Decision: '' as Ref<Class<Decision>>,
+    Resolution: '' as Ref<Class<Resolution>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -753,7 +792,11 @@ const pluginState = plugin(trackerId, {
     ClassingProjectType: '' as Ref<ProjectType>,
     // Seeded department roles. Teams add their own alongside these.
     RoleAccountable: '' as Ref<DepartmentRole>,
-    RoleContributing: '' as Ref<DepartmentRole>
+    RoleContributing: '' as Ref<DepartmentRole>,
+    ResolutionFixed: '' as Ref<Resolution>,
+    ResolutionWontDo: '' as Ref<Resolution>,
+    ResolutionDuplicate: '' as Ref<Resolution>,
+    ResolutionCannotReproduce: '' as Ref<Resolution>
   },
   status: {
     Backlog: '' as Ref<Status>,
@@ -781,6 +824,7 @@ const pluginState = plugin(trackerId, {
     LabelsView: '' as AnyComponent,
     DepartmentSegments: '' as AnyComponent,
     Decisions: '' as AnyComponent,
+    ResolutionEditor: '' as AnyComponent,
     DecisionPresenter: '' as AnyComponent,
     CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
@@ -886,6 +930,15 @@ const pluginState = plugin(trackerId, {
   string: {
     TrackerApplication: '' as IntlString,
     ConfigLabel: '' as IntlString,
+    Resolution: '' as IntlString,
+    Resolutions: '' as IntlString,
+    NoResolution: '' as IntlString,
+    ResolutionFixed: '' as IntlString,
+    ResolutionWontDo: '' as IntlString,
+    ResolutionDuplicate: '' as IntlString,
+    ResolutionCannotReproduce: '' as IntlString,
+    SetResolution: '' as IntlString,
+    SuccessfulResolution: '' as IntlString,
     Decision: '' as IntlString,
     Decisions: '' as IntlString,
     NewDecision: '' as IntlString,

@@ -69,6 +69,7 @@ import {
   type DepartmentRoleKind,
   type Decision,
   type DecisionState,
+  type Resolution,
   type DepartmentSegment,
   type Issue,
   type IssueChildInfo,
@@ -247,6 +248,12 @@ export class TIssue extends TTask implements Issue {
 
   @Prop(Collection(tracker.class.DepartmentSegment), tracker.string.DepartmentSegments)
     segments?: number
+
+  // Why the issue closed, separate from the status that closed it. Optional so
+  // existing issues need no migration.
+  @Prop(TypeRef(tracker.class.Resolution), tracker.string.Resolution)
+  @Index(IndexKind.Indexed)
+    resolution?: Ref<Resolution> | null
 
   @Prop(ArrOf(TypeRef(core.class.TypeRelatedDocument)), tracker.string.BlockedBy)
     blockedBy!: RelatedDocument[]
@@ -458,6 +465,32 @@ export class TDepartmentSegment extends TAttachedDoc implements DepartmentSegmen
  * A decision, recorded so nobody reconstructs it from chat six months later.
  * @public
  */
+/**
+ * Why an issue stopped being open. See the Resolution interface for why this
+ * is separate from status.
+ * @public
+ */
+@Model(tracker.class.Resolution, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Resolution, tracker.icon.Issue)
+export class TResolution extends TDoc implements Resolution {
+  @Prop(TypeString(), tracker.string.Resolution)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Description)
+    description?: string
+
+  @Prop(TypeBoolean(), tracker.string.SuccessfulResolution)
+    successful!: boolean
+
+  @Prop(TypeNumber(), tracker.string.Color)
+    color!: number
+
+  @Prop(TypeBoolean(), tracker.string.Resolution)
+  @Hidden()
+    readonly?: boolean
+}
+
 @Model(tracker.class.Decision, core.class.Doc, DOMAIN_TRACKER)
 @UX(tracker.string.Decision, tracker.icon.Issue, undefined, 'decidedOn', undefined, tracker.string.Decisions)
 export class TDecision extends TDoc implements Decision {
