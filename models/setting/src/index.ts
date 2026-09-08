@@ -299,6 +299,23 @@ export function createModel (builder: Builder): void {
     },
     setting.ids.Backup
   )
+  // One screen for the four things a new team needs: who, their position,
+  // their role, and their department. Previously spread across Invite,
+  // Members, the job-title control and the HR module.
+  builder.createDoc(
+    setting.class.WorkspaceSettingCategory,
+    core.space.Model,
+    {
+      name: 'team',
+      label: setting.string.TeamSetup,
+      icon: setting.icon.Members,
+      component: setting.component.TeamSetup,
+      order: 990,
+      role: AccountRole.Maintainer
+    },
+    'setting:ids:TeamSetup' as Ref<any>
+  )
+
   builder.createDoc(
     setting.class.WorkspaceSettingCategory,
     core.space.Model,

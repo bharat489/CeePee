@@ -282,6 +282,20 @@
     "ApiBaseUrl": "Base URL",
     "ApiWorkspaceId": "Your workspace ID (UUID) is included in the token. Pass it as :workspaceId in the URL.",
     "ApiTokenRevokeError": "Failed to revoke token. Please try again.",
-    "JobTitle": "Job title"
+    "JobTitle": "Job title",
+    "TeamSetup": "Team",
+    "TeamSetupHint": "Add people, set their position, role and department in one place.",
+    "AddPeople": "Add people",
+    "Email": "Email",
+    "FirstName": "First name",
+    "LastName": "Last name",
+    "Position": "Position",
+    "Department": "Department",
+    "InviteAndAdd": "Create invite",
+    "CopyInviteLink": "Copy invite link",
+    "LinkCopied": "Copied",
+    "PendingInvites": "Invite links",
+    "NoDepartment": "No department",
+    "TeamSetupEmpty": "No one here yet. Add the first person below."
   }
 }
