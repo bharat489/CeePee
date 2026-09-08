@@ -90,7 +90,18 @@
     )
   }
 
-  $: statuses = getTaskTypeStates(value.kind, $taskTypeStore, $statusStore.byId)
+  // Transition guards. The full status list comes from the task type; if the
+  // type declares allowed transitions for the current status, offer only
+  // those plus the current one (so the control never shows an empty list).
+  // A status absent from the map may move anywhere -- existing types are
+  // unaffected until someone opts in.
+  $: allStatuses = getTaskTypeStates(value.kind, $taskTypeStore, $statusStore.byId)
+  $: guard =
+    value.kind !== undefined && value.status !== undefined
+      ? $taskTypeStore.get(value.kind)?.transitions?.[value.status]
+      : undefined
+  $: statuses =
+    guard === undefined ? allStatuses : allStatuses.filter((s) => s._id === value.status || guard.includes(s._id))
 
   function getSelectedStatus (
     statuses: WithLookup<IssueStatus>[] | undefined,

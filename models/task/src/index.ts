@@ -217,6 +217,12 @@ export class TTaskType extends TDoc implements TaskType {
   @Prop(TypeRef(core.class.Class), getEmbeddedLabel('Task target class'))
     targetClass!: Ref<Class<Task>> // Class or Mixin mixin to hold all user defined attributes.
 
+  @Prop(TypeRecord(), getEmbeddedLabel('Transitions'))
+    transitions?: Record<Ref<Status>, Ref<Status>[]>
+
+  @Prop(ArrOf(TypeString()), getEmbeddedLabel('Required before terminal'))
+    requiredBeforeTerminal?: string[]
+
   @Prop(ArrOf(TypeRef(core.class.Status)), getEmbeddedLabel('Task statuses'))
     statuses!: Ref<Status>[]
 

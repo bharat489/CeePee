@@ -123,6 +123,24 @@ export interface TaskType extends Doc, IconProps {
   ofClass: Ref<Class<Task>> // Base class for task
   targetClass: Ref<Class<Task>> // Class or Mixin mixin to hold all user defined attributes.
 
+  /**
+   * Transition guards. The 80% of Jira's workflow engine that prevents bad
+   * data, without the scripting that made it opaque.
+   *
+   * transitions: for a given status, the statuses it may move to. A status
+   * absent from the map may move anywhere, so existing types keep their
+   * current behaviour with no migration. Side effects never live here -- they
+   * belong in the process engine, where they are listed and inspectable.
+   */
+  transitions?: Record<Ref<Status>, Ref<Status>[]>
+
+  /**
+   * Attribute names that must be non-empty before a task may enter a Won or
+   * Lost status. Lets a team require, say, a resolution or an estimate at
+   * closure without a validator script.
+   */
+  requiredBeforeTerminal?: string[]
+
   // Allowed statuses and ordering
   statuses: Ref<Status>[]
   statusClass: Ref<Class<Status>>

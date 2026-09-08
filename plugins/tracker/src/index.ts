@@ -1088,7 +1088,8 @@ const pluginState = plugin(trackerId, {
   },
   taskTypes: {
     Issue: '' as Ref<TaskType>,
-    SubIssue: '' as Ref<TaskType>
+    SubIssue: '' as Ref<TaskType>,
+    Epic: '' as Ref<TaskType>
   },
   permission: {
     ForbidCreateProject: '' as Ref<Permission>

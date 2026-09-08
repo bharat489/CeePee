@@ -981,10 +981,33 @@ function defineSpaceType (builder: Builder): void {
       targetClass: tracker.mixin.IssueTypeData,
       statusClass: tracker.class.IssueStatus,
       statusCategories: classicIssueTaskStatuses.map((it) => it.category),
-      allowedAsChildOf: [tracker.taskTypes.Issue],
+      allowedAsChildOf: [tracker.taskTypes.Issue, tracker.taskTypes.Epic],
       icon: tracker.icon.Issue
     },
     tracker.taskTypes.Issue
+  )
+
+  // Epic: a container issue for a body of work. Deliberately a TaskType rather
+  // than a special object, so it gets hierarchy, statuses and attributes from
+  // the same machinery as everything else. Sub-issues roll up to it; it may
+  // not itself be a child.
+  builder.createDoc(
+    task.class.TaskType,
+    core.space.Model,
+    {
+      parent: pluginState.ids.ClassingProjectType,
+      statuses: classicStatuses,
+      descriptor: tracker.descriptors.Issue,
+      name: 'Epic',
+      kind: 'task',
+      ofClass: tracker.class.Issue,
+      targetClass: tracker.mixin.IssueTypeData,
+      statusClass: tracker.class.IssueStatus,
+      statusCategories: classicIssueTaskStatuses.map((it) => it.category),
+      allowedAsChildOf: [],
+      icon: tracker.icon.Issues
+    },
+    tracker.taskTypes.Epic
   )
 
   builder.createDoc(
@@ -994,10 +1017,13 @@ function defineSpaceType (builder: Builder): void {
       name: 'Classic project',
       descriptor: tracker.descriptors.ProjectType,
       description: '',
-      tasks: [tracker.taskTypes.Issue],
+      tasks: [tracker.taskTypes.Issue, tracker.taskTypes.Epic],
       roles: 0,
       classic: true,
-      statuses: classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Issue })),
+      statuses: [
+        ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Issue })),
+        ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Epic }))
+      ],
       targetClass: tracker.mixin.ClassicProjectTypeData
     },
     pluginState.ids.ClassingProjectType
