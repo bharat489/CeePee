@@ -13,6 +13,10 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { type Action } from '@hcengineering/view'
+  import view from '@hcengineering/view'
+  import { invokeAction } from '@hcengineering/view-resources'
+  import { markupToText } from '@hcengineering/text'
   import activity, { ActivityMessage } from '@hcengineering/activity'
   import { Analytics } from '@hcengineering/analytics'
   import { AttachmentRefInput } from '@hcengineering/attachment-resources'
@@ -152,6 +156,31 @@
     }
   }
 
+
+  const SLASH_ISSUE = /^\/issue\b\s*/i
+
+  function isSlashIssue (event: CustomEvent): boolean {
+    const raw = event.detail?.message
+    return typeof raw === 'string' && SLASH_ISSUE.test(markupToText(raw).trim())
+  }
+
+  // Markup is a JSON document; the command sits at the start of its first
+  // text node, so a single guarded replacement removes it without a parse.
+  function stripSlashIssue (event: CustomEvent): void {
+    const raw = event.detail?.message
+    if (typeof raw !== 'string') return
+    event.detail.message = raw.replace(/("text":")\/issue\b\s*/i, '$1')
+  }
+
+  async function promoteToIssue (id: Ref<ChatMessage>, event: CustomEvent): Promise<void> {
+    const msg = await client.findOne(chunter.class.ChatMessage, { _id: id })
+    const action = client
+      .getModel()
+      .findAllSync(view.class.Action, { _id: 'tracker:action:CreateIssueFromMessage' as Ref<Action> })[0]
+    if (msg === undefined || action === undefined) return
+    await invokeAction(msg, event, action)
+  }
+
   async function onMessage (event: CustomEvent): Promise<void> {
     draftController.remove()
     inputRef.removeDraft(false)
@@ -159,6 +188,14 @@
     if (chatMessage !== undefined) {
       loading = true
       await handleEdit(event)
+    } else if (isSlashIssue(event)) {
+      // /issue <text>: post the message, then promote it to an issue through
+      // the tracker action. Going via the action registry keeps chat unaware
+      // of the tracker; the dependency stays tracker -> chunter.
+      stripSlashIssue(event)
+      await handleCreate(event, _id)
+      void deleteTypingInfo()
+      await promoteToIssue(_id, event)
     } else {
       void handleCreate(event, _id)
       void deleteTypingInfo()
