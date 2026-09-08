@@ -85,6 +85,7 @@ import MyIssues from './components/myissues/MyIssues.svelte'
 import NewIssueHeader from './components/NewIssueHeader.svelte'
 import NopeComponent from './components/NopeComponent.svelte'
 import Decisions from './components/decisions/Decisions.svelte'
+import { createIssueFromMessage } from './createIssueFromMessage'
 import ResolutionEditor from './components/issues/ResolutionEditor.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
@@ -549,6 +550,7 @@ export default async (): Promise<Resources> => ({
     FormatIssueMarkdownValue: formatIssueValue
   },
   actionImpl: {
+    CreateIssueFromMessage: createIssueFromMessage,
     Move: move,
     EditWorkflowStatuses: editWorkflowStatuses,
     EditProject: editProject,

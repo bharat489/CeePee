@@ -17,6 +17,7 @@ import contact from '@hcengineering/contact'
 import { type Builder } from '@hcengineering/model'
 import core from '@hcengineering/model-core'
 import task from '@hcengineering/model-task'
+import chunter from '@hcengineering/chunter'
 import view, { actionTemplates, createAction } from '@hcengineering/model-view'
 import workbench, { createNavigateAction } from '@hcengineering/model-workbench'
 import { type IntlString } from '@hcengineering/platform'
@@ -43,6 +44,23 @@ function createGotoSpecialAction (
   })
 }
 export function createActions (builder: Builder, issuesId: string, componentsId: string, myIssuesId: string): void {
+  // Turn a chat message into an issue. Registered here rather than in
+  // models/chunter so the dependency runs tracker -> chunter, which already
+  // exists, and never the reverse. Chat stays unaware of the tracker.
+  createAction(
+    builder,
+    {
+      action: tracker.actionImpl.CreateIssueFromMessage,
+      label: tracker.string.CreateIssueFromMessage,
+      icon: tracker.icon.NewIssue,
+      input: 'focus',
+      category: tracker.category.Tracker,
+      target: chunter.class.ChatMessage,
+      context: { mode: ['context', 'browser'], group: 'associate' }
+    },
+    tracker.action.CreateIssueFromMessage
+  )
+
   createGotoSpecialAction(builder, issuesId, 'keyG->keyE', tracker.string.GotoIssues)
   createGotoSpecialAction(builder, issuesId, 'keyG->keyA', tracker.string.GotoActive, { mode: 'active' })
   createGotoSpecialAction(builder, issuesId, 'keyG->keyB', tracker.string.GotoBacklog, { mode: 'backlog' })

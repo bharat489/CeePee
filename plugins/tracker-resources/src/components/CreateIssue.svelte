@@ -28,6 +28,7 @@
     getCurrentAccount,
     makeCollabId,
     makeDocCollabId,
+    type Markup,
     type PersonId,
     Ref,
     type RelatedDocument,
@@ -110,6 +111,10 @@
   export let shouldSaveDraft: boolean = true
   export let parentIssue: Issue | undefined
   export let originalIssue: Issue | undefined
+  /** Pre-filled title, e.g. when an issue is created from a chat message. */
+  export let title: string | undefined = undefined
+  /** Pre-filled description markup, same use. */
+  export let description: Markup | undefined = undefined
 
   const mDraftController = new MultipleDraftController(tracker.ids.IssueDraft)
   // Stored across the function/dispatch boundary so the success-path close
@@ -188,8 +193,8 @@
   function getDefaultObject (id: Ref<Issue> | undefined = undefined, ignoreOriginal = false): IssueDraft {
     const base: IssueDraft = {
       _id: id ?? generateId(),
-      title: '',
-      description: EmptyMarkup,
+      title: title ?? '',
+      description: description ?? EmptyMarkup,
       kind: '' as Ref<TaskType>,
       priority: priority ?? IssuePriority.NoPriority,
       space: _space as Ref<Project>,

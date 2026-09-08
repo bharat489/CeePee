@@ -939,6 +939,7 @@ const pluginState = plugin(trackerId, {
     ResolutionCannotReproduce: '' as IntlString,
     SetResolution: '' as IntlString,
     SuccessfulResolution: '' as IntlString,
+    CreateIssueFromMessage: '' as IntlString,
     Decision: '' as IntlString,
     Decisions: '' as IntlString,
     NewDecision: '' as IntlString,
