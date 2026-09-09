@@ -78,7 +78,14 @@ function pick (i: Issue): Record<string, unknown> {
   }
 }
 
-async function deliver (hook: Webhook, event: WebhookEvent, body: string, control: TriggerControl): Promise<void> {
+function slackBody (event: WebhookEvent, p: Record<string, unknown>): string {
+  const i = (p.issue ?? {}) as Record<string, unknown>
+  const what = event === 'issue.created' ? 'created' : event === 'issue.deleted' ? 'deleted' : event === 'issue.status' ? 'changed status' : 'updated'
+  return JSON.stringify({ text: `*${String(i.identifier ?? '')}* ${String(i.title ?? '')} — ${what}` })
+}
+
+async function deliver (hook: Webhook, event: WebhookEvent, payload: Record<string, unknown>, control: TriggerControl): Promise<void> {
+  const body = hook.format === 'slack' ? slackBody(event, payload) : JSON.stringify(payload)
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     'user-agent': 'CeePee-Webhooks/1.0',
@@ -129,14 +136,14 @@ export async function OnIssueWebhook (txes: Tx[], control: TriggerControl): Prom
       event === 'issue.deleted'
         ? (control.removedMap.get(cud.objectId) as Issue | undefined)
         : (await control.findAll(control.ctx, tracker.class.Issue, { _id: cud.objectId }, { limit: 1 }))[0]
-    const body = JSON.stringify({
+    const payload: Record<string, unknown> = {
       event,
       at: Date.now(),
       workspace: control.workspace.url,
       issue: issue !== undefined ? pick(issue) : { _id: cud.objectId },
       changes: cud._class === core.class.TxUpdateDoc ? (cud as TxUpdateDoc<Issue>).operations : undefined
-    })
-    for (const h of targets) void deliver(h, event, body, control)
+    }
+    for (const h of targets) void deliver(h, event, payload, control)
   }
   return []
 }

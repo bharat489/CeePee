@@ -110,6 +110,13 @@ export interface TaskStatusFactory {
 /**
  * @public
  */
+/** @public */
+export interface TaskFieldConfig {
+  hiddenOnCreate?: string[]
+  hiddenOnEdit?: string[]
+  requiredOnCreate?: string[]
+}
+
 export interface TaskType extends Doc, IconProps {
   parent: Ref<ProjectType>
   descriptor: Ref<TaskTypeDescriptor>
@@ -140,6 +147,9 @@ export interface TaskType extends Doc, IconProps {
    * closure without a validator script.
    */
   requiredBeforeTerminal?: string[]
+
+  /** Which fields each surface shows, and which must be filled to create. */
+  fieldConfig?: TaskFieldConfig
 
   // Allowed statuses and ordering
   statuses: Ref<Status>[]

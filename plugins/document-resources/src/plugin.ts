@@ -34,6 +34,7 @@ export default mergeIds(documentId, document, {
   },
   string: {
     DocumentNamePlaceholder: '' as IntlString,
+    IssuesInDocument: '' as IntlString,
     Name: '' as IntlString,
     Cancel: '' as IntlString,
     Document: '' as IntlString,

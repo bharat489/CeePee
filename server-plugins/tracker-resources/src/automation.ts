@@ -89,9 +89,10 @@ export async function OnIssueAutomation (txes: Tx[], control: TriggerControl): P
     if (cud._class === core.class.TxCreateDoc) {
       const attrs = (cud as TxCreateDoc<Issue>).attributes
       const ops: Partial<Issue> = {}
-      if (auto.assignComponentLead === true && attrs.assignee == null && attrs.component != null) {
+      if (attrs.assignee == null && attrs.component != null) {
         const comp = (await control.findAll(control.ctx, tracker.class.Component, { _id: attrs.component }, { limit: 1 }))[0]
-        if (comp?.lead != null) ops.assignee = comp.lead
+        if (comp?.defaultAssignee != null) ops.assignee = comp.defaultAssignee
+        else if (auto.assignComponentLead === true && comp?.lead != null) ops.assignee = comp.lead
       }
       if (project.sla !== undefined) {
         const due = slaDueFor(project, attrs.priority, cud.modifiedOn)

@@ -32,6 +32,12 @@
   import ComponentEditor from '../../components/ComponentEditor.svelte'
   import MilestoneEditor from '../../milestones/MilestoneEditor.svelte'
   import SprintEditor from '../../sprints/SprintEditor.svelte'
+  import Votes from './Votes.svelte'
+  import Watchers from './Watchers.svelte'
+  import ExternalLinks from './ExternalLinks.svelte'
+  import MentionedIn from './MentionedIn.svelte'
+  import CsatPrompt from './CsatPrompt.svelte'
+  import { taskTypeStore } from '@hcengineering/task-resources'
   import AssigneeEditor from '../AssigneeEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
   import DeadlineEditor from '../DeadlineEditor.svelte'
@@ -70,6 +76,12 @@
     'dueDate',
     'milestone',
     'sprint',
+    'votes',
+    'voteCount',
+    'externalLinks',
+    'requestType',
+    'csat',
+    'csatComment',
     'relations',
     'blockedBy',
     'identifier',
@@ -106,6 +118,9 @@
   }
 
   $: updateKeys(issue._class, ignoreKeys)
+  // Per-type field configuration (Settings → Fields): hidden fields stay editable elsewhere.
+  $: fieldConfig = $taskTypeStore.get(issue.kind)?.fieldConfig
+  $: isHidden = (key: string): boolean => fieldConfig?.hiddenOnEdit?.includes(key) === true
   let creatorPersonRef: Ref<Person> | undefined
   $: if (issue.createdBy !== undefined) {
     getPersonRefByPersonIdCb(issue.createdBy, (ref) => {
@@ -117,6 +132,7 @@
 </script>
 
 <div class="popupPanel-body__aside-grid">
+  <div style="grid-column: 1 / -1"><CsatPrompt {issue} /></div>
   {#if issue.template?.template}
     <span class="labelOnPanel">
       <Label label={tracker.string.IssueTemplate} />
@@ -170,10 +186,12 @@
 
   <IssueDependenciesPanel {issue} {readonly} />
 
+  {#if !isHidden('priority')}
   <span class="labelOnPanel">
     <Label label={tracker.string.Priority} />
   </span>
   <PriorityEditor value={issue} size={'medium'} shouldShowLabel isEditable={!readonly} width={'100%'} />
+  {/if}
 
   <span class="labelOnPanel">
     <Label label={core.string.CreatedBy} />
@@ -189,11 +207,14 @@
     readonly
   />
 
+  {#if !isHidden('assignee')}
   <span class="labelOnPanel">
     <Label label={tracker.string.Assignee} />
   </span>
   <AssigneeEditor object={issue} size={'medium'} avatarSize={'card'} width="100%" {readonly} />
+  {/if}
 
+  {#if !isHidden('labels')}
   <span class="labelTop">
     <Label label={tracker.string.Labels} />
   </span>
@@ -201,35 +222,63 @@
     is={tags.component.TagsAttributeEditor}
     props={{ object: issue, label: tracker.string.AddLabel, readonly }}
   />
+  {/if}
 
   <div class="divider" />
 
+  {#if !isHidden('component')}
   <span class="labelOnPanel">
     <Label label={tracker.string.Component} />
   </span>
   <ComponentEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} />
+  {/if}
 
+  {#if !isHidden('milestone')}
   <span class="labelOnPanel">
     <Label label={tracker.string.Milestone} />
   </span>
   <MilestoneEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} />
+  {/if}
 
+  {#if !isHidden('sprint')}
   <span class="labelOnPanel">
     <Label label={tracker.string.Sprint} />
   </span>
   <SprintEditor value={issue} {readonly} />
+  {/if}
+  {#if !isHidden('externalLinks')}
+  <span class="labelTop">
+    <Label label={tracker.string.ExternalLinks} />
+  </span>
+  <ExternalLinks {issue} {readonly} />
+  {/if}
+  {#if !isHidden('votes')}
+  <span class="labelOnPanel">
+    <Label label={tracker.string.Votes} />
+  </span>
+  <Votes {issue} {readonly} />
+  <span class="labelTop">
+    <Label label={tracker.string.Watchers} />
+  </span>
+  <Watchers {issue} {readonly} />
+  {/if}
+  <MentionedIn {issue} />
 
   <div class="divider" />
 
+  {#if !isHidden('startDate')}
   <span class="labelOnPanel">
     <Label label={tracker.string.IssueStartDate} />
   </span>
   <StartDateEditor value={issue} width={'100%'} editable={!readonly} />
+  {/if}
 
+  {#if !isHidden('dueDate')}
   <span class="labelOnPanel">
     <Label label={tracker.string.DueDate} />
   </span>
   <DueDateEditor value={issue} width={'100%'} editable={!readonly} />
+  {/if}
 
   <ResolutionEditor value={issue} {readonly} />
 

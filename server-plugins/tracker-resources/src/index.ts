@@ -15,6 +15,7 @@
 
 import { OnIssueAutomation } from './automation'
 import { OnIssueWebhook } from './webhooks'
+import { OnAutomationRules } from './rules'
 import chunter, { ChatMessage } from '@hcengineering/chunter'
 import contact, { Employee, Person, PersonSpace } from '@hcengineering/contact'
 import core, {
@@ -924,6 +925,7 @@ export default async () => ({
   trigger: {
     OnIssueWebhook,
     OnIssueAutomation,
+    OnAutomationRules,
     OnIssueStatusGuard,
     OnIssueUpdate,
     OnComponentRemove,

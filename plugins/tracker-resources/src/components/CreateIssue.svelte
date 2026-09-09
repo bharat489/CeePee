@@ -53,7 +53,7 @@
   } from '@hcengineering/presentation'
   import tags, { type TagElement, TagReference } from '@hcengineering/tags'
   import { TaskType } from '@hcengineering/task'
-  import { TaskKindSelector } from '@hcengineering/task-resources'
+  import { TaskKindSelector, taskTypeStore } from '@hcengineering/task-resources'
   import { EmptyMarkup, isEmptyMarkup } from '@hcengineering/text'
   import {
     Component as ComponentType,
@@ -254,7 +254,34 @@
     getTitle(object.title ?? '').length > 0 &&
     object.status !== undefined &&
     kind !== undefined &&
-    currentProject !== undefined
+    currentProject !== undefined &&
+    requiredOk
+
+  // Per-type field configuration (Settings → Fields).
+  $: fieldConfig = kind !== undefined ? $taskTypeStore.get(kind)?.fieldConfig : undefined
+  $: hiddenC = (key: string): boolean => fieldConfig?.hiddenOnCreate?.includes(key) === true
+  $: requiredOk = (fieldConfig?.requiredOnCreate ?? []).every((k) => {
+    switch (k) {
+      case 'assignee':
+        return object.assignee != null
+      case 'priority':
+        return object.priority !== IssuePriority.NoPriority
+      case 'component':
+        return object.component != null
+      case 'milestone':
+        return object.milestone != null
+      case 'estimation':
+        return (object.estimation ?? 0) > 0
+      case 'dueDate':
+        return object.dueDate != null
+      case 'startDate':
+        return object.startDate != null
+      case 'labels':
+        return object.labels.length > 0
+      default:
+        return true
+    }
+  })
 
   $: empty = {
     assignee: assignee ?? currentProject?.defaultAssignee,
@@ -959,6 +986,7 @@
         />
       {/if}
     </div>
+    {#if !hiddenC('priority')}
     <div id="priority-editor">
       <PriorityEditor
         focusIndex={4}
@@ -974,6 +1002,8 @@
         }}
       />
     </div>
+    {/if}
+    {#if !hiddenC('assignee')}
     <div id="assignee-editor">
       <AssigneeEditor
         focusIndex={5}
@@ -988,6 +1018,8 @@
         }}
       />
     </div>
+    {/if}
+    {#if !hiddenC('labels')}
     <Component
       is={tags.component.TagsDropdownEditor}
       props={{
@@ -1006,6 +1038,8 @@
         object.labels = object.labels.filter((it) => it.tag !== evt.detail._id)
       }}
     />
+    {/if}
+    {#if !hiddenC('component')}
     <ComponentSelector
       focusIndex={7}
       value={object.component}
@@ -1015,9 +1049,13 @@
       kind={'regular'}
       size={'large'}
     />
+    {/if}
+    {#if !hiddenC('estimation')}
     <div id="estimation-editor" class="new-line">
       <EstimationEditor focusIndex={8} kind={'regular'} size={'large'} value={object} />
     </div>
+    {/if}
+    {#if !hiddenC('milestone')}
     <div id="milestone-editor" class="new-line">
       <MilestoneSelector
         focusIndex={9}
@@ -1029,6 +1067,8 @@
         short
       />
     </div>
+    {/if}
+    {#if !hiddenC('relations')}
     <div id="relations-picker" class="new-line">
       <IssueRelationsPicker
         bind:blockedBy={pickedBlockedBy}
@@ -1037,6 +1077,8 @@
         exclude={object._id}
       />
     </div>
+    {/if}
+    {#if !hiddenC('dueDate')}
     <div id="duedate-editor" class="new-line">
       <DatePresenter
         focusIndex={10}
@@ -1047,6 +1089,8 @@
         editable
       />
     </div>
+    {/if}
+    {#if !hiddenC('parent')}
     <div id="parentissue-editor" class="new-line">
       <Button
         focusIndex={11}
@@ -1058,6 +1102,7 @@
         on:click={object.parentIssue != null ? clearParentIssue : setParentIssue}
       />
     </div>
+    {/if}
     <DocCreateExtComponent manager={docCreateManager} kind={'pool'} space={currentProject} props={extraProps} />
   </svelte:fragment>
   <svelte:fragment slot="attachments">

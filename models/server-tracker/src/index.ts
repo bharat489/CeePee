@@ -55,6 +55,12 @@ export function createModel (builder: Builder): void {
   // writes through the API meets the same rule.
   // Automation rules and SLA deadlines, then outbound webhooks. Both watch
   // every issue transaction and decide inside what applies.
+  // Project automation rules (WHEN/IF/THEN), on issue changes and comments.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnAutomationRules,
+    txMatch: { objectClass: { $in: [tracker.class.Issue, 'chunter:class:ChatMessage' as any] } }
+  })
+
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnIssueAutomation,
     txMatch: { objectClass: tracker.class.Issue }

@@ -13,438 +13,239 @@
 // limitations under the License.
 -->
 <!--
-  Dashboard: the first screen of the day.
-
-  Six fixed widgets rather than a gadget builder. What people configure on a
-  Jira dashboard is, nearly always, the same six things -- what is mine, what
-  is due, what has stalled, how the sprint is going, who is loaded, what was
-  decided. Building those well beats a widget marketplace nobody curates.
+  Dashboards: as many as you like, each a list of widgets. Private by
+  default; share one and everyone sees it. Wallboard mode goes full screen
+  and refreshes every minute, for the TV by the team.
 -->
 <script lang="ts">
-  import contact, { formatName, getCurrentEmployee, type Person } from '@hcengineering/contact'
-  import { SortingOrder, type Ref } from '@hcengineering/core'
+  import { getCurrentEmployee } from '@hcengineering/contact'
+  import core, { generateId, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import task from '@hcengineering/task'
-  import { IssuePriority, type Decision, type Issue, type IssueStatus, type Project, type Sprint } from '@hcengineering/tracker'
-  import { Label, showPanel } from '@hcengineering/ui'
-  import view from '@hcengineering/view'
+  import { type Dashboard, type DashboardWidget, type Project } from '@hcengineering/tracker'
+  import { Button, IconAdd, Label } from '@hcengineering/ui'
+  import { onDestroy } from 'svelte'
 
   import tracker from '../../plugin'
+  import Widget from './Widget.svelte'
 
   const client = getClient()
   const me = getCurrentEmployee()
-  const DAY = 86_400_000
-  const STALE_DAYS = 7
-
-  const statusQuery = createQuery()
-  const mineQuery = createQuery()
-  const sprintQuery = createQuery()
+  const query = createQuery()
   const projectQuery = createQuery()
-  const decisionQuery = createQuery()
-
-  let statuses: IssueStatus[] = []
-  let mine: Issue[] = []
-  let activeSprints: Sprint[] = []
+  let dashboards: Dashboard[] = []
   let projects: Project[] = []
-  let decisions: Decision[] = []
+  query.query(tracker.class.Dashboard, {}, (r) => { dashboards = r.filter((d) => d.owner === me || d.shared) }, { sort: { createdOn: SortingOrder.Ascending } })
+  projectQuery.query(tracker.class.Project, {}, (r) => { projects = r })
 
-  statusQuery.query(tracker.class.IssueStatus, {}, (r) => {
-    statuses = r
-  })
-  projectQuery.query(tracker.class.Project, {}, (r) => {
-    projects = r
-  })
-  sprintQuery.query(tracker.class.Sprint, { state: 'active' }, (r) => {
-    activeSprints = r
-  })
-  decisionQuery.query(
-    tracker.class.Decision,
-    {},
-    (r) => {
-      decisions = r
-    },
-    { limit: 5, sort: { modifiedOn: SortingOrder.Descending } }
-  )
+  const DEFAULT: DashboardWidget[] = [
+    { id: 'w1', type: 'mine' },
+    { id: 'w2', type: 'due' },
+    { id: 'w3', type: 'stale' },
+    { id: 'w4', type: 'sprints' },
+    { id: 'w5', type: 'workload' },
+    { id: 'w6', type: 'decisions' }
+  ]
+  let selectedId: Ref<Dashboard> | 'default' = 'default'
+  $: selected = selectedId === 'default' ? undefined : dashboards.find((d) => d._id === selectedId)
+  $: widgets = selected?.widgets ?? DEFAULT
+  $: canEdit = selected !== undefined && selected.owner === me
 
-  $: openIds = statuses
-    .filter((s) => s.category !== task.statusCategory.Won && s.category !== task.statusCategory.Lost)
-    .map((s) => s._id)
-  $: doneIds = statuses
-    .filter((s) => s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost)
-    .map((s) => s._id)
-  $: if (openIds.length > 0) {
-    mineQuery.query(
-      tracker.class.Issue,
-      { assignee: me, status: { $in: openIds } },
-      (r) => {
-        mine = r
-      },
-      { limit: 300 }
-    )
-  }
-  $: projectName = new Map(projects.map((p) => [p._id, p.name]))
-  $: statusName = new Map(statuses.map((s) => [s._id, s.name]))
-
-  function rank (p: IssuePriority): number {
-    return p === IssuePriority.NoPriority ? 99 : p
-  }
-  const priorityLabel: Record<IssuePriority, string> = {
-    [IssuePriority.Urgent]: 'Urgent',
-    [IssuePriority.High]: 'High',
-    [IssuePriority.Medium]: 'Medium',
-    [IssuePriority.Low]: 'Low',
-    [IssuePriority.NoPriority]: 'None'
-  }
-  const priorities = [IssuePriority.Urgent, IssuePriority.High, IssuePriority.Medium, IssuePriority.Low, IssuePriority.NoPriority]
-
-  $: next = [...mine]
-    .sort((a, b) => {
-      const pr = rank(a.priority) - rank(b.priority)
-      if (pr !== 0) return pr
-      return (a.dueDate ?? Number.MAX_SAFE_INTEGER) - (b.dueDate ?? Number.MAX_SAFE_INTEGER)
+  let editing = false
+  async function createDashboard (fromDefault = true): Promise<void> {
+    const name = prompt('Dashboard name', 'My dashboard')
+    if (name === null || name.trim() === '') return
+    const id = await client.createDoc(tracker.class.Dashboard, core.space.Workspace, {
+      name: name.trim(),
+      owner: me,
+      shared: false,
+      widgets: fromDefault ? DEFAULT.map((w) => ({ ...w, id: generateId() })) : []
     })
-    .slice(0, 6)
-  $: byPriority = priorities.map((p) => ({ p, n: mine.filter((i) => i.priority === p).length }))
-  $: maxPriority = Math.max(1, ...byPriority.map((b) => b.n))
-  $: dueSoon = mine
-    .filter((i) => i.dueDate != null && i.dueDate < Date.now() + 7 * DAY)
-    .sort((a, b) => (a.dueDate ?? 0) - (b.dueDate ?? 0))
-    .slice(0, 6)
-
-  // ---- one-shot loads that are too broad for a live query ---------------
-  let stale: Issue[] = []
-  let workload: Array<{ name: string, n: number }> = []
-  let progress: Array<{ sprint: Sprint, done: number, total: number }> = []
-
-  async function loadStaleAndWorkload (open: Ref<IssueStatus>[]): Promise<void> {
-    stale = await client.findAll(
-      tracker.class.Issue,
-      { status: { $in: open }, modifiedOn: { $lt: Date.now() - STALE_DAYS * DAY } },
-      { limit: 6, sort: { modifiedOn: SortingOrder.Ascending } }
-    )
-    const assigned = await client.findAll(tracker.class.Issue, { status: { $in: open }, assignee: { $ne: null } }, { limit: 2000 })
-    const counts = new Map<Ref<Person>, number>()
-    for (const i of assigned) if (i.assignee != null) counts.set(i.assignee, (counts.get(i.assignee) ?? 0) + 1)
-    const ids = Array.from(counts.keys())
-    const people = ids.length > 0 ? await client.findAll(contact.class.Person, { _id: { $in: ids } }) : []
-    const name = new Map(people.map((p) => [p._id, formatName(p.name)]))
-    workload = ids
-      .map((id) => ({ name: name.get(id) ?? '—', n: counts.get(id) ?? 0 }))
-      .sort((a, b) => b.n - a.n)
-      .slice(0, 8)
+    selectedId = id
+    editing = true
   }
-  $: if (openIds.length > 0) void loadStaleAndWorkload(openIds)
-  $: maxLoad = Math.max(1, ...workload.map((w) => w.n))
+  async function save (ws: DashboardWidget[]): Promise<void> {
+    if (selected === undefined) return
+    await client.update(selected, { widgets: ws })
+  }
+  async function rename (): Promise<void> {
+    if (selected === undefined) return
+    const name = prompt('Dashboard name', selected.name)
+    if (name === null || name.trim() === '') return
+    await client.update(selected, { name: name.trim() })
+  }
+  async function remove (): Promise<void> {
+    if (selected === undefined || !confirm(`Delete "${selected.name}"?`)) return
+    await client.remove(selected)
+    selectedId = 'default'
+    editing = false
+  }
+  function move (idx: number, dir: -1 | 1): void {
+    const ws = [...widgets]
+    const j = idx + dir
+    if (j < 0 || j >= ws.length) return
+    ;[ws[idx], ws[j]] = [ws[j], ws[idx]]
+    void save(ws)
+  }
+  function removeWidget (idx: number): void {
+    void save(widgets.filter((_, k) => k !== idx))
+  }
 
-  async function loadProgress (sprints: Sprint[], done: Ref<IssueStatus>[]): Promise<void> {
-    const out: typeof progress = []
-    for (const s of sprints) {
-      const issues = await client.findAll(tracker.class.Issue, { sprint: s._id })
-      out.push({ sprint: s, total: issues.length, done: issues.filter((i) => done.includes(i.status)).length })
+  // ---- add widget ----------------------------------------------------------
+  const LIBRARY: Array<{ type: string, label: string, hint: string }> = [
+    { type: 'mine', label: 'Assigned to me', hint: 'Open issues by priority, top of the list first' },
+    { type: 'due', label: 'Due soon', hint: 'Mine due within N days' },
+    { type: 'stale', label: 'Gone quiet', hint: 'Open issues untouched for N days' },
+    { type: 'sprints', label: 'Active sprints', hint: 'Progress of every active sprint' },
+    { type: 'workload', label: 'Workload', hint: 'Open issues per person' },
+    { type: 'decisions', label: 'Decisions', hint: 'Latest decision records' },
+    { type: 'query', label: 'Query results', hint: 'Any query-language expression' },
+    { type: 'pie', label: 'Breakdown', hint: 'Donut by status, priority, assignee or project' },
+    { type: 'cvr', label: 'Created vs resolved', hint: 'Daily lines for the last N days' },
+    { type: 'sla', label: 'SLA at risk', hint: 'Open issues breaching within N hours' },
+    { type: 'activity', label: 'Recent activity', hint: 'Latest changes across issues' },
+    { type: 'hours', label: 'Hours this week', hint: 'Logged time per person' }
+  ]
+  let adding = false
+  let newType = 'query'
+  let newTitle = ''
+  let newText = 'assignee = me AND status != done'
+  let newField = 'status'
+  let newDays = 30
+  let newHours = 24
+  let newProject: Ref<Project> | '' = ''
+  function addWidget (): void {
+    const params: Record<string, any> = {}
+    if (newTitle.trim() !== '') params.title = newTitle.trim()
+    if (newType === 'query') params.text = newText
+    if (newType === 'pie') {
+      params.field = newField
+      if (newProject !== '') params.project = newProject
     }
-    progress = out
+    if (newType === 'cvr') {
+      params.days = newDays
+      if (newProject !== '') params.project = newProject
+    }
+    if (newType === 'due' || newType === 'stale') params.days = newDays
+    if (newType === 'sla') params.hours = newHours
+    void save([...widgets, { id: generateId(), type: newType, params }])
+    adding = false
+    newTitle = ''
   }
-  $: if (statuses.length > 0) void loadProgress(activeSprints, doneIds)
 
-  function open (issue: Issue): void {
-    showPanel(view.component.EditDoc, issue._id, issue._class, 'content')
+  // ---- wallboard -----------------------------------------------------------
+  let wall = false
+  let tick = 0
+  let timer: ReturnType<typeof setInterval> | undefined
+  function toggleWall (): void {
+    wall = !wall
+    if (wall) {
+      void document.documentElement.requestFullscreen?.()
+      timer = setInterval(() => { tick++ }, 60_000)
+    } else {
+      if (document.fullscreenElement != null) void document.exitFullscreen()
+      if (timer !== undefined) clearInterval(timer)
+    }
   }
-  function openDecision (d: Decision): void {
-    showPanel(view.component.EditDoc, d._id, d._class, 'content')
-  }
-  function daysLeft (s: Sprint): number {
-    return Math.max(0, Math.ceil((s.endDate - Date.now()) / DAY))
-  }
-  function ago (ts: number): string {
-    const d = Math.floor((Date.now() - ts) / DAY)
-    return d <= 0 ? 'today' : d === 1 ? '1d' : d + 'd'
-  }
-  function due (ts: number): string {
-    const d = Math.ceil((ts - Date.now()) / DAY)
-    return d < 0 ? `${-d}d overdue` : d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d}d`
-  }
+  onDestroy(() => {
+    if (timer !== undefined) clearInterval(timer)
+  })
+  const titleOf = (w: DashboardWidget): string => (w.params?.title as string | undefined) ?? LIBRARY.find((l) => l.type === w.type)?.label ?? w.type
 </script>
 
-<div class="dash">
+<div class="dash" class:dash--wall={wall}>
   <header class="dash__head">
-    <span class="dash__title"><Label label={tracker.string.Dashboard} /></span>
-    <span class="dash__sub">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+    <div class="dash__left">
+      <select class="select" bind:value={selectedId}>
+        <option value="default">Default</option>
+        {#each dashboards as d (d._id)}<option value={d._id}>{d.name}{d.shared ? ' · shared' : ''}{d.owner !== me ? ' · ' : ''}</option>{/each}
+      </select>
+      <span class="dash__sub">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+    </div>
+    <div class="dash__tools">
+      {#if selected === undefined}
+        <Button kind={'ghost'} icon={IconAdd} label={tracker.string.NewDashboard} on:click={() => { void createDashboard(true) }} />
+      {:else if canEdit}
+        <Button kind={editing ? 'primary' : 'ghost'} label={editing ? tracker.string.Done : tracker.string.Edit} on:click={() => { editing = !editing; adding = false }} />
+        {#if editing}
+          <Button kind={'ghost'} label={tracker.string.Rename} on:click={rename} />
+          <Button kind={'ghost'} label={selected.shared ? tracker.string.Unshare : tracker.string.Share} on:click={() => { void client.update(selected, { shared: !selected.shared }) }} />
+          <Button kind={'ghost'} label={tracker.string.Delete} on:click={remove} />
+          <Button kind={'ghost'} icon={IconAdd} label={tracker.string.NewDashboard} on:click={() => { void createDashboard(false) }} />
+        {/if}
+      {/if}
+      <Button kind={'ghost'} label={wall ? tracker.string.ExitWallboard : tracker.string.Wallboard} on:click={toggleWall} />
+    </div>
   </header>
 
-  <!-- 1. What is mine -->
-  <section class="card motion-rise" style="--i: 0">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.MyIssues} /></span>
-      <span class="card__n">{mine.length}</span>
-    </div>
-    <div class="bars">
-      {#each byPriority as b (b.p)}
-        <div class="bar-row">
-          <span class="bar-row__label">{priorityLabel[b.p]}</span>
-          <span class="bar-row__track"><span class="bar-row__fill" style="width: {(b.n / maxPriority) * 100}%" /></span>
-          <span class="bar-row__n">{b.n}</span>
+  {#if editing && canEdit}
+    <section class="addbar motion-pop">
+      {#if !adding}
+        <Button kind={'primary'} icon={IconAdd} label={tracker.string.AddWidget} on:click={() => { adding = true }} />
+      {:else}
+        <div class="addbar__form">
+          <select class="select" bind:value={newType}>{#each LIBRARY as l (l.type)}<option value={l.type}>{l.label}</option>{/each}</select>
+          <input class="input" placeholder="Title (optional)" bind:value={newTitle} />
+          {#if newType === 'query'}<input class="input input--wide" placeholder="assignee = me AND status != done" bind:value={newText} />{/if}
+          {#if newType === 'pie'}
+            <select class="select" bind:value={newField}><option value="status">by status</option><option value="priority">by priority</option><option value="assignee">by assignee</option><option value="project">by project</option></select>
+          {/if}
+          {#if newType === 'pie' || newType === 'cvr'}
+            <select class="select" bind:value={newProject}><option value="">all projects</option>{#each projects as p (p._id)}<option value={p._id}>{p.name}</option>{/each}</select>
+          {/if}
+          {#if newType === 'cvr' || newType === 'due' || newType === 'stale'}<input class="input input--n" type="number" min="1" bind:value={newDays} /> days{/if}
+          {#if newType === 'sla'}<input class="input input--n" type="number" min="1" bind:value={newHours} /> hours{/if}
+          <Button kind={'primary'} label={tracker.string.Add} on:click={addWidget} />
+          <Button kind={'ghost'} label={tracker.string.Cancel} on:click={() => { adding = false }} />
         </div>
-      {/each}
-    </div>
-    {#each next as i, idx (i._id)}
-      <button class="row motion-rise" style="--i: {idx}" on:click={() => { open(i) }}>
-        <span class="row__id">{i.identifier}</span>
-        <span class="row__title">{i.title}</span>
-        <span class="row__meta">{statusName.get(i.status) ?? ''}</span>
-      </button>
-    {/each}
-    {#if mine.length === 0}<p class="muted"><Label label={tracker.string.NothingAssigned} /></p>{/if}
-  </section>
+        <span class="addbar__hint">{LIBRARY.find((l) => l.type === newType)?.hint}</span>
+      {/if}
+    </section>
+  {/if}
 
-  <!-- 2. What is due -->
-  <section class="card motion-rise" style="--i: 1">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.DueSoon} /></span>
-      <span class="card__n">{dueSoon.length}</span>
-    </div>
-    {#each dueSoon as i, idx (i._id)}
-      <button class="row motion-rise" style="--i: {idx}" on:click={() => { open(i) }}>
-        <span class="row__id">{i.identifier}</span>
-        <span class="row__title">{i.title}</span>
-        <span class="row__meta" class:row__meta--late={(i.dueDate ?? 0) < Date.now()}>{due(i.dueDate ?? 0)}</span>
-      </button>
-    {/each}
-    {#if dueSoon.length === 0}<p class="muted"><Label label={tracker.string.NothingDue} /></p>{/if}
-  </section>
-
-  <!-- 3. What has stalled -->
-  <section class="card motion-rise" style="--i: 2">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.GoneQuiet} /></span>
-      <span class="card__n">{STALE_DAYS}d+</span>
-    </div>
-    {#each stale as i, idx (i._id)}
-      <button class="row motion-rise" style="--i: {idx}" on:click={() => { open(i) }}>
-        <span class="row__id">{i.identifier}</span>
-        <span class="row__title">{i.title}</span>
-        <span class="row__meta">{ago(i.modifiedOn)}</span>
-      </button>
-    {/each}
-    {#if stale.length === 0}<p class="muted"><Label label={tracker.string.NothingStale} /></p>{/if}
-  </section>
-
-  <!-- 4. How the sprints are going -->
-  <section class="card motion-rise" style="--i: 3">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.ActiveSprint} /></span>
-      <span class="card__n">{progress.length}</span>
-    </div>
-    {#each progress as p (p.sprint._id)}
-      <div class="sprint">
-        <div class="sprint__head">
-          <span class="sprint__name">{p.sprint.name}</span>
-          <span class="sprint__meta">{projectName.get(p.sprint.space) ?? ''} · {daysLeft(p.sprint)} <Label label={tracker.string.DaysLeft} /></span>
+  <div class="grid">
+    {#each widgets as w, idx (w.id)}
+      <section class="card motion-rise" style="--i: {idx}">
+        <div class="card__head">
+          <span class="card__title">{titleOf(w)}</span>
+          {#if editing && canEdit}
+            <span class="card__tools">
+              <button class="tool" title="Move up" on:click={() => { move(idx, -1) }}>↑</button>
+              <button class="tool" title="Move down" on:click={() => { move(idx, 1) }}>↓</button>
+              <button class="tool tool--x" title="Remove" on:click={() => { removeWidget(idx) }}>×</button>
+            </span>
+          {/if}
         </div>
-        <span class="bar-row__track bar-row__track--wide">
-          <span class="bar-row__fill" style="width: {p.total === 0 ? 0 : (p.done / p.total) * 100}%" />
-        </span>
-        <span class="sprint__n">{p.done} / {p.total}</span>
-      </div>
+        {#key tick}
+          <Widget type={w.type} params={w.params ?? {}} {tick} {wall} />
+        {/key}
+      </section>
     {/each}
-    {#if progress.length === 0}<p class="muted"><Label label={tracker.string.NoActiveSprint} /></p>{/if}
-  </section>
-
-  <!-- 5. Who is loaded -->
-  <section class="card motion-rise" style="--i: 4">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.Workload} /></span>
-    </div>
-    <div class="bars">
-      {#each workload as w (w.name)}
-        <div class="bar-row">
-          <span class="bar-row__label bar-row__label--wide">{w.name}</span>
-          <span class="bar-row__track"><span class="bar-row__fill bar-row__fill--blue" style="width: {(w.n / maxLoad) * 100}%" /></span>
-          <span class="bar-row__n">{w.n}</span>
-        </div>
-      {/each}
-    </div>
-    {#if workload.length === 0}<p class="muted"><Label label={tracker.string.NothingAssigned} /></p>{/if}
-  </section>
-
-  <!-- 6. What was decided -->
-  <section class="card motion-rise" style="--i: 5">
-    <div class="card__head">
-      <span class="card__title"><Label label={tracker.string.Decisions} /></span>
-    </div>
-    {#each decisions as d, idx (d._id)}
-      <button class="row motion-rise" style="--i: {idx}" on:click={() => { openDecision(d) }}>
-        <span class="row__title">{d.title}</span>
-        <span class="row__meta">{ago(d.modifiedOn)}</span>
-      </button>
-    {/each}
-    {#if decisions.length === 0}<p class="muted"><Label label={tracker.string.NoDecisions} /></p>{/if}
-  </section>
+  </div>
+  {#if selected === undefined}
+    <p class="muted"><Label label={tracker.string.DefaultDashboardHint} /></p>
+  {/if}
 </div>
 
 <style lang="scss">
-  .dash {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    overflow: auto;
+  .dash { display: flex; flex-direction: column; gap: 1rem; padding: 1rem 1.25rem; overflow: auto; height: 100%;
+    &--wall { background: #0b0c0f; color: #fff; .card { background: #15171c; border-color: #23262e; } .card__title { font-size: 1.1rem; } }
   }
-  .dash__head {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-  }
-  .dash__title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--theme-caption-color);
-  }
-  .dash__sub {
-    font-size: 0.8125rem;
-    color: var(--theme-trans-color);
-  }
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.9rem 1rem;
-    min-width: 0;
-    border: 1px solid var(--theme-divider-color);
-    border-radius: 0.75rem;
-    background: var(--theme-panel-color);
-  }
-  .card__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 0.4rem;
-  }
-  .card__title {
-    font-weight: 600;
-    color: var(--theme-caption-color);
-  }
-  .card__n {
-    font-size: 0.75rem;
-    color: var(--theme-trans-color);
-  }
-  .muted {
-    margin: 0.25rem 0 0;
-    font-size: 0.8125rem;
-    color: var(--theme-trans-color);
-  }
-  .bars {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    margin-bottom: 0.5rem;
-  }
-  .bar-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--theme-dark-color);
-  }
-  .bar-row__label {
-    width: 4rem;
-    flex-shrink: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    &--wide {
-      width: 8rem;
-    }
-  }
-  .bar-row__track {
-    flex: 1;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--theme-button-pressed);
-    overflow: hidden;
-    &--wide {
-      height: 0.5rem;
-    }
-  }
-  .bar-row__fill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent-brand);
-    transition: width var(--motion-slow) var(--ease-enter);
-    &--blue {
-      background: var(--primary-button-default);
-    }
-  }
-  .bar-row__n {
-    width: 1.5rem;
-    text-align: right;
-    color: var(--theme-caption-color);
-  }
-  .row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.35rem 0.4rem;
-    border: none;
-    border-radius: 0.375rem;
-    background: transparent;
-    color: var(--theme-content-color);
-    font: inherit;
-    font-size: 0.8125rem;
-    text-align: left;
-    cursor: pointer;
-    &:hover {
-      background: var(--theme-button-hovered);
-      color: var(--theme-caption-color);
-    }
-  }
-  .row__id {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    color: var(--theme-trans-color);
-  }
-  .row__title {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .row__meta {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    color: var(--theme-trans-color);
-    &--late {
-      color: var(--negative-button-default);
-      font-weight: 600;
-    }
-  }
-  .sprint {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 0.25rem 0.6rem;
-    padding: 0.35rem 0;
-  }
-  .sprint__head {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-  }
-  .sprint__name {
-    font-weight: 500;
-    color: var(--theme-caption-color);
-  }
-  .sprint__meta {
-    font-size: 0.7rem;
-    color: var(--theme-trans-color);
-  }
-  .sprint__n {
-    font-size: 0.75rem;
-    color: var(--theme-dark-color);
-  }
+  .dash__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .dash__left { display: flex; align-items: baseline; gap: 0.75rem; }
+  .dash__sub { font-size: 0.8125rem; color: var(--theme-trans-color); }
+  .dash__tools { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+  .select, .input { padding: 0.35rem 0.6rem; border: 1px solid var(--theme-divider-color); border-radius: 0.4rem; background: var(--theme-panel-color); color: var(--theme-caption-color); font: inherit; font-size: 0.875rem; }
+  .select { font-weight: 600; }
+  .input--wide { min-width: 20rem; font-family: var(--mono-font, ui-monospace, Menlo, monospace); font-size: 0.8125rem; }
+  .input--n { width: 4rem; }
+  .addbar { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.75rem 1rem; border: 1px dashed var(--accent-brand); border-radius: 0.75rem; }
+  .addbar__form { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--theme-content-color); }
+  .addbar__hint { font-size: 0.75rem; color: var(--theme-trans-color); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; }
+  .card { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.9rem 1rem; min-width: 0; border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; background: var(--theme-panel-color); }
+  .card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+  .card__title { font-weight: 600; color: var(--theme-caption-color); }
+  .card__tools { display: flex; gap: 0.2rem; }
+  .tool { width: 1.5rem; height: 1.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.3rem; background: transparent; color: var(--theme-dark-color); font: inherit; cursor: pointer; &:hover { background: var(--theme-button-hovered); } &--x:hover { color: var(--negative-button-default); } }
+  .muted { margin: 0; font-size: 0.8125rem; color: var(--theme-trans-color); }
 </style>

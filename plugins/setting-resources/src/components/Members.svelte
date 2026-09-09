@@ -13,6 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { recordAudit } from '../audit'
   import contact, { Employee, formatName } from '@hcengineering/contact'
   import { EmployeePresenter } from '@hcengineering/contact-resources'
   import core, { Account, AccountRole, Enum, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
@@ -73,6 +74,7 @@
 
     try {
       await accountClient.updateWorkspaceRole(personUuid, value)
+      void recordAudit('role.changed', personUuid, String(value))
       workspaceMembers[personUuid] = value
 
       const employee = employees.find((e) => e.personUuid === personUuid)

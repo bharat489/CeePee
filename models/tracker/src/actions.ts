@@ -757,6 +757,20 @@ export function createActions (builder: Builder, issuesId: string, componentsId:
   createAction(
     builder,
     {
+      action: tracker.actionImpl.CloneWithSubIssues,
+      label: tracker.string.CloneWithSubIssues,
+      icon: tracker.icon.Issues,
+      category: tracker.category.Tracker,
+      input: 'focus',
+      target: tracker.class.Issue,
+      context: { mode: ['context', 'browser'], group: 'copy' }
+    },
+    tracker.action.CloneWithSubIssues
+  )
+
+  createAction(
+    builder,
+    {
       action: view.actionImpl.CopyAsMarkdownTable,
       actionProps: {
         cardClass: tracker.class.Issue

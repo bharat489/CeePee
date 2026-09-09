@@ -66,6 +66,7 @@
   import DocumentTitle from './DocumentTitle.svelte'
   import History from './sidebar/History.svelte'
   import References from './sidebar/References.svelte'
+  import IssuesInDocument from './IssuesInDocument.svelte'
 
   export let _id: Ref<Document>
   export let readonly: boolean = false
@@ -434,6 +435,8 @@
         ignoreKeys={['name']}
         readonly={effectiveReadonly}
       />
+
+      <IssuesInDocument doc={doc._id} />
 
       <div class="doc-divider" />
 

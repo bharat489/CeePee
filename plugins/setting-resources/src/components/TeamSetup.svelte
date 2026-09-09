@@ -29,6 +29,7 @@
   on every deployment.
 -->
 <script lang="ts">
+  import { recordAudit } from '../audit'
   import contact, { type Employee, formatName } from '@hcengineering/contact'
   import { EmployeePresenter } from '@hcengineering/contact-resources'
   import core, { type Account, AccountRole, type Enum, type Ref, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
@@ -129,6 +130,7 @@
   async function setRole (e: Employee, role: AccountRole): Promise<void> {
     if (e.personUuid == null || workspaceRoles[e.personUuid] === role) return
     await accountClient.updateWorkspaceRole(e.personUuid, role)
+    void recordAudit('role.changed', formatName(e.name), String(role))
     workspaceRoles = { ...workspaceRoles, [e.personUuid]: role }
   }
 
@@ -168,6 +170,7 @@
       // autoJoin: the invitee lands in the workspace on first sign-in with the
       // role already set -- no second trip to Members to promote them.
       p.link = await accountClient.createInviteLink(p.email.trim(), p.role, true, p.first.trim(), p.last.trim())
+      void recordAudit('invite.created', p.email.trim(), String(p.role))
     } finally {
       p.busy = false
       adding = adding

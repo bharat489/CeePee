@@ -100,6 +100,13 @@ import Webhooks from './components/webhooks/Webhooks.svelte'
 import Quickstart from './components/quickstart/Quickstart.svelte'
 import JiraImport from './components/import/JiraImport.svelte'
 import AuditLog from './components/audit/AuditLog.svelte'
+import SwimlaneBoard from './components/issues/SwimlaneBoard.svelte'
+import Releases from './components/milestones/Releases.svelte'
+import FieldsSetup from './components/settings/FieldsSetup.svelte'
+import Roadmap from './components/roadmap/Roadmap.svelte'
+import ServiceDesk from './components/servicedesk/ServiceDesk.svelte'
+import SubmitRequest from './components/servicedesk/SubmitRequest.svelte'
+import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
@@ -449,6 +456,12 @@ export default async (): Promise<Resources> => ({
     Quickstart,
     JiraImport,
     AuditLog,
+    SwimlaneBoard,
+    Releases,
+    FieldsSetup,
+    Roadmap,
+    ServiceDesk,
+    SubmitRequest,
     Assistant,
     NopeComponent,
     DepartmentSegments,
@@ -581,6 +594,7 @@ export default async (): Promise<Resources> => ({
   actionImpl: {
     CreateIssueFromMessage: createIssueFromMessage,
     ReleaseNotes: releaseNotes,
+    CloneWithSubIssues: cloneWithSubIssues,
     Move: move,
     EditWorkflowStatuses: editWorkflowStatuses,
     EditProject: editProject,

@@ -44,6 +44,13 @@ import {
   TResolution,
   TSprint,
   TWebhook,
+  TDashboard,
+  TTimesheetApproval,
+  TBillingRate,
+  TAuditEvent,
+  TAuditPolicy,
+  TRequestType,
+  TAutomationRule,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -406,6 +413,20 @@ function defineApplication (
             }
           },
           {
+            id: 'roadmap',
+            position: 'top',
+            label: tracker.string.Roadmap,
+            icon: tracker.icon.Milestone,
+            component: tracker.component.Roadmap
+          },
+          {
+            id: 'submit-request',
+            position: 'top',
+            label: tracker.string.SubmitRequest,
+            icon: tracker.icon.NewIssue,
+            component: tracker.component.SubmitRequest
+          },
+          {
             id: 'query',
             position: 'top',
             label: tracker.string.Query,
@@ -533,6 +554,30 @@ function defineApplication (
                 component: tracker.component.ProjectAutomation
               },
               {
+                id: 'board-swimlanes',
+                label: tracker.string.Swimlanes,
+                icon: tracker.icon.Issues,
+                component: tracker.component.SwimlaneBoard
+              },
+              {
+                id: 'releases',
+                label: tracker.string.Releases,
+                icon: tracker.icon.Milestone,
+                component: tracker.component.Releases
+              },
+              {
+                id: 'service-desk',
+                label: tracker.string.ServiceDesk,
+                icon: tracker.icon.Issue,
+                component: tracker.component.ServiceDesk
+              },
+              {
+                id: 'fields',
+                label: tracker.string.Fields,
+                icon: tracker.icon.Issues,
+                component: tracker.component.FieldsSetup
+              },
+              {
                 id: opt.templatesId,
                 label: tracker.string.IssueTemplates,
                 icon: tracker.icon.IssueTemplates,
@@ -572,7 +617,14 @@ export function createModel (builder: Builder): void {
     TDecision,
     TResolution,
     TSprint,
-    TWebhook
+    TWebhook,
+    TDashboard,
+    TTimesheetApproval,
+    TBillingRate,
+    TAuditEvent,
+    TAuditPolicy,
+    TRequestType,
+    TAutomationRule
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the

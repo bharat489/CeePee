@@ -158,8 +158,91 @@ export interface Webhook extends Doc {
   secret?: string
   events: WebhookEvent[]
   enabled: boolean
+  /** slack: post a Slack-style {text} message instead of the JSON payload. */
+  format?: 'json' | 'slack'
   lastStatus?: number
   lastDeliveredOn?: Timestamp
+  lastError?: string | null
+}
+
+/** @public */
+export interface DashboardWidget {
+  id: string
+  type: string
+  params?: Record<string, any>
+}
+
+/** A dashboard: a named list of widgets, private unless shared. @public */
+export interface Dashboard extends Doc {
+  name: string
+  owner: Ref<Person>
+  shared: boolean
+  widgets: DashboardWidget[]
+}
+
+/** One person, one week: submitted, approved or rejected. @public */
+export interface TimesheetApproval extends Doc {
+  employee: Ref<Employee>
+  weekStart: Timestamp
+  state: 'submitted' | 'approved' | 'rejected'
+  approver?: Ref<Person>
+  note?: string
+  decidedOn?: Timestamp
+}
+
+/** @public */
+export interface BillingRate extends Doc {
+  employee: Ref<Employee>
+  rate: number
+  currency: string
+}
+
+/** An administrative action that bypassed the document store. @public */
+export interface AuditEvent extends Doc {
+  kind: string
+  actor?: Ref<Person>
+  target: string
+  details: string
+}
+
+/** @public */
+export interface AuditPolicy extends Doc {
+  /** 0 = keep forever */
+  retentionDays: number
+}
+
+/** What a customer can ask for. @public */
+export interface RequestType extends Doc {
+  space: Ref<Project>
+  name: string
+  description: string
+  priority: IssuePriority
+  slaHours?: number
+}
+
+/** @public */
+export type AutomationTrigger = 'created' | 'status' | 'priority' | 'assignee' | 'commented' | 'updated'
+/** @public */
+export interface AutomationCondition {
+  field: 'status' | 'priority' | 'assignee' | 'kind' | 'component' | 'labels' | 'title' | 'sprint' | 'milestone'
+  op: 'is' | 'is-not' | 'contains' | 'empty' | 'not-empty'
+  value?: string
+}
+/** @public */
+export interface AutomationAction {
+  type: 'set-status' | 'set-priority' | 'set-assignee' | 'add-label' | 'add-comment' | 'set-sprint' | 'set-milestone' | 'set-due' | 'webhook'
+  value?: string
+}
+/** WHEN trigger IF conditions THEN actions, evaluated on the server. @public */
+export interface AutomationRule extends Doc {
+  space: Ref<Project>
+  name: string
+  enabled: boolean
+  trigger: AutomationTrigger
+  conditions: AutomationCondition[]
+  actions: AutomationAction[]
+  runs?: number
+  lastRun?: Timestamp
   lastError?: string | null
 }
 
@@ -287,6 +370,9 @@ export interface Milestone extends Doc {
   startDate: Timestamp | null // null = open-ended begin marker
   targetDate: Timestamp
   color?: number
+  /** Released versions can be archived out of the way. */
+  archived?: boolean
+  releasedOn?: Timestamp | null
 }
 
 /**
@@ -326,6 +412,19 @@ export interface Issue extends Task {
 
   /** Service-level deadline, set from the project SLA table by priority. */
   slaDue?: Timestamp | null
+
+  /** People who voted for this issue. */
+  votes?: Ref<Person>[]
+  voteCount?: number
+
+  /** Work that lives elsewhere: another workspace, a pull request, a design. */
+  externalLinks?: Array<{ url: string, label: string }>
+
+  /** Set when raised through the service desk. */
+  requestType?: Ref<RequestType> | null
+  /** Satisfaction rating (1-5) from the person who raised the request. */
+  csat?: number
+  csatComment?: string
 
   // Remaining time in man hours
   remainingTime: number
@@ -819,6 +918,8 @@ export interface Component extends Doc {
   label: string
   description?: Markup
   lead: Ref<Employee> | null
+  /** New issues with this component and no assignee go here, before the lead. */
+  defaultAssignee?: Ref<Employee> | null
   space: Ref<Project>
   comments: number
   attachments?: number
@@ -855,7 +956,14 @@ const pluginState = plugin(trackerId, {
     Decision: '' as Ref<Class<Decision>>,
     Resolution: '' as Ref<Class<Resolution>>,
     Sprint: '' as Ref<Class<Sprint>>,
-    Webhook: '' as Ref<Class<Webhook>>
+    Webhook: '' as Ref<Class<Webhook>>,
+    Dashboard: '' as Ref<Class<Dashboard>>,
+    TimesheetApproval: '' as Ref<Class<TimesheetApproval>>,
+    BillingRate: '' as Ref<Class<BillingRate>>,
+    AuditEvent: '' as Ref<Class<AuditEvent>>,
+    AuditPolicy: '' as Ref<Class<AuditPolicy>>,
+    RequestType: '' as Ref<Class<RequestType>>,
+    AutomationRule: '' as Ref<Class<AutomationRule>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -915,6 +1023,12 @@ const pluginState = plugin(trackerId, {
     Quickstart: '' as AnyComponent,
     JiraImport: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
+    SwimlaneBoard: '' as AnyComponent,
+    Releases: '' as AnyComponent,
+    FieldsSetup: '' as AnyComponent,
+    Roadmap: '' as AnyComponent,
+    ServiceDesk: '' as AnyComponent,
+    SubmitRequest: '' as AnyComponent,
     DecisionPresenter: '' as AnyComponent,
     CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
@@ -1106,6 +1220,49 @@ const pluginState = plugin(trackerId, {
     AuditLogHint: '' as IntlString,
     NothingToShow: '' as IntlString,
     LoadMore: '' as IntlString,
+    Swimlanes: '' as IntlString,
+    Releases: '' as IntlString,
+    NoReleases: '' as IntlString,
+    Release: '' as IntlString,
+    Archive: '' as IntlString,
+    Unarchive: '' as IntlString,
+    Fields: '' as IntlString,
+    FieldsHint: '' as IntlString,
+    Roadmap: '' as IntlString,
+    Capacity: '' as IntlString,
+    CrossProjectDependencies: '' as IntlString,
+    ServiceDesk: '' as IntlString,
+    AddRequestType: '' as IntlString,
+    SubmitRequest: '' as IntlString,
+    SubmitRequestHint: '' as IntlString,
+    OpenIssue: '' as IntlString,
+    SubmitAnother: '' as IntlString,
+    RequestType: '' as IntlString,
+    Satisfaction: '' as IntlString,
+    NewRule: '' as IntlString,
+    NewDashboard: '' as IntlString,
+    Edit: '' as IntlString,
+    Rename: '' as IntlString,
+    Share: '' as IntlString,
+    Unshare: '' as IntlString,
+    Delete: '' as IntlString,
+    Wallboard: '' as IntlString,
+    ExitWallboard: '' as IntlString,
+    AddWidget: '' as IntlString,
+    Add: '' as IntlString,
+    Cancel: '' as IntlString,
+    Save: '' as IntlString,
+    DefaultDashboardHint: '' as IntlString,
+    SavedQueries: '' as IntlString,
+    SaveQuery: '' as IntlString,
+    QueryTruncated: '' as IntlString,
+    ExportCsv: '' as IntlString,
+    Description: '' as IntlString,
+    Votes: '' as IntlString,
+    Watchers: '' as IntlString,
+    ExternalLinks: '' as IntlString,
+    MentionedIn: '' as IntlString,
+    CloneWithSubIssues: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,

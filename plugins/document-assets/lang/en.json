@@ -35,30 +35,24 @@
     "NoBacklinks": "No backlinks",
     "NoHistory": "No previous history",
     "Untitled": "Untitled",
-
     "Description": "Description",
-
     "CopyDocumentUrl": "Copy document URL to clipboard",
     "DocumentUrlCopied": "Copied!",
-
     "ViewMode": "View",
     "EditMode": "Edit",
     "SuggestMode": "Suggest",
-
     "CompareTo": "Compare to...",
     "Star": "Star",
     "Unstar": "Unstar",
-
     "Lock": "Lock",
     "Unlock": "Unlock",
     "Locked": "Locked",
-
     "ConfigLabel": "Documents",
     "ConfigDescription": "Extension for collaborative document editing",
-
     "Icon": "Icon",
     "Color": "Color",
     "ForbidCreateTeamspacePermission": "Forbid create teamspace",
-    "ForbidCreateTeamspacePermissionDescription": "Forbid users creating new teamspaces"
+    "ForbidCreateTeamspacePermissionDescription": "Forbid users creating new teamspaces",
+    "IssuesInDocument": "Issues on this page"
   }
 }

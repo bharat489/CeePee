@@ -52,7 +52,22 @@ import {
 } from '@hcengineering/model'
 import attachment from '@hcengineering/model-attachment'
 import core, { TAttachedDoc, TDoc, TStatus, TType } from '@hcengineering/model-core'
-import type { ProjectAutomation, Webhook, WebhookEvent } from '@hcengineering/tracker'
+import type {
+  AuditEvent,
+  AuditPolicy,
+  AutomationAction,
+  AutomationCondition,
+  AutomationRule,
+  AutomationTrigger,
+  BillingRate,
+  Dashboard,
+  DashboardWidget,
+  ProjectAutomation,
+  RequestType,
+  TimesheetApproval,
+  Webhook,
+  WebhookEvent
+} from '@hcengineering/tracker'
 import notification, { TCommonInboxNotification } from '@hcengineering/model-notification'
 import task, { TTask, TProject as TTaskProject } from '@hcengineering/model-task'
 import { getEmbeddedLabel, type IntlString } from '@hcengineering/platform'
@@ -323,6 +338,30 @@ export class TIssue extends TTask implements Issue {
 
   @Prop(TypeDate(), tracker.string.SlaDue)
     slaDue?: Timestamp | null
+
+  @Prop(ArrOf(TypeRef(contact.class.Person)), tracker.string.Votes)
+  @Hidden()
+    votes?: Ref<Person>[]
+
+  @Prop(TypeNumber(), tracker.string.Votes)
+  @Hidden()
+    voteCount?: number
+
+  @Prop(TypeRecord(), tracker.string.ExternalLinks)
+  @Hidden()
+    externalLinks?: Array<{ url: string, label: string }>
+
+  @Prop(TypeRef(tracker.class.RequestType), tracker.string.RequestType)
+  @Hidden()
+    requestType?: Ref<RequestType> | null
+
+  @Prop(TypeNumber(), tracker.string.Satisfaction)
+  @Hidden()
+    csat?: number
+
+  @Prop(TypeString(), tracker.string.Satisfaction)
+  @Hidden()
+    csatComment?: string
 
   @Prop(TypeReportedTime(), tracker.string.ReportedTime)
     reportedTime!: number
@@ -650,6 +689,9 @@ export class TComponent extends TDoc implements Component {
   @Prop(TypeRef(contact.mixin.Employee), tracker.string.ComponentLead)
     lead!: Ref<Employee> | null
 
+  @Prop(TypeRef(contact.mixin.Employee), tracker.string.DefaultAssignee)
+    defaultAssignee?: Ref<Employee> | null
+
   @Prop(Collection(chunter.class.ChatMessage), chunter.string.Comments)
     comments!: number
 
@@ -690,6 +732,14 @@ export class TMilestone extends TDoc implements Milestone {
 
   @Prop(TypeDate(), tracker.string.TargetDate)
     targetDate!: Timestamp
+
+  @Prop(TypeBoolean(), tracker.string.Archive)
+  @Hidden()
+    archived?: boolean
+
+  @Prop(TypeDate(), tracker.string.Release)
+  @Hidden()
+    releasedOn?: Timestamp | null
 
   @Prop(TypeNumber(), tracker.string.Color)
     color?: number
@@ -814,7 +864,114 @@ export class TWebhook extends TDoc implements Webhook {
   @Prop(TypeBoolean(), tracker.string.Enabled)
     enabled!: boolean
 
+  @Prop(TypeString(), tracker.string.Webhooks)
+  @Hidden()
+    format?: 'json' | 'slack'
+
   lastStatus?: number
   lastDeliveredOn?: Timestamp
+  lastError?: string | null
+}
+
+@Model(tracker.class.Dashboard, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Dashboard)
+export class TDashboard extends TDoc implements Dashboard {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeRef(contact.class.Person), tracker.string.Assignee)
+  @Index(IndexKind.Indexed)
+    owner!: Ref<Person>
+
+  @Prop(TypeBoolean(), tracker.string.Share)
+    shared!: boolean
+
+  widgets!: DashboardWidget[]
+}
+
+@Model(tracker.class.TimesheetApproval, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Timesheets)
+export class TTimesheetApproval extends TDoc implements TimesheetApproval {
+  @Prop(TypeRef(contact.mixin.Employee), tracker.string.Person)
+  @Index(IndexKind.Indexed)
+    employee!: Ref<Employee>
+
+  @Prop(TypeDate(), tracker.string.ThisWeek)
+  @Index(IndexKind.Indexed)
+    weekStart!: Timestamp
+
+  state!: 'submitted' | 'approved' | 'rejected'
+  approver?: Ref<Person>
+  note?: string
+  decidedOn?: Timestamp
+}
+
+@Model(tracker.class.BillingRate, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Timesheets)
+export class TBillingRate extends TDoc implements BillingRate {
+  @Prop(TypeRef(contact.mixin.Employee), tracker.string.Person)
+  @Index(IndexKind.Indexed)
+    employee!: Ref<Employee>
+
+  rate!: number
+  currency!: string
+}
+
+@Model(tracker.class.AuditEvent, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.AuditLog)
+export class TAuditEvent extends TDoc implements AuditEvent {
+  @Prop(TypeString(), tracker.string.AuditLog)
+    kind!: string
+
+  @Prop(TypeRef(contact.class.Person), tracker.string.Person)
+    actor?: Ref<Person>
+
+  target!: string
+  details!: string
+}
+
+@Model(tracker.class.AuditPolicy, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.AuditLog)
+export class TAuditPolicy extends TDoc implements AuditPolicy {
+  retentionDays!: number
+}
+
+@Model(tracker.class.RequestType, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.RequestType)
+export class TRequestType extends TDoc implements RequestType {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Description)
+    description!: string
+
+  priority!: IssuePriority
+  slaHours?: number
+}
+
+@Model(tracker.class.AutomationRule, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Automation)
+export class TAutomationRule extends TDoc implements AutomationRule {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeBoolean(), tracker.string.Enabled)
+    enabled!: boolean
+
+  @Prop(TypeString(), tracker.string.Automation)
+    trigger!: AutomationTrigger
+
+  conditions!: AutomationCondition[]
+  actions!: AutomationAction[]
+  runs?: number
+  lastRun?: Timestamp
   lastError?: string | null
 }

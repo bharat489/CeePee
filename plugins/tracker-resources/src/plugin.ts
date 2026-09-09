@@ -46,7 +46,6 @@ export default mergeIds(trackerId, tracker, {
   },
   string: {
     More: '' as IntlString,
-    Delete: '' as IntlString,
     Open: '' as IntlString,
     Default: '' as IntlString,
     MakeDefault: '' as IntlString,
@@ -108,7 +107,6 @@ export default mergeIds(trackerId, tracker, {
     Import: '' as IntlString,
     ProjectIdentifier: '' as IntlString,
     IdentifierExists: '' as IntlString,
-    Description: '' as IntlString,
     Status: '' as IntlString,
     DefaultIssueStatus: '' as IntlString,
     IssueStatus: '' as IntlString,
@@ -215,7 +213,6 @@ export default mergeIds(trackerId, tracker, {
 
     EditIssue: '' as IntlString,
 
-    Save: '' as IntlString,
     IncludeItemsThatMatch: '' as IntlString,
     AnyFilter: '' as IntlString,
     AllFilters: '' as IntlString,

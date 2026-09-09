@@ -24,6 +24,7 @@
   import { Button, EditBox, IconAdd, IconDelete, Label, Toggle } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
+  import { recordAudit } from '../../audit'
 
   const client = getClient()
   const query = createQuery()
@@ -49,6 +50,7 @@
   let url = ''
   let secret = ''
   let events: WebhookEvent[] = ['issue.created', 'issue.updated']
+  let format: 'json' | 'slack' = 'json'
   $: canAdd = name.trim() !== '' && /^https?:\/\/\S+$/i.test(url.trim()) && events.length > 0
 
   function toggleEvent (id: WebhookEvent): void {
@@ -62,8 +64,10 @@
       url: url.trim(),
       secret: secret.trim() === '' ? undefined : secret.trim(),
       events,
-      enabled: true
+      enabled: true,
+      format
     })
+    void recordAudit('webhook.created', name.trim(), url.trim())
     name = ''
     url = ''
     secret = ''
@@ -100,6 +104,7 @@
           <EditBox bind:value={name} placeholder={tracker.string.Name} kind={'default'} autoFocus fullSize />
           <EditBox bind:value={url} placeholder={tracker.string.WebhookUrl} kind={'default'} fullSize />
           <EditBox bind:value={secret} placeholder={tracker.string.WebhookSecret} kind={'default'} fullSize />
+          <select class="fmt" bind:value={format}><option value="json">JSON payload</option><option value="slack">Slack message</option></select>
         </div>
         <div class="events">
           {#each EVENTS as e (e.id)}
@@ -133,7 +138,7 @@
         <div class="row__main">
           <span class="row__name">{h.name}</span>
           <span class="row__url">{h.url}</span>
-          <span class="row__events">{h.events.join(' · ')}</span>
+          <span class="row__events">{h.events.join(' · ')}{h.format === 'slack' ? ' · Slack' : ''}</span>
           <span class="row__status" class:row__status--bad={h.lastError != null} class:row__status--ok={h.lastError == null && h.lastStatus !== undefined}>
             {#if h.lastDeliveredOn !== undefined}
               {h.lastError ?? `HTTP ${h.lastStatus}`} · {when(h.lastDeliveredOn)}
@@ -154,6 +159,7 @@
             kind={'ghost'}
             on:click={() => {
               void client.remove(h)
+              void recordAudit('webhook.deleted', h.name, h.url)
             }}
           />
         </div>
@@ -202,9 +208,10 @@
     border-radius: 0.75rem;
     background: var(--theme-panel-color);
   }
+  .fmt { font: inherit; font-size: 0.8125rem; color: var(--theme-caption-color); background: var(--theme-bg-color); }
   .form {
     display: grid;
-    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-columns: 1fr 2fr 1fr auto;
     gap: 0.5rem;
     > :global(*) {
       padding: 0.3rem 0.6rem;

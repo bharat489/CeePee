@@ -25,6 +25,7 @@
   import { Button, EditBox, Label, Toggle } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
+  import RuleBuilder from './RuleBuilder.svelte'
 
   export let currentSpace: Ref<Project>
 
@@ -132,6 +133,8 @@
       <Button kind={'primary'} label={presentation.string.Save} disabled={!slaDirty} on:click={saveSla} />
     </div>
   </section>
+
+  <RuleBuilder {currentSpace} />
 </div>
 
 <style lang="scss">

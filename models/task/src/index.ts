@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 
+import type { TaskFieldConfig } from '@hcengineering/task'
 import type { Person } from '@hcengineering/contact'
 import contact from '@hcengineering/contact'
 import {
@@ -222,6 +223,9 @@ export class TTaskType extends TDoc implements TaskType {
 
   @Prop(ArrOf(TypeString()), getEmbeddedLabel('Required before terminal'))
     requiredBeforeTerminal?: string[]
+
+  @Prop(TypeRecord(), getEmbeddedLabel('Field configuration'))
+    fieldConfig?: TaskFieldConfig
 
   @Prop(ArrOf(TypeRef(core.class.Status)), getEmbeddedLabel('Task statuses'))
     statuses!: Ref<Status>[]
