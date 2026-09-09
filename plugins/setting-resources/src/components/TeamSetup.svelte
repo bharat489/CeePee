@@ -208,10 +208,10 @@
             <span><Label label={setting.string.Role} /></span>
             <span><Label label={setting.string.Department} /></span>
           </div>
-          {#each employees as e (e._id)}
+          {#each employees as e, idx (e._id)}
             {@const uuid = e.personUuid ?? undefined}
             {@const role = uuid !== undefined ? workspaceRoles[uuid] : undefined}
-            <div class="team__grid team__row">
+            <div class="team__grid team__row motion-rise" style="--i: {idx}">
               <div class="team__who"><EmployeePresenter value={e} disabled={false} /></div>
               <DropdownLabels
                 label={setting.string.Position}
@@ -261,7 +261,7 @@
         </div>
 
         {#each adding as p, i (i)}
-          <div class="team__add">
+          <div class="team__add motion-pop">
             <EditBox bind:value={p.email} placeholder={setting.string.Email} kind={'default'} disabled={p.link !== undefined} />
             <EditBox bind:value={p.first} placeholder={setting.string.FirstName} kind={'default'} disabled={p.link !== undefined} />
             <EditBox bind:value={p.last} placeholder={setting.string.LastName} kind={'default'} disabled={p.link !== undefined} />

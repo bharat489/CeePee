@@ -33,6 +33,7 @@
   export let props: Record<string, any> = {}
   export let compactMode: boolean = false
   export let readonly: boolean = false
+  export let index: number = 0
 
   export function scroll () {
     elem?.scrollIntoView({ behavior: 'auto', block: 'nearest' })
@@ -85,6 +86,7 @@
 <div
   bind:this={elem}
   class="listGrid antiList__row row flex-gap-2 flex-grow"
+  style="--i: {index}"
   class:compactMode
   class:checking={checked}
   class:mListGridSelected={selected}

@@ -528,6 +528,7 @@
               <ListItem
                 bind:this={listItems[i]}
                 {docObject}
+                index={i}
                 model={getDocItemModel(Hierarchy.mixinOrClass(docObject))}
                 {groupByKey}
                 selected={isSelected(docObject, $focusStore)}

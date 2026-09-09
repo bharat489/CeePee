@@ -168,9 +168,10 @@
 
   {#if answered === undefined && !unmatched}
     <div class="assistant__chips">
-      {#each intents as i (i.id)}
+      {#each intents as i, idx (i.id)}
         <button
-          class="chip"
+          class="chip motion-rise"
+          style="--i: {idx}"
           on:click={() => {
             input = i.label
             void run(i)
@@ -197,9 +198,10 @@
         {#each groups as g (g.assignee)}
           <div class="group">
             <span class="group__who">{g.assignee} <span class="group__n">{g.issues.length}</span></span>
-            {#each g.issues as i (i._id)}
+            {#each g.issues as i, idx (i._id)}
               <button
-                class="row"
+                class="row motion-rise"
+                style="--i: {idx}"
                 on:click={() => {
                   open(i)
                 }}
@@ -217,9 +219,10 @@
           {answered.id === 'next' ? 'Nothing open is assigned to you.' : `Nothing open has gone quiet for ${STALE_DAYS} days.`}
         </p>
       {:else}
-        {#each rows as i (i._id)}
+        {#each rows as i, idx (i._id)}
           <button
-            class="row"
+            class="row motion-rise"
+            style="--i: {idx}"
             on:click={() => {
               open(i)
             }}

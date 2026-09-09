@@ -295,4 +295,24 @@
     flex-grow: 1;
     height: max-content;
   }
+  .backd::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    clip-path: inset(0);
+    mix-blend-mode: screen;
+    background:
+      radial-gradient(42% 55% at 14% 18%, rgba(43, 107, 234, 0.55), transparent 70%),
+      radial-gradient(36% 46% at 86% 82%, rgba(192, 240, 16, 0.3), transparent 70%),
+      radial-gradient(30% 40% at 62% 8%, rgba(106, 69, 245, 0.45), transparent 70%);
+    filter: blur(48px);
+    animation: auroraDrift 24s var(--ease-standard) infinite alternate;
+  }
+  .backd .panel-base {
+    position: relative;
+    z-index: 2;
+    animation: riseIn var(--motion-slow) var(--ease-enter) both;
+  }
 </style>

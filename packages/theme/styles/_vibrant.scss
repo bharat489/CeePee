@@ -1,0 +1,180 @@
+//
+// Copyright © 2026 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// ---------------------------------------------------------------------------
+// Vibrancy layer.
+//
+// The base theme is deliberately neutral: greys, one blue, flat surfaces. It
+// reads as competent and forgettable. This file adds the colour and the
+// physical feedback that make a tool feel alive without touching the
+// neutral tokens themselves, so it can be tuned -- or removed -- in one
+// place. It is imported last so equal-specificity rules here win.
+//
+// Two colours carry the brand: the lime (#C0F010) that appears in the logo,
+// used for "you are here" and "this is live" signals, and a blue-to-violet
+// gradient for the primary action. Lime is never used as text on light
+// backgrounds; it fails contrast there. Bars, rings and washes only.
+// ---------------------------------------------------------------------------
+
+* {
+  --accent-brand: #c0f010;
+  --accent-brand-ink: #4e6600;
+  --accent-brand-soft: rgba(192, 240, 16, 0.14);
+  --accent-brand-ring: rgba(192, 240, 16, 0.55);
+  --accent-gradient: linear-gradient(135deg, #2b6bea 0%, #6a45f5 100%);
+  --accent-glow: 0 10px 28px -10px rgba(84, 96, 245, 0.65);
+  --accent-glow-strong: 0 14px 36px -10px rgba(84, 96, 245, 0.85);
+  --card-lift-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.5);
+}
+.theme-light {
+  --card-lift-shadow: 0 8px 22px -10px rgba(20, 30, 60, 0.3);
+}
+
+// Selection colour is one of the few places a product's colour touches every
+// screen. Make it the brand's.
+::selection {
+  background: rgba(192, 240, 16, 0.35);
+}
+
+// Keyboard focus is shown with the brand ring, only for keyboard users.
+// Pointer users keep the quiet hover states.
+button:focus-visible,
+a:focus-visible,
+.hulyNavItem-container:focus-visible,
+.antiNav-element:focus-visible {
+  outline: 2px solid var(--accent-brand-ring);
+  outline-offset: 2px;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons: the primary action gets the gradient and a glow on hover; every
+// button gets a press. The press is what makes a button feel like a button.
+// ---------------------------------------------------------------------------
+.hulyButton,
+.antiButton {
+  transition:
+    var(--transition-interactive),
+    transform var(--motion-fast) var(--ease-standard),
+    filter var(--motion-fast) var(--ease-standard);
+
+  &:active:not(:disabled, .disabled) {
+    transform: scale(0.97);
+  }
+}
+
+.hulyButton.primary:not(:disabled, .disabled),
+.antiButton.primary:not(:disabled, .disabled) {
+  background-image: var(--accent-gradient);
+  border-color: transparent;
+
+  &:hover {
+    box-shadow: var(--accent-glow);
+    filter: brightness(1.08);
+  }
+  &:active,
+  &.pressed {
+    box-shadow: none;
+    filter: brightness(0.96);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Navigation: the selected item carries a lime bar that grows in, and a
+// faint wash that fades out to the right. Hover nudges the row toward the
+// content it opens.
+// ---------------------------------------------------------------------------
+.hulyNavItem-container,
+.antiNav-element {
+  position: relative;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+
+  &:not(.selected):hover {
+    transform: translateX(2px);
+  }
+  &.selected {
+    background-image: linear-gradient(90deg, var(--accent-brand-soft), transparent 65%);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 22%;
+      bottom: 22%;
+      width: 3px;
+      border-radius: 3px;
+      background: var(--accent-brand);
+      transform-origin: center;
+      animation: barIn var(--motion-base) var(--ease-emphasis) both;
+      pointer-events: none;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Lists and boards. Rows rise in with a stagger (index supplied by the row
+// as --i); cards lift on hover and settle on press.
+// ---------------------------------------------------------------------------
+.listGrid.row {
+  animation: riseIn var(--motion-base) var(--ease-enter) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 18ms);
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.kanban-container .card-container {
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-lift-shadow);
+  }
+  &:active {
+    transform: translateY(0) scale(0.995);
+    box-shadow: none;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Popups arrive through PopupInstance (tokens, no spring); nothing here
+// animates their contents a second time. Panels get a hairline of brand at
+// the top so an open issue reads as "live".
+// ---------------------------------------------------------------------------
+.panel-instance .popupPanel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-gradient);
+  opacity: 0.9;
+  z-index: 1;
+  pointer-events: none;
+}
+.panel-instance .popupPanel {
+  position: relative;
+}
+
+// Skeleton / placeholder sheen for anything that opts in.
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}

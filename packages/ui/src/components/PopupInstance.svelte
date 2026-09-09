@@ -359,7 +359,7 @@
     opacity: 0;
 
     &.preShow {
-      transform: scale(0.9);
+      transform: translateY(-0.375rem) scale(0.97);
     }
     &.endShow {
       opacity: 1;
@@ -368,8 +368,8 @@
       transform: scale(1);
       opacity: 1;
       transition-property: transform, opacity;
-      transition-timing-function: cubic-bezier(0, 1.59, 0.26, 1.01), ease-in-out;
-      transition-duration: 0.3s;
+      transition-timing-function: var(--ease-enter), var(--ease-standard);
+      transition-duration: var(--motion-base), var(--motion-fast);
     }
 
     &.anim {
@@ -384,7 +384,7 @@
     left: 0;
     width: 100%;
     height: 100vh;
-    transition: background-color 0.5s ease;
+    transition: background-color var(--motion-base) var(--ease-standard);
     touch-action: none;
     &.testing {
       transition: background-color 0 ease;

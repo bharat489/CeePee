@@ -170,7 +170,8 @@
     {:else}
       {#each filtered as entry, i (entry.id)}
         <button
-          class="palette__row"
+          class="palette__row motion-rise"
+          style="--i: {i}"
           class:selected={i === selected}
           on:mouseenter={() => {
             selected = i

@@ -121,3 +121,76 @@
     opacity: 0.55;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Entrances for content, not just surfaces.
+//
+// `surfaceIn` above is for things that float (popups, panels). Content that
+// belongs to the page -- rows, cards, chips -- should arrive from where it
+// lives: a short rise, no scale. Lists stagger by index so the eye is led
+// down the list instead of hit by it. The delay is capped so long lists do
+// not turn into a slideshow; after the twelfth item everything arrives
+// together.
+// ---------------------------------------------------------------------------
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Affirmative moments: a status landing, a decision ratified. One overshoot.
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// The accent bar on a selected navigation item grows from its centre.
+@keyframes barIn {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+// Slow ambient drift for large decorative gradients (sign-in backdrop).
+// Long enough that nobody watches it; it is felt, not seen.
+@keyframes auroraDrift {
+  from {
+    transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1);
+  }
+  to {
+    transform: translate3d(3%, 4%, 0) rotate(6deg) scale(1.08);
+  }
+}
+
+// Loading placeholder sheen.
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+// Set `--i` on the element (its index) to stagger a group.
+.motion-rise {
+  animation: riseIn var(--motion-base) var(--ease-enter) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 22ms);
+}
+.motion-pop {
+  animation: popIn var(--motion-base) var(--ease-emphasis) both;
+}
