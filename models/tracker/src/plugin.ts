@@ -99,6 +99,7 @@ export default mergeIds(trackerId, tracker, {
   },
   actionImpl: {
     CreateIssueFromMessage: '' as ViewAction,
+    ReleaseNotes: '' as ViewAction,
     Move: '' as ViewAction,
     CopyToClipboard: '' as ViewAction,
     EditWorkflowStatuses: '' as ViewAction,
@@ -109,6 +110,7 @@ export default mergeIds(trackerId, tracker, {
   },
   action: {
     CreateIssueFromMessage: '' as Ref<Action>,
+    ReleaseNotes: '' as Ref<Action>,
     NewRelatedIssue: '' as Ref<Action<Doc, any>>,
     DeleteMilestone: '' as Ref<Action<Doc, Record<string, any>>>,
     DeleteProject: '' as Ref<Action<Doc, Record<string, any>>>,

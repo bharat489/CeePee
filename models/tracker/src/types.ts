@@ -52,6 +52,7 @@ import {
 } from '@hcengineering/model'
 import attachment from '@hcengineering/model-attachment'
 import core, { TAttachedDoc, TDoc, TStatus, TType } from '@hcengineering/model-core'
+import type { ProjectAutomation, Webhook, WebhookEvent } from '@hcengineering/tracker'
 import notification, { TCommonInboxNotification } from '@hcengineering/model-notification'
 import task, { TTask, TProject as TTaskProject } from '@hcengineering/model-task'
 import { getEmbeddedLabel, type IntlString } from '@hcengineering/platform'
@@ -156,6 +157,18 @@ export class TProject extends TTaskProject implements Project {
 
   @Prop(TypeRecord(), tracker.string.WorkingDaysConfig)
     workingDaysConfig?: WorkingDaysConfig
+
+  @Prop(TypeRecord(), tracker.string.WipLimit)
+  @Hidden()
+    wipLimits?: Record<Ref<IssueStatus>, number>
+
+  @Prop(TypeRecord(), tracker.string.Automation)
+  @Hidden()
+    automation?: ProjectAutomation
+
+  @Prop(TypeRecord(), tracker.string.ServiceLevels)
+  @Hidden()
+    sla?: Record<string, number>
 }
 /**
  * @public
@@ -304,6 +317,12 @@ export class TIssue extends TTask implements Issue {
 
   @Prop(TypeEstimation(), tracker.string.Estimation)
     estimation!: number
+
+  @Prop(TypeNumber(), tracker.string.StoryPoints)
+    storyPoints?: number
+
+  @Prop(TypeDate(), tracker.string.SlaDue)
+    slaDue?: Timestamp | null
 
   @Prop(TypeReportedTime(), tracker.string.ReportedTime)
     reportedTime!: number
@@ -771,4 +790,31 @@ export class TDependencyShiftRequest extends TDoc implements DependencyShiftRequ
 
   @Prop(TypeString(), tracker.string.DependencyShifted)
     cascadeToken!: string
+}
+
+/**
+ * @public
+ */
+@Model(tracker.class.Webhook, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Webhooks)
+export class TWebhook extends TDoc implements Webhook {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.WebhookUrl)
+    url!: string
+
+  @Prop(TypeString(), tracker.string.WebhookSecret)
+  @Hidden()
+    secret?: string
+
+  @Prop(ArrOf(TypeString()), tracker.string.Webhooks)
+    events!: WebhookEvent[]
+
+  @Prop(TypeBoolean(), tracker.string.Enabled)
+    enabled!: boolean
+
+  lastStatus?: number
+  lastDeliveredOn?: Timestamp
+  lastError?: string | null
 }

@@ -37,6 +37,8 @@ export default plugin(serverTrackerId, {
   trigger: {
     OnIssueUpdate: '' as Resource<TriggerFunc>,
     OnIssueStatusGuard: '' as Resource<TriggerFunc>,
+    OnIssueWebhook: '' as Resource<TriggerFunc>,
+    OnIssueAutomation: '' as Resource<TriggerFunc>,
     OnComponentRemove: '' as Resource<TriggerFunc>,
     OnProjectRemove: '' as Resource<TriggerFunc>,
     OnDependencyShiftRequest: '' as Resource<TriggerFunc>

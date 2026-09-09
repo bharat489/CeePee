@@ -53,6 +53,18 @@ export function createModel (builder: Builder): void {
   // Transition guards are enforced here as well as in the status editor: the
   // editor is a convenience, the trigger is the guarantee. Anything that
   // writes through the API meets the same rule.
+  // Automation rules and SLA deadlines, then outbound webhooks. Both watch
+  // every issue transaction and decide inside what applies.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnIssueAutomation,
+    txMatch: { objectClass: tracker.class.Issue }
+  })
+
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnIssueWebhook,
+    txMatch: { objectClass: tracker.class.Issue }
+  })
+
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnIssueStatusGuard,
     txMatch: {

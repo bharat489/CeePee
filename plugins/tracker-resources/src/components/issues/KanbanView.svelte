@@ -72,6 +72,7 @@
   import { onDestroy, onMount } from 'svelte'
 
   import tracker from '../../plugin'
+  import SetWipLimitPopup from './SetWipLimitPopup.svelte'
   import { activeProjects } from '../../utils'
   import ComponentEditor from '../components/ComponentEditor.svelte'
   import CreateIssue from '../CreateIssue.svelte'
@@ -358,7 +359,12 @@
     <svelte:fragment slot="header" let:state let:count let:index>
       {@const color = accentColors.get(`${index}${$themeStore.dark}${groupByKey}`)}
       {@const headerBGColor = color?.background ?? defaultBackground($themeStore.dark)}
-      <div style:background={headerBGColor} class="header flex-between">
+      {@const wipLimit = groupByKey === 'status' ? currentProject?.wipLimits?.[state] : undefined}
+      <div
+        style:background={headerBGColor}
+        class="header flex-between"
+        class:over-limit={wipLimit !== undefined && count > wipLimit}
+      >
         <div class="flex-row-center gap-1">
           <span
             class="clear-mins fs-bold overflow-label pointer-events-none"
@@ -382,9 +388,20 @@
               />
             {/if}
           </span>
-          <span class="counter ml-1">
-            {count}
-          </span>
+          <button
+            type="button"
+            class="counter ml-1"
+            class:settable={groupByKey === 'status'}
+            class:over={wipLimit !== undefined && count > wipLimit}
+            disabled={groupByKey !== 'status'}
+            on:click={() => {
+              if (groupByKey === 'status' && currentProject !== undefined) {
+                showPopup(SetWipLimitPopup, { project: currentProject, status: state }, 'top')
+              }
+            }}
+          >
+            {count}{#if wipLimit !== undefined}<span class="limit">/{wipLimit}</span>{/if}
+          </button>
         </div>
         <div class="tools gap-1">
           <Button
@@ -523,7 +540,33 @@
     border-radius: 0.25rem;
 
     .counter {
+      padding: 0 0.3rem;
+      border: none;
+      border-radius: 0.25rem;
+      background: none;
+      font: inherit;
       color: var(--theme-dark-color);
+      cursor: default;
+
+      &.settable {
+        cursor: pointer;
+      }
+      &.settable:hover {
+        background: var(--theme-button-hovered);
+        color: var(--theme-caption-color);
+      }
+      .limit {
+        color: var(--theme-trans-color);
+      }
+      &.over {
+        color: var(--negative-button-default);
+        font-weight: 600;
+        animation: attentionPulse 1.4s ease-in-out 2;
+      }
+    }
+    &.over-limit {
+      border-color: var(--negative-button-default);
+      box-shadow: inset 0 0 0 1px var(--negative-button-default);
     }
     .tools {
       opacity: 0;

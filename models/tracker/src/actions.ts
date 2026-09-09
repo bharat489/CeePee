@@ -743,6 +743,20 @@ export function createActions (builder: Builder, issuesId: string, componentsId:
   createAction(
     builder,
     {
+      action: tracker.actionImpl.ReleaseNotes,
+      label: tracker.string.ReleaseNotes,
+      icon: tracker.icon.Milestone,
+      category: tracker.category.Tracker,
+      input: 'focus',
+      target: tracker.class.Milestone,
+      context: { mode: ['context', 'browser'], group: 'tools' }
+    },
+    tracker.action.ReleaseNotes
+  )
+
+  createAction(
+    builder,
+    {
       action: view.actionImpl.CopyAsMarkdownTable,
       actionProps: {
         cardClass: tracker.class.Issue

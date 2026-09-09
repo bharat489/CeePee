@@ -826,6 +826,10 @@
   // Command palette (Ctrl/Cmd-K). Ignored while typing so the shortcut never
   // steals a keystroke from an input, textarea or rich-text editor.
   let paletteOpen = false
+  // First-week guide, floating bottom-right. Resolved by id for the same
+  // reason as the assistant below: the workbench does not import tracker.
+  const quickstart = 'tracker:component:Quickstart' as AnyComponent
+
   // Assistant (Ctrl/Cmd-Shift-A). Resolved by id at call time so the
   // workbench never imports the tracker package.
   let assistantOpen = false
@@ -1172,6 +1176,7 @@
     <ComponentExtensions extension={workbench.extensions.WorkbenchExtensions} />
   </div>
   <BrowserNotificatator />
+  <Component is={quickstart} showLoading={false} />
 {/if}
 
 <style lang="scss">

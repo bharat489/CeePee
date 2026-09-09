@@ -43,6 +43,7 @@ import {
   TDecision,
   TResolution,
   TSprint,
+  TWebhook,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -363,6 +364,13 @@ function defineApplication (
       navigatorModel: {
         specials: [
           {
+            id: 'dashboard',
+            position: 'top',
+            label: tracker.string.Dashboard,
+            icon: tracker.icon.TrackerApplication,
+            component: tracker.component.Dashboard
+          },
+          {
             id: opt.myIssuesId,
             position: 'top',
             label: tracker.string.MyIssues,
@@ -396,6 +404,20 @@ function defineApplication (
               ],
               allProjectsTypes: true
             }
+          },
+          {
+            id: 'query',
+            position: 'top',
+            label: tracker.string.Query,
+            icon: tracker.icon.Issues,
+            component: tracker.component.IssueQuery
+          },
+          {
+            id: 'timesheets',
+            position: 'top',
+            label: tracker.string.Timesheets,
+            icon: tracker.icon.Milestone,
+            component: tracker.component.Timesheets
           },
           {
             id: 'all-projects',
@@ -470,6 +492,23 @@ function defineApplication (
                 }
               },
               {
+                id: 'initiatives',
+                label: tracker.string.Initiatives,
+                icon: tracker.icon.Issues,
+                component: tracker.component.Issues,
+                componentProps: {
+                  icon: tracker.icon.Issues,
+                  title: tracker.string.Initiatives,
+                  config: [['all', tracker.string.All, { kind: tracker.taskTypes.Initiative }]]
+                }
+              },
+              {
+                id: 'backlog',
+                label: tracker.string.Backlog,
+                icon: tracker.icon.Issues,
+                component: tracker.component.ProjectBacklog
+              },
+              {
                 id: 'sprints',
                 label: tracker.string.Sprints,
                 icon: tracker.icon.Milestone,
@@ -480,6 +519,18 @@ function defineApplication (
                 label: tracker.string.Decisions,
                 icon: tracker.icon.Issue,
                 component: tracker.component.ProjectDecisions
+              },
+              {
+                id: 'reports',
+                label: tracker.string.Reports,
+                icon: tracker.icon.Milestone,
+                component: tracker.component.ProjectReports
+              },
+              {
+                id: 'automation',
+                label: tracker.string.Automation,
+                icon: tracker.icon.Issues,
+                component: tracker.component.ProjectAutomation
               },
               {
                 id: opt.templatesId,
@@ -520,7 +571,8 @@ export function createModel (builder: Builder): void {
     TDepartmentSegment,
     TDecision,
     TResolution,
-    TSprint
+    TSprint,
+    TWebhook
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the
@@ -531,6 +583,16 @@ export function createModel (builder: Builder): void {
     icon: tracker.icon.Issues,
     component: tracker.component.DepartmentRolesSetting,
     order: 1150,
+    role: AccountRole.Maintainer
+  })
+
+  // Settings → Webhooks. Workspace-wide outbound events.
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'webhooks',
+    label: tracker.string.Webhooks,
+    icon: setting.icon.Integrations,
+    component: tracker.component.Webhooks,
+    order: 1160,
     role: AccountRole.Maintainer
   })
 
@@ -1012,6 +1074,10 @@ function defineSpaceType (builder: Builder): void {
     tracker.taskTypes.Issue
   )
 
+  builder.mixin(tracker.class.Sprint, core.class.Class, view.mixin.ObjectPresenter, {
+    presenter: tracker.component.SprintPresenter
+  })
+
   // Epic: a container issue for a body of work. Deliberately a TaskType rather
   // than a special object, so it gets hierarchy, statuses and attributes from
   // the same machinery as everything else. Sub-issues roll up to it; it may
@@ -1029,10 +1095,31 @@ function defineSpaceType (builder: Builder): void {
       targetClass: tracker.mixin.IssueTypeData,
       statusClass: tracker.class.IssueStatus,
       statusCategories: classicIssueTaskStatuses.map((it) => it.category),
-      allowedAsChildOf: [],
+      allowedAsChildOf: [tracker.taskTypes.Initiative],
       icon: tracker.icon.Issues
     },
     tracker.taskTypes.Epic
+  )
+
+  // Initiative: the level above Epic, for quarter-scale bets that span
+  // several epics. Same machinery again; only the hierarchy rule differs.
+  builder.createDoc(
+    task.class.TaskType,
+    core.space.Model,
+    {
+      parent: pluginState.ids.ClassingProjectType,
+      statuses: classicStatuses,
+      descriptor: tracker.descriptors.Issue,
+      name: 'Initiative',
+      kind: 'task',
+      ofClass: tracker.class.Issue,
+      targetClass: tracker.mixin.IssueTypeData,
+      statusClass: tracker.class.IssueStatus,
+      statusCategories: classicIssueTaskStatuses.map((it) => it.category),
+      allowedAsChildOf: [],
+      icon: tracker.icon.Issues
+    },
+    tracker.taskTypes.Initiative
   )
 
   builder.createDoc(
@@ -1042,12 +1129,13 @@ function defineSpaceType (builder: Builder): void {
       name: 'Classic project',
       descriptor: tracker.descriptors.ProjectType,
       description: '',
-      tasks: [tracker.taskTypes.Issue, tracker.taskTypes.Epic],
+      tasks: [tracker.taskTypes.Issue, tracker.taskTypes.Epic, tracker.taskTypes.Initiative],
       roles: 0,
       classic: true,
       statuses: [
         ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Issue })),
-        ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Epic }))
+        ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Epic })),
+        ...classicStatuses.map((s) => ({ _id: s, taskType: tracker.taskTypes.Initiative }))
       ],
       targetClass: tracker.mixin.ClassicProjectTypeData
     },

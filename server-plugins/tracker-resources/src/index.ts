@@ -13,6 +13,8 @@
 // limitations under the License.
 //
 
+import { OnIssueAutomation } from './automation'
+import { OnIssueWebhook } from './webhooks'
 import chunter, { ChatMessage } from '@hcengineering/chunter'
 import contact, { Employee, Person, PersonSpace } from '@hcengineering/contact'
 import core, {
@@ -920,6 +922,8 @@ export default async () => ({
     IssueLinkIdProvider: issueLinkIdProvider
   },
   trigger: {
+    OnIssueWebhook,
+    OnIssueAutomation,
     OnIssueStatusGuard,
     OnIssueUpdate,
     OnComponentRemove,

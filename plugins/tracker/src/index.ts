@@ -123,6 +123,44 @@ export interface Project extends TaskProject, IconProps {
    * `undefined` means "every day is a working day" (legacy behaviour).
    */
   workingDaysConfig?: WorkingDaysConfig
+  /**
+   * Work-in-progress limit per status for the board. Absent means no limit.
+   * The board shows count/limit and flags a column that is over.
+   */
+  wipLimits?: Record<Ref<IssueStatus>, number>
+  /** Automation rules for this project. */
+  automation?: ProjectAutomation
+  /** Hours to resolve, keyed by IssuePriority as a string. Absent = no SLA. */
+  sla?: Record<string, number>
+}
+
+/**
+ * Automation rules: each is one sentence, on or off. Enforced by a server
+ * trigger so API writes and imports get the same behaviour as the UI.
+ * @public
+ */
+export interface ProjectAutomation {
+  assignComponentLead?: boolean
+  parentFollowsChildren?: boolean
+  startParentOnChildStart?: boolean
+}
+
+/** @public */
+export type WebhookEvent = 'issue.created' | 'issue.updated' | 'issue.status' | 'issue.deleted'
+
+/**
+ * An outbound webhook. Workspace-wide: receives events for every project.
+ * @public
+ */
+export interface Webhook extends Doc {
+  name: string
+  url: string
+  secret?: string
+  events: WebhookEvent[]
+  enabled: boolean
+  lastStatus?: number
+  lastDeliveredOn?: Timestamp
+  lastError?: string | null
 }
 
 /**
@@ -282,6 +320,12 @@ export interface Issue extends Task {
 
   // Estimation in man hours
   estimation: number
+
+  /** Relative size for sprint planning. Independent of hour estimates. */
+  storyPoints?: number
+
+  /** Service-level deadline, set from the project SLA table by priority. */
+  slaDue?: Timestamp | null
 
   // Remaining time in man hours
   remainingTime: number
@@ -810,7 +854,8 @@ const pluginState = plugin(trackerId, {
     DepartmentSegment: '' as Ref<Class<DepartmentSegment>>,
     Decision: '' as Ref<Class<Decision>>,
     Resolution: '' as Ref<Class<Resolution>>,
-    Sprint: '' as Ref<Class<Sprint>>
+    Sprint: '' as Ref<Class<Sprint>>,
+    Webhook: '' as Ref<Class<Webhook>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -859,6 +904,15 @@ const pluginState = plugin(trackerId, {
     ProjectDecisions: '' as AnyComponent,
     ProjectSprints: '' as AnyComponent,
     Assistant: '' as AnyComponent,
+    SprintPresenter: '' as AnyComponent,
+    ProjectBacklog: '' as AnyComponent,
+    ProjectReports: '' as AnyComponent,
+    Dashboard: '' as AnyComponent,
+    Timesheets: '' as AnyComponent,
+    IssueQuery: '' as AnyComponent,
+    ProjectAutomation: '' as AnyComponent,
+    Webhooks: '' as AnyComponent,
+    Quickstart: '' as AnyComponent,
     DecisionPresenter: '' as AnyComponent,
     CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
@@ -982,6 +1036,67 @@ const pluginState = plugin(trackerId, {
     Epics: '' as IntlString,
     Assistant: '' as IntlString,
     AskAssistant: '' as IntlString,
+    StoryPoints: '' as IntlString,
+    Points: '' as IntlString,
+    Backlog: '' as IntlString,
+    BacklogEmpty: '' as IntlString,
+    NoSprintsYet: '' as IntlString,
+    MoveToSprint: '' as IntlString,
+    MoveToBacklog: '' as IntlString,
+    DaysLeft: '' as IntlString,
+    WipLimit: '' as IntlString,
+    SetWipLimit: '' as IntlString,
+    WipLimitHint: '' as IntlString,
+    ClearWipLimit: '' as IntlString,
+    Initiative: '' as IntlString,
+    Initiatives: '' as IntlString,
+    Reports: '' as IntlString,
+    Burndown: '' as IntlString,
+    Velocity: '' as IntlString,
+    CumulativeFlow: '' as IntlString,
+    Remaining: '' as IntlString,
+    Ideal: '' as IntlString,
+    AvgVelocity: '' as IntlString,
+    NoCompletedSprints: '' as IntlString,
+    ToDo: '' as IntlString,
+    InProgress: '' as IntlString,
+    Done: '' as IntlString,
+    Dashboard: '' as IntlString,
+    DueSoon: '' as IntlString,
+    GoneQuiet: '' as IntlString,
+    NothingAssigned: '' as IntlString,
+    NothingDue: '' as IntlString,
+    NothingStale: '' as IntlString,
+    NoActiveSprint: '' as IntlString,
+    Workload: '' as IntlString,
+    Timesheets: '' as IntlString,
+    ThisWeek: '' as IntlString,
+    Person: '' as IntlString,
+    Total: '' as IntlString,
+    NoTimeReported: '' as IntlString,
+    Query: '' as IntlString,
+    QueryHint: '' as IntlString,
+    ReleaseNotes: '' as IntlString,
+    CopyMarkdown: '' as IntlString,
+    Copied: '' as IntlString,
+    Close: '' as IntlString,
+    Automation: '' as IntlString,
+    AutomationHint: '' as IntlString,
+    Rules: '' as IntlString,
+    ServiceLevels: '' as IntlString,
+    ServiceLevelsHint: '' as IntlString,
+    Hours: '' as IntlString,
+    SlaDue: '' as IntlString,
+    Webhooks: '' as IntlString,
+    WebhooksHint: '' as IntlString,
+    AddWebhook: '' as IntlString,
+    Name: '' as IntlString,
+    WebhookUrl: '' as IntlString,
+    WebhookSecret: '' as IntlString,
+    WebhookSignatureHint: '' as IntlString,
+    NoWebhooks: '' as IntlString,
+    NoDeliveriesYet: '' as IntlString,
+    Enabled: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,
@@ -1142,7 +1257,8 @@ const pluginState = plugin(trackerId, {
   taskTypes: {
     Issue: '' as Ref<TaskType>,
     SubIssue: '' as Ref<TaskType>,
-    Epic: '' as Ref<TaskType>
+    Epic: '' as Ref<TaskType>,
+    Initiative: '' as Ref<TaskType>
   },
   permission: {
     ForbidCreateProject: '' as Ref<Permission>

@@ -89,6 +89,16 @@ import { createIssueFromMessage } from './createIssueFromMessage'
 import ResolutionEditor from './components/issues/ResolutionEditor.svelte'
 import ProjectDecisions from './components/decisions/ProjectDecisions.svelte'
 import ProjectSprints from './components/sprints/ProjectSprints.svelte'
+import ProjectBacklog from './components/sprints/ProjectBacklog.svelte'
+import SprintPresenter from './components/sprints/SprintPresenter.svelte'
+import ProjectReports from './components/reports/ProjectReports.svelte'
+import Dashboard from './components/dashboard/Dashboard.svelte'
+import Timesheets from './components/timesheets/Timesheets.svelte'
+import IssueQuery from './components/query/IssueQuery.svelte'
+import ProjectAutomation from './components/automation/ProjectAutomation.svelte'
+import Webhooks from './components/webhooks/Webhooks.svelte'
+import Quickstart from './components/quickstart/Quickstart.svelte'
+import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
@@ -426,6 +436,15 @@ export default async (): Promise<Resources> => ({
     ResolutionEditor,
     ProjectDecisions,
     ProjectSprints,
+    ProjectBacklog,
+    SprintPresenter,
+    ProjectReports,
+    Dashboard,
+    Timesheets,
+    IssueQuery,
+    ProjectAutomation,
+    Webhooks,
+    Quickstart,
     Assistant,
     NopeComponent,
     DepartmentSegments,
@@ -557,6 +576,7 @@ export default async (): Promise<Resources> => ({
   },
   actionImpl: {
     CreateIssueFromMessage: createIssueFromMessage,
+    ReleaseNotes: releaseNotes,
     Move: move,
     EditWorkflowStatuses: editWorkflowStatuses,
     EditProject: editProject,
