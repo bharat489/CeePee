@@ -98,6 +98,8 @@ import IssueQuery from './components/query/IssueQuery.svelte'
 import ProjectAutomation from './components/automation/ProjectAutomation.svelte'
 import Webhooks from './components/webhooks/Webhooks.svelte'
 import Quickstart from './components/quickstart/Quickstart.svelte'
+import JiraImport from './components/import/JiraImport.svelte'
+import AuditLog from './components/audit/AuditLog.svelte'
 import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
@@ -445,6 +447,8 @@ export default async (): Promise<Resources> => ({
     ProjectAutomation,
     Webhooks,
     Quickstart,
+    JiraImport,
+    AuditLog,
     Assistant,
     NopeComponent,
     DepartmentSegments,

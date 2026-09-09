@@ -596,6 +596,24 @@ export function createModel (builder: Builder): void {
     role: AccountRole.Maintainer
   })
 
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'jira-import',
+    label: tracker.string.JiraImport,
+    icon: setting.icon.Integrations,
+    component: tracker.component.JiraImport,
+    order: 1170,
+    role: AccountRole.Maintainer
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'audit',
+    label: tracker.string.AuditLog,
+    icon: setting.icon.Privacy,
+    component: tracker.component.AuditLog,
+    order: 1180,
+    role: AccountRole.Maintainer
+  })
+
   // Seed the two roles the model depends on. Teams add their own alongside
   // these from Settings → Department roles; only these two are protected from
   // deletion, because the accountable/contributing distinction is structural.

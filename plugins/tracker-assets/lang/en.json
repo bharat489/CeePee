@@ -679,7 +679,14 @@
     "WebhookSignatureHint": "Receivers verify X-CeePee-Signature: sha256=HMAC(secret, body). Deliveries time out after 10 s and are recorded on the hook.",
     "NoWebhooks": "No webhooks yet.",
     "NoDeliveriesYet": "No deliveries yet",
-    "Enabled": "Enabled"
+    "Enabled": "Enabled",
+    "JiraImport": "Import from Jira",
+    "JiraImportHint": "Bring a Jira project over from its CSV export. Everything is previewed before anything is written.",
+    "ImportIssues": "Import issues",
+    "AuditLog": "Audit log",
+    "AuditLogHint": "Every change to shared work, by whom and when. Edits only — nothing about presence or reading is recorded.",
+    "NothingToShow": "Nothing to show.",
+    "LoadMore": "Load more"
   },
   "status": {}
 }
