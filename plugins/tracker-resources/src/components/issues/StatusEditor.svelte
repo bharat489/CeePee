@@ -15,7 +15,7 @@
 <script lang="ts">
   import { AttachedData, Ref, WithLookup } from '@hcengineering/core'
   import { getClient } from '@hcengineering/presentation'
-  import { getTaskTypeStates } from '@hcengineering/task'
+  import task, { getTaskTypeStates } from '@hcengineering/task'
   import { taskTypeStore } from '@hcengineering/task-resources'
   import { Issue, IssueDraft, IssueStatus, Project, TrackerEvents } from '@hcengineering/tracker'
   import {
@@ -103,6 +103,24 @@
   $: statuses =
     guard === undefined ? allStatuses : allStatuses.filter((s) => s._id === value.status || guard.includes(s._id))
 
+  // Required-before-terminal: a Won or Lost status is offered only once every
+  // attribute the task type names is non-empty. This is the validator half of
+  // Jira's workflow engine without the scripting -- the rule is a list of
+  // field names on the type, visible to anyone who opens it.
+  $: required = value.kind !== undefined ? $taskTypeStore.get(value.kind)?.requiredBeforeTerminal ?? [] : []
+  $: missing = required.filter((k) => {
+    const v = (value as any)[k]
+    return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+  })
+  $: terminalBlocked = missing.length > 0
+  $: offered = terminalBlocked
+    ? statuses.filter((s) => {
+        const cat = s.category
+        const terminal = cat === task.statusCategory.Won || cat === task.statusCategory.Lost
+        return !terminal || s._id === value.status
+      })
+    : statuses
+
   function getSelectedStatus (
     statuses: WithLookup<IssueStatus>[] | undefined,
     value: ValueType,
@@ -130,7 +148,7 @@
 
   $: selectedStatus = getSelectedStatus(statuses, value, defaultIssueStatus)
   $: selectedStatusLabel = shouldShowLabel ? selectedStatus?.name : undefined
-  $: statusesInfo = statuses?.map((s) => {
+  $: statusesInfo = offered?.map((s) => {
     return {
       id: s._id,
       component: StatusPresenter,

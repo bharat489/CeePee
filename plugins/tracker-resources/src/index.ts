@@ -87,6 +87,9 @@ import NopeComponent from './components/NopeComponent.svelte'
 import Decisions from './components/decisions/Decisions.svelte'
 import { createIssueFromMessage } from './createIssueFromMessage'
 import ResolutionEditor from './components/issues/ResolutionEditor.svelte'
+import ProjectDecisions from './components/decisions/ProjectDecisions.svelte'
+import ProjectSprints from './components/sprints/ProjectSprints.svelte'
+import Assistant from './components/assistant/Assistant.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
 import DepartmentRolesSetting from './components/departments/DepartmentRolesSetting.svelte'
@@ -421,6 +424,9 @@ export default async (): Promise<Resources> => ({
     Decisions,
     CreateDecisionPopup,
     ResolutionEditor,
+    ProjectDecisions,
+    ProjectSprints,
+    Assistant,
     NopeComponent,
     DepartmentSegments,
     AddDepartmentPopup,

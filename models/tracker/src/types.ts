@@ -70,6 +70,8 @@ import {
   type Decision,
   type DecisionState,
   type Resolution,
+  type Sprint,
+  type SprintState,
   type DepartmentSegment,
   type Issue,
   type IssueChildInfo,
@@ -254,6 +256,14 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeRef(tracker.class.Resolution), tracker.string.Resolution)
   @Index(IndexKind.Indexed)
     resolution?: Ref<Resolution> | null
+
+  @Prop(TypeRef(tracker.class.Sprint), tracker.string.Sprint)
+  @Index(IndexKind.Indexed)
+    sprint?: Ref<Sprint> | null
+
+  @Prop(TypeRef(tracker.class.Milestone), tracker.string.AffectsVersion)
+  @Index(IndexKind.Indexed)
+    affectsMilestone?: Ref<Milestone> | null
 
   @Prop(ArrOf(TypeRef(core.class.TypeRelatedDocument)), tracker.string.BlockedBy)
     blockedBy!: RelatedDocument[]
@@ -470,6 +480,35 @@ export class TDepartmentSegment extends TAttachedDoc implements DepartmentSegmen
  * is separate from status.
  * @public
  */
+/** @public */
+@Model(tracker.class.Sprint, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Sprint, tracker.icon.Milestone, undefined, 'startDate', undefined, tracker.string.Sprints)
+export class TSprint extends TDoc implements Sprint {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Title)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.SprintGoal)
+    goal?: string
+
+  @Prop(TypeDate(), tracker.string.SprintStart)
+    startDate!: Timestamp
+
+  @Prop(TypeDate(), tracker.string.SprintEnd)
+    endDate!: Timestamp
+
+  @Prop(TypeString(), tracker.string.Sprint)
+  @Index(IndexKind.Indexed)
+    state!: SprintState
+
+  @Prop(TypeRef(tracker.class.Sprint), tracker.string.CarriedOver)
+    carriedOverTo?: Ref<Sprint> | null
+}
+
 @Model(tracker.class.Resolution, core.class.Doc, DOMAIN_TRACKER)
 @UX(tracker.string.Resolution, tracker.icon.Issue)
 export class TResolution extends TDoc implements Resolution {

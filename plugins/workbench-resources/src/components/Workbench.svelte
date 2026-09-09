@@ -826,7 +826,26 @@
   // Command palette (Ctrl/Cmd-K). Ignored while typing so the shortcut never
   // steals a keystroke from an input, textarea or rich-text editor.
   let paletteOpen = false
+  // Assistant (Ctrl/Cmd-Shift-A). Resolved by id at call time so the
+  // workbench never imports the tracker package.
+  let assistantOpen = false
+  function openAssistant (): void {
+    if (assistantOpen) return
+    assistantOpen = true
+    showPopup('tracker:component:Assistant' as AnyComponent, {}, 'top', () => {
+      assistantOpen = false
+    })
+  }
+
   function onGlobalKeydown (evt: KeyboardEvent): void {
+
+    if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey && evt.key.toLowerCase() === 'a') {
+      const t = evt.target as HTMLElement | null
+      if (t?.tagName === 'INPUT' || t?.tagName === 'TEXTAREA' || t?.isContentEditable === true) return
+      evt.preventDefault()
+      openAssistant()
+      return
+    }
     if (!(evt.ctrlKey || evt.metaKey) || evt.key.toLowerCase() !== 'k') return
     const t = evt.target as HTMLElement | null
     const tag = t?.tagName

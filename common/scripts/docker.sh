@@ -27,6 +27,7 @@ if [ "$MINIFIED" = true ]; then
     --to @hcengineering/pod-media \
     --to @hcengineering/pod-external \
     --to @hcengineering/pod-worker \
+    --to @hcengineering/pod-process \
     --to @hcengineering/pod-events-processor
 else
   rush docker:build -p 20 \

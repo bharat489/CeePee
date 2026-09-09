@@ -42,6 +42,7 @@ import {
   TDependencyShiftRequest,
   TDecision,
   TResolution,
+  TSprint,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -458,6 +459,29 @@ function defineApplication (
                 component: tracker.component.Milestones
               },
               {
+                id: 'epics',
+                label: tracker.string.Epics,
+                icon: tracker.icon.Issues,
+                component: tracker.component.Issues,
+                componentProps: {
+                  icon: tracker.icon.Issues,
+                  title: tracker.string.Epics,
+                  config: [['all', tracker.string.All, { kind: tracker.taskTypes.Epic }]]
+                }
+              },
+              {
+                id: 'sprints',
+                label: tracker.string.Sprints,
+                icon: tracker.icon.Milestone,
+                component: tracker.component.ProjectSprints
+              },
+              {
+                id: 'decisions',
+                label: tracker.string.Decisions,
+                icon: tracker.icon.Issue,
+                component: tracker.component.ProjectDecisions
+              },
+              {
                 id: opt.templatesId,
                 label: tracker.string.IssueTemplates,
                 icon: tracker.icon.IssueTemplates,
@@ -495,7 +519,8 @@ export function createModel (builder: Builder): void {
     TDepartmentRole,
     TDepartmentSegment,
     TDecision,
-    TResolution
+    TResolution,
+    TSprint
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the

@@ -340,6 +340,17 @@ export interface Issue extends Task {
    * described.
    */
   resolution?: Ref<Resolution> | null
+
+  /** The iteration this issue is committed to. */
+  sprint?: Ref<Sprint> | null
+
+  /**
+   * The release in which the problem was observed. The existing milestone
+   * is the fix version -- where it will be resolved. Keeping both answers
+   * "when did this break?" and "when will it ship?" without a Jira-style
+   * version scheme.
+   */
+  affectsMilestone?: Ref<Milestone> | null
 }
 
 /**
@@ -478,6 +489,25 @@ export interface Decision extends Doc {
    * Cleared on ratification: once a human ratifies, the human owns it.
    */
   aiDrafted?: boolean
+}
+
+/**
+ * A time-boxed iteration. Deliberately optional: Milestones carry the dates
+ * that matter for delivery, and a team that does not run a cadence never sees
+ * this. Teams that do get start/complete with carry-over of unfinished work.
+ * @public
+ */
+export type SprintState = 'planned' | 'active' | 'completed'
+
+export interface Sprint extends Doc {
+  space: Ref<Project>
+  name: string
+  goal?: string
+  startDate: Timestamp
+  endDate: Timestamp
+  state: SprintState
+  /** Set when completed; unfinished issues were moved here. */
+  carriedOverTo?: Ref<Sprint> | null
 }
 
 /**
@@ -779,7 +809,8 @@ const pluginState = plugin(trackerId, {
     DepartmentRole: '' as Ref<Class<DepartmentRole>>,
     DepartmentSegment: '' as Ref<Class<DepartmentSegment>>,
     Decision: '' as Ref<Class<Decision>>,
-    Resolution: '' as Ref<Class<Resolution>>
+    Resolution: '' as Ref<Class<Resolution>>,
+    Sprint: '' as Ref<Class<Sprint>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -825,6 +856,9 @@ const pluginState = plugin(trackerId, {
     DepartmentSegments: '' as AnyComponent,
     Decisions: '' as AnyComponent,
     ResolutionEditor: '' as AnyComponent,
+    ProjectDecisions: '' as AnyComponent,
+    ProjectSprints: '' as AnyComponent,
+    Assistant: '' as AnyComponent,
     DecisionPresenter: '' as AnyComponent,
     CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
@@ -930,6 +964,24 @@ const pluginState = plugin(trackerId, {
   string: {
     TrackerApplication: '' as IntlString,
     ConfigLabel: '' as IntlString,
+    Sprint: '' as IntlString,
+    Sprints: '' as IntlString,
+    NewSprint: '' as IntlString,
+    SprintGoal: '' as IntlString,
+    SprintStart: '' as IntlString,
+    SprintEnd: '' as IntlString,
+    StartSprint: '' as IntlString,
+    CompleteSprint: '' as IntlString,
+    ActiveSprint: '' as IntlString,
+    PlannedSprint: '' as IntlString,
+    CompletedSprint: '' as IntlString,
+    AffectsVersion: '' as IntlString,
+    FixVersion: '' as IntlString,
+    NoSprint: '' as IntlString,
+    CarriedOver: '' as IntlString,
+    Epics: '' as IntlString,
+    Assistant: '' as IntlString,
+    AskAssistant: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,

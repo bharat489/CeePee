@@ -603,7 +603,25 @@
     "ResolutionCannotReproduce": "Cannot reproduce",
     "SetResolution": "Set resolution",
     "SuccessfulResolution": "Counts as delivered",
-    "CreateIssueFromMessage": "Create issue from message"
+    "CreateIssueFromMessage": "Create issue from message",
+    "Sprint": "Sprint",
+    "Sprints": "Sprints",
+    "NewSprint": "New sprint",
+    "SprintGoal": "Goal",
+    "SprintStart": "Start",
+    "SprintEnd": "End",
+    "StartSprint": "Start sprint",
+    "CompleteSprint": "Complete sprint",
+    "ActiveSprint": "Active",
+    "PlannedSprint": "Planned",
+    "CompletedSprint": "Completed",
+    "AffectsVersion": "Affects version",
+    "FixVersion": "Fix version",
+    "NoSprint": "No sprint",
+    "CarriedOver": "Carried over to",
+    "Epics": "Epics",
+    "Assistant": "Assistant",
+    "AskAssistant": "Ask the assistant"
   },
   "status": {}
 }

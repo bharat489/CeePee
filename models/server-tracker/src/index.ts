@@ -50,6 +50,18 @@ export function createModel (builder: Builder): void {
     title: [['title']]
   })
 
+  // Transition guards are enforced here as well as in the status editor: the
+  // editor is a convenience, the trigger is the guarantee. Anything that
+  // writes through the API meets the same rule.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnIssueStatusGuard,
+    txMatch: {
+      _class: core.class.TxUpdateDoc,
+      objectClass: tracker.class.Issue,
+      'operations.status': { $exists: true }
+    }
+  })
+
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnIssueUpdate,
     txMatch: {

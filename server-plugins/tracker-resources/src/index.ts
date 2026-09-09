@@ -33,7 +33,8 @@ import core, {
   WithLookup
 } from '@hcengineering/core'
 import notification, { DocNotifyContext, NotificationContent } from '@hcengineering/notification'
-import { getMetadata, IntlString } from '@hcengineering/platform'
+import task from '@hcengineering/task'
+import platform, { getMetadata, IntlString, PlatformError, Severity, Status } from '@hcengineering/platform'
 import serverCore, { TriggerControl } from '@hcengineering/server-core'
 import { getAccountBySocialId } from '@hcengineering/server-contact'
 import { NOTIFICATION_BODY_SIZE } from '@hcengineering/server-notification'
@@ -44,6 +45,7 @@ import tracker, {
   type DependencyShiftRequest,
   groupShiftsByRecipient,
   Issue,
+  IssueStatus,
   IssueParentInfo,
   type ShiftedIssuePayload,
   TimeSpendReport,
@@ -862,6 +864,54 @@ export async function OnDependencyShiftRequest (txes: Tx[], control: TriggerCont
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+
+/**
+ * Reject a status change the task type does not allow.
+ *
+ * Two rules, both declared on the TaskType so anyone can read them:
+ * `transitions` limits where each status may move; `requiredBeforeTerminal`
+ * names attributes that must be set before a Won or Lost status. A status
+ * absent from `transitions` may move anywhere, so types that never opted in
+ * are unaffected. Side effects never live here -- that is the process engine.
+ */
+export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  for (const tx of txes) {
+    const utx = tx as TxUpdateDoc<Issue>
+    const next = (utx.operations as any)?.status as Ref<IssueStatus> | undefined
+    if (next === undefined) continue
+
+    const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: utx.objectId }, { limit: 1 }))[0]
+    if (issue === undefined || issue.status === next) continue
+
+    const type = (await control.findAll(control.ctx, task.class.TaskType, { _id: issue.kind }, { limit: 1 }))[0]
+    if (type === undefined) continue
+
+    const allowed = (type as any).transitions?.[issue.status] as Ref<IssueStatus>[] | undefined
+    if (allowed !== undefined && !allowed.includes(next)) {
+      throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+    }
+
+    const required = ((type as any).requiredBeforeTerminal as string[] | undefined) ?? []
+    if (required.length > 0) {
+      const status = (await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: next }, { limit: 1 }))[0]
+      const terminal =
+        status?.category === task.statusCategory.Won || status?.category === task.statusCategory.Lost
+      if (terminal) {
+        // Values after this update are what count, so merge the operations in.
+        const merged: any = { ...issue, ...utx.operations }
+        const missing = required.filter((k) => {
+          const v = merged[k]
+          return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+        })
+        if (missing.length > 0) {
+          throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: missing.join(', ') }))
+        }
+      }
+    }
+  }
+  return []
+}
+
 export default async () => ({
   function: {
     IssueHTMLPresenter: issueHTMLPresenter,
@@ -870,6 +920,7 @@ export default async () => ({
     IssueLinkIdProvider: issueLinkIdProvider
   },
   trigger: {
+    OnIssueStatusGuard,
     OnIssueUpdate,
     OnComponentRemove,
     OnProjectRemove,

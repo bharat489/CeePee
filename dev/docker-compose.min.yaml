@@ -2,7 +2,7 @@
 # Use with: docker compose -f docker-compose.yaml -f docker-compose.min.yaml up
 # (rush docker:up:min)
 # Excluded: preview, link-preview, elastic, redis, stats, payment, billing, fulltext_cockroach,
-#           print, sign, hulykvs, hulygun, hulypulse, process-service, backup-cockroach,
+#           print, sign, hulykvs, hulygun, hulypulse, backup-cockroach,
 #           backup-api, rating_cockroach
 # Overrides below remove dependencies on excluded services so the min project validates.
 
@@ -32,8 +32,6 @@ services:
   hulygun:
     profiles: ["full"]
   hulypulse:
-    profiles: ["full"]
-  process-service:
     profiles: ["full"]
   backup-cockroach:
     profiles: ["full"]
