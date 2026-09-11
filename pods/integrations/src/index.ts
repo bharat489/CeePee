@@ -149,6 +149,10 @@ async function getScimToken (): Promise<string> {
 }
 
 async function platform (res: ServerResponse): Promise<Awaited<ReturnType<typeof getPlatform>> | undefined> {
+  if (platformCfg.email === '' || platformCfg.password === '' || platformCfg.workspace === '') {
+    send(res, 503, { error: 'integrations account not configured: set INTEGRATIONS_EMAIL, INTEGRATIONS_PASSWORD and WORKSPACE' })
+    return undefined
+  }
   try {
     return await getPlatform(platformCfg)
   } catch (e: any) {
