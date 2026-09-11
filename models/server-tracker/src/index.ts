@@ -70,7 +70,7 @@ export function createModel (builder: Builder): void {
   // Project automation rules (WHEN/IF/THEN), on issue changes and comments.
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnAutomationRules,
-    txMatch: { objectClass: { $in: [tracker.class.Issue, 'chunter:class:ChatMessage' as any] } }
+    txMatch: { objectClass: { $in: [tracker.class.Issue, 'chunter:class:ChatMessage' as any, tracker.class.AutomationHeartbeat, tracker.class.AutomationRule] } }
   })
 
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {

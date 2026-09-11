@@ -107,6 +107,7 @@ import Roadmap from './components/roadmap/Roadmap.svelte'
 import ServiceDesk from './components/servicedesk/ServiceDesk.svelte'
 import SubmitRequest from './components/servicedesk/SubmitRequest.svelte'
 import ProjectPermissions from './components/settings/ProjectPermissions.svelte'
+import ProjectTemplates from './components/settings/ProjectTemplates.svelte'
 import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
@@ -464,6 +465,7 @@ export default async (): Promise<Resources> => ({
     ServiceDesk,
     SubmitRequest,
     ProjectPermissions,
+    ProjectTemplates,
     Assistant,
     NopeComponent,
     DepartmentSegments,

@@ -424,6 +424,7 @@
       {#key issueId}
         <div
           class="tracker-card"
+          data-issue={issueId}
           on:click={() => {
             void openDoc(client.getHierarchy(), issue)
           }}

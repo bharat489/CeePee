@@ -33,6 +33,11 @@ export interface DigestConfig {
 }
 
 const DAY = 86_400_000
+function startOfWeek (t: number): number {
+  const d = new Date(t)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime() - ((d.getDay() + 6) % 7) * DAY
+}
 const rank = (p: IssuePriority): number => (p === IssuePriority.NoPriority ? 99 : p)
 
 async function sendMail (cfg: DigestConfig, to: string, subject: string, text: string, html: string): Promise<void> {
@@ -60,7 +65,13 @@ export async function runDigest (c: PlatformClient, cfg: DigestConfig): Promise<
     const to = emailOf.get(e._id)
     if (to === undefined) continue
     const mine = await c.findAll(tracker.class.Issue, { assignee: e._id, status: { $in: open } }, { limit: 200 })
-    if (mine.length === 0) continue
+    // timesheet reminder: hours logged last week, nothing submitted
+    const prevWeek = startOfWeek(Date.now()) - 7 * DAY
+    const lastWeekHours = (await c.findAll(tracker.class.TimeSpendReport, { employee: e._id as any, date: { $gte: prevWeek, $lt: prevWeek + 7 * DAY } }, { limit: 1000 })).reduce((a, r) => a + r.value, 0)
+    const approval = lastWeekHours > 0 ? await c.findOne(tracker.class.TimesheetApproval, { employee: e._id as any, weekStart: prevWeek }) : undefined
+    const needsTimesheet = lastWeekHours > 0 && (approval === undefined || approval.state === 'rejected')
+    const timesheetUrl = `${cfg.frontUrl.replace(/\/$/, '')}/workbench/${cfg.workspace}/tracker/timesheets`
+    if (mine.length === 0 && !needsTimesheet) continue
     const next = [...mine].sort((a, b) => rank(a.priority) - rank(b.priority) || (a.dueDate ?? 9e15) - (b.dueDate ?? 9e15)).slice(0, 8)
     const due = mine.filter((i) => i.dueDate != null && i.dueDate < Date.now() + 3 * DAY).sort((a, b) => (a.dueDate ?? 0) - (b.dueDate ?? 0))
     const myStale = stale.filter((i) => i.assignee === e._id).slice(0, 5)
@@ -73,10 +84,11 @@ export async function runDigest (c: PlatformClient, cfg: DigestConfig): Promise<
       ...next.map(line),
       ...(due.length > 0 ? ['', 'Due within 3 days:', ...due.map(line)] : []),
       ...(myStale.length > 0 ? ['', 'Gone quiet (7+ days):', ...myStale.map(line)] : []),
+      ...(needsTimesheet ? ['', `Timesheet: ${Math.round(lastWeekHours * 10) / 10}h logged last week, not yet submitted. Submit it: ${timesheetUrl}`] : []),
       '',
       `Open CeePee: ${cfg.frontUrl}`
     ].join('\n')
-    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222"><p>Good morning. <b>${mine.length}</b> open issue${mine.length === 1 ? '' : 's'} assigned to you.</p><p><b>Next up</b></p><ul>${next.map(hline).join('')}</ul>${due.length > 0 ? `<p><b>Due within 3 days</b></p><ul>${due.map(hline).join('')}</ul>` : ''}${myStale.length > 0 ? `<p><b>Gone quiet (7+ days)</b></p><ul>${myStale.map(hline).join('')}</ul>` : ''}<p><a href="${cfg.frontUrl}">Open CeePee</a></p></div>`
+    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222"><p>Good morning. <b>${mine.length}</b> open issue${mine.length === 1 ? '' : 's'} assigned to you.</p><p><b>Next up</b></p><ul>${next.map(hline).join('')}</ul>${due.length > 0 ? `<p><b>Due within 3 days</b></p><ul>${due.map(hline).join('')}</ul>` : ''}${myStale.length > 0 ? `<p><b>Gone quiet (7+ days)</b></p><ul>${myStale.map(hline).join('')}</ul>` : ''}${needsTimesheet ? `<p><b>Timesheet</b> · ${Math.round(lastWeekHours * 10) / 10}h logged last week, not yet submitted. <a href="${timesheetUrl}">Submit it</a>.</p>` : ''}<p><a href="${cfg.frontUrl}">Open CeePee</a></p></div>`
     try {
       await sendMail(cfg, to, `Your day in ${projectOf.size > 1 ? 'CeePee' : projectOf.values().next().value ?? 'CeePee'}: ${mine.length} open, ${due.length} due soon`, text, html)
       sent++

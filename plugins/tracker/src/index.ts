@@ -137,6 +137,8 @@ export interface Project extends TaskProject, IconProps {
   permissions?: PermissionScheme
   /** Event kinds this project delivers; see NotificationScheme. */
   notificationScheme?: NotificationScheme
+  /** Template the project was created from, e.g. "scrum:team". */
+  projectTemplate?: string
 }
 
 /**
@@ -162,13 +164,20 @@ export interface PermissionScheme {
   moveSprint?: AccountRole
 }
 
-/** false switches an event kind off for the project. @public */
+/** Who receives an event kind. Absent = everyone the platform would notify. @public */
+export interface NotificationRecipients {
+  assignee?: boolean
+  reporter?: boolean
+  watchers?: boolean
+  others?: boolean
+}
+/** false switches an event kind off for the project; an object picks recipients. @public */
 export interface NotificationScheme {
-  assigned?: boolean
-  statusChanged?: boolean
-  commented?: boolean
-  mentioned?: boolean
-  otherChanges?: boolean
+  assigned?: boolean | NotificationRecipients
+  statusChanged?: boolean | NotificationRecipients
+  commented?: boolean | NotificationRecipients
+  mentioned?: boolean | NotificationRecipients
+  otherChanges?: boolean | NotificationRecipients
 }
 
 /** @public */
@@ -247,7 +256,7 @@ export interface RequestType extends Doc {
 }
 
 /** @public */
-export type AutomationTrigger = 'created' | 'status' | 'priority' | 'assignee' | 'commented' | 'updated'
+export type AutomationTrigger = 'created' | 'status' | 'priority' | 'assignee' | 'commented' | 'updated' | 'scheduled' | 'webhook'
 /** @public */
 export interface AutomationCondition {
   field: 'status' | 'priority' | 'assignee' | 'kind' | 'component' | 'labels' | 'title' | 'sprint' | 'milestone'
@@ -256,9 +265,15 @@ export interface AutomationCondition {
 }
 /** @public */
 export interface AutomationAction {
-  type: 'set-status' | 'set-priority' | 'set-assignee' | 'add-label' | 'add-comment' | 'set-sprint' | 'set-milestone' | 'set-due' | 'webhook'
+  type: 'set-status' | 'set-priority' | 'set-assignee' | 'add-label' | 'add-comment' | 'set-sprint' | 'set-milestone' | 'set-due' | 'webhook' | 'slack' | 'teams'
   value?: string
+  /** Which issues the action touches: the triggering one (default) or related ones. */
+  target?: 'self' | 'parent' | 'children' | 'blocked-by' | 'blocking'
+  /** Slack / Teams incoming-webhook URL, or a plain webhook URL. */
+  url?: string
 }
+/** Which issues a scheduled rule looks at. @public */
+export type AutomationScope = 'open' | 'all' | 'stale7' | 'due3' | 'overdue' | 'unassigned'
 /** WHEN trigger IF conditions THEN actions, evaluated on the server. @public */
 export interface AutomationRule extends Doc {
   space: Ref<Project>
@@ -270,6 +285,26 @@ export interface AutomationRule extends Doc {
   runs?: number
   lastRun?: Timestamp
   lastError?: string | null
+  /** scheduled: minutes between runs. */
+  every?: number
+  /** scheduled: which issues to evaluate. */
+  scope?: AutomationScope
+  /** webhook: secret in the inbound URL. */
+  token?: string
+  /** webhook: last delivery, set by the integrations service; the trigger fires on it. */
+  lastWebhook?: Timestamp
+  lastPayload?: Record<string, any>
+  /** issues matched on the last run. */
+  lastMatched?: number
+}
+
+/**
+ * A single doc the integrations service touches every few minutes so the
+ * server trigger gets a transaction to run scheduled rules on.
+ * @public
+ */
+export interface AutomationHeartbeat extends Doc {
+  at: Timestamp
 }
 
 /**
@@ -451,6 +486,8 @@ export interface Issue extends Task {
   /** Satisfaction rating (1-5) from the person who raised the request. */
   csat?: number
   csatComment?: string
+  /** Email of the person who raised this through the public portal (no account). */
+  portalEmail?: string
 
   // Remaining time in man hours
   remainingTime: number
@@ -989,7 +1026,8 @@ const pluginState = plugin(trackerId, {
     AuditEvent: '' as Ref<Class<AuditEvent>>,
     AuditPolicy: '' as Ref<Class<AuditPolicy>>,
     RequestType: '' as Ref<Class<RequestType>>,
-    AutomationRule: '' as Ref<Class<AutomationRule>>
+    AutomationRule: '' as Ref<Class<AutomationRule>>,
+    AutomationHeartbeat: '' as Ref<Class<AutomationHeartbeat>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -1048,6 +1086,7 @@ const pluginState = plugin(trackerId, {
     Webhooks: '' as AnyComponent,
     Quickstart: '' as AnyComponent,
     JiraImport: '' as AnyComponent,
+    ProjectTemplates: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
     SwimlaneBoard: '' as AnyComponent,
     Releases: '' as AnyComponent,
@@ -1292,6 +1331,18 @@ const pluginState = plugin(trackerId, {
     CloneWithSubIssues: '' as IntlString,
     Permissions: '' as IntlString,
     PermissionsHint: '' as IntlString,
+    MergeInto: '' as IntlString,
+    CopyLink: '' as IntlString,
+    ExportJson: '' as IntlString,
+    ImportJson: '' as IntlString,
+    ProjectTemplates: '' as IntlString,
+    ProjectTemplatesHint: '' as IntlString,
+    Scenario: '' as IntlString,
+    Apply: '' as IntlString,
+    Discard: '' as IntlString,
+    SubmitTimesheet: '' as IntlString,
+    InvoiceWeek: '' as IntlString,
+    InvoiceMonth: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,

@@ -217,6 +217,50 @@
   }
   $: analyze(csvText)
 
+  // ---- Jira Cloud REST API import (via the integrations service) ------------------
+  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  let apiBase = ''
+  let apiEmail = ''
+  let apiToken = ''
+  let apiJql = ''
+  let apiInbound = ''
+  let apiAttachments = true
+  let apiHistory = true
+  let apiComments = true
+  let apiWorklogs = true
+  let apiJob: { id: string, state: string, total: number, done: number, created: number, attachments: number, errors: string[] } | undefined
+  let apiError = ''
+  let apiTimer: ReturnType<typeof setInterval> | undefined
+  async function startApiImport (): Promise<void> {
+    apiError = ''
+    if (project === undefined) return
+    try {
+      const r = await fetch(`${integrationsUrl}/inbound/jira-import`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiInbound}` },
+        body: JSON.stringify({ baseUrl: apiBase.trim(), email: apiEmail.trim(), token: apiToken.trim(), jql: apiJql.trim(), project: project.identifier, attachments: apiAttachments, history: apiHistory, comments: apiComments, worklogs: apiWorklogs })
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error ?? `HTTP ${r.status}`)
+      apiJob = j
+      if (apiTimer !== undefined) clearInterval(apiTimer)
+      apiTimer = setInterval(() => { void pollApi() }, 2000)
+    } catch (e: any) {
+      apiError = String(e?.message ?? e) + (integrationsUrl !== '' ? ` — is the integrations service running at ${integrationsUrl} with INBOUND_TOKEN set?` : '')
+    }
+  }
+  async function pollApi (): Promise<void> {
+    if (apiJob === undefined) return
+    try {
+      const r = await fetch(`${integrationsUrl}/inbound/jira-import/${apiJob.id}`, { headers: { authorization: `Bearer ${apiInbound}` } })
+      if (r.ok) apiJob = await r.json()
+      if (apiJob !== undefined && apiJob.state !== 'running' && apiTimer !== undefined) {
+        clearInterval(apiTimer)
+        apiTimer = undefined
+      }
+    } catch {}
+  }
+
   async function onFile (e: Event): Promise<void> {
     const input = e.target as HTMLInputElement
     const f = input.files?.[0]
@@ -471,8 +515,36 @@
       </div>
     </section>
 
+    <section class="card motion-rise" style="--i: 2">
+      <span class="card__step">or</span>
+      <div class="card__body">
+        <span class="card__title">Or import straight from Jira Cloud (REST API)</span>
+        <p class="hint">Brings attachments and change history too. Runs on the integrations service with your Jira API token; nothing is stored. Create a token at id.atlassian.com → Security → API tokens.</p>
+        <div class="grid2">
+          <input class="select" placeholder="https://your-site.atlassian.net" bind:value={apiBase} />
+          <input class="select" placeholder="you@company.com" bind:value={apiEmail} />
+          <input class="select" type="password" placeholder="Jira API token" bind:value={apiToken} />
+          <input class="select" placeholder="JQL, e.g. project = ABC ORDER BY created ASC" bind:value={apiJql} />
+          <input class="select" type="password" placeholder="Integrations INBOUND_TOKEN" bind:value={apiInbound} />
+        </div>
+        <div class="opts">
+          <label class="check"><input type="checkbox" bind:checked={apiAttachments} /> attachments</label>
+          <label class="check"><input type="checkbox" bind:checked={apiHistory} /> change history</label>
+          <label class="check"><input type="checkbox" bind:checked={apiComments} /> comments</label>
+          <label class="check"><input type="checkbox" bind:checked={apiWorklogs} /> work logs</label>
+        </div>
+        <div class="actions"><Button kind={'primary'} label={tracker.string.ImportIssues} disabled={apiBase.trim() === '' || apiEmail.trim() === '' || apiToken.trim() === '' || apiJql.trim() === '' || apiInbound.trim() === '' || apiJob?.state === 'running'} on:click={() => { void startApiImport() }} /></div>
+        {#if apiError !== ''}<p class="err">{apiError}</p>{/if}
+        {#if apiJob !== undefined}
+          <div class="progress"><span class="progress__fill" style="width: {apiJob.total === 0 ? (apiJob.state === 'running' ? 5 : 100) : (apiJob.done / apiJob.total) * 100}%" /></div>
+          <p class="hint">{apiJob.state} · {apiJob.done} / {apiJob.total} issues · {apiJob.created} created · {apiJob.attachments} attachments{#if apiJob.errors.length > 0} · {apiJob.errors.length} failed{/if}</p>
+          {#if apiJob.errors.length > 0}<ul class="errs">{#each apiJob.errors.slice(0, 20) as e}<li>{e}</li>{/each}</ul>{/if}
+        {/if}
+      </div>
+    </section>
+
     {#if rows.length > 0 && mapping !== undefined}
-      <section class="card motion-rise" style="--i: 2">
+      <section class="card motion-rise" style="--i: 3">
         <span class="card__step">3</span>
         <div class="card__body">
           <span class="card__title">Preview</span>
@@ -522,4 +594,5 @@
   .progress { height: 0.4rem; border-radius: 999px; background: var(--theme-button-pressed); overflow: hidden; }
   .progress__fill { display: block; height: 100%; background-image: var(--accent-gradient); transition: width var(--motion-fast) linear; }
   .errs { margin: 0; padding-left: 1.2rem; font-size: 0.75rem; color: var(--negative-button-default); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem; }
 </style>

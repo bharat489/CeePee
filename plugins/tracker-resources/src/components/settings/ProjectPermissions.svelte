@@ -16,18 +16,17 @@
   Permission and notification schemes for one project.
 
   Permissions: the minimum workspace role needed to close, delete or
-  reassign issues, and per-field edit locks. Enforced by a server trigger,
-  so the API and imports obey them too. Issue-level secrecy is the space
-  model's job: a private project only its members can see.
+  reassign issues, and per-field edit locks. Enforced by a server trigger.
 
-  Notifications: which events in this project reach people's inboxes.
-  Enforced server-side by dropping the notification before delivery.
+  Notifications: per event kind, who receives it -- assignee, reporter,
+  watchers, everyone else. Enforced server-side by dropping notifications
+  that do not match before delivery.
 -->
 <script lang="ts">
   import { AccountRole, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import { type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
-  import { Label, Toggle } from '@hcengineering/ui'
+  import { type NotificationRecipients, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
+  import { Label } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
 
@@ -47,7 +46,7 @@
   ]
   const ACTIONS: Array<{ key: keyof PermissionScheme, label: string, hint: string }> = [
     { key: 'close', label: 'Close or cancel issues', hint: 'Moving an issue to a done or cancelled status.' },
-    { key: 'reopen', label: 'Reopen issues', hint: 'Moving a done issue back to an open status.' },
+    { key: 'reopen', label: 'Reopen issues', hint: 'Moving a resolved issue back to an open status.' },
     { key: 'delete', label: 'Delete issues', hint: 'Permanent removal.' },
     { key: 'reassign', label: 'Change assignee', hint: 'Assigning to anyone, including yourself.' },
     { key: 'changePriority', label: 'Change priority', hint: '' },
@@ -55,14 +54,25 @@
     { key: 'editDates', label: 'Edit due, start and SLA dates', hint: '' },
     { key: 'moveSprint', label: 'Move between sprints and milestones', hint: '' }
   ]
-  const EVENTS: Array<{ key: keyof NotificationScheme, label: string, hint: string }> = [
-    { key: 'assigned', label: 'Assigned to me', hint: 'When someone assigns you an issue.' },
-    { key: 'statusChanged', label: 'Status changed', hint: 'On issues you follow.' },
-    { key: 'commented', label: 'New comment', hint: 'On issues you follow.' },
-    { key: 'mentioned', label: 'Mentioned', hint: 'Someone @-mentions you.' },
-    { key: 'otherChanges', label: 'Other field changes', hint: 'Priority, dates, labels and the rest.' }
+  const EVENTS: Array<{ key: keyof NotificationScheme, label: string }> = [
+    { key: 'assigned', label: 'Assigned' },
+    { key: 'statusChanged', label: 'Status changed' },
+    { key: 'commented', label: 'New comment' },
+    { key: 'mentioned', label: 'Mentioned' },
+    { key: 'otherChanges', label: 'Other field changes' }
   ]
-
+  const WHO: Array<{ key: keyof NotificationRecipients, label: string }> = [
+    { key: 'assignee', label: 'Assignee' },
+    { key: 'reporter', label: 'Reporter' },
+    { key: 'watchers', label: 'Watchers' },
+    { key: 'others', label: 'Everyone else' }
+  ]
+  function on (ev: keyof NotificationScheme, who: keyof NotificationRecipients): boolean {
+    const s = notify[ev]
+    if (s === undefined || s === true) return true
+    if (s === false) return false
+    return s[who] !== false
+  }
   async function setRole (key: keyof PermissionScheme, role: AccountRole): Promise<void> {
     if (project === undefined) return
     const next: PermissionScheme = { ...perms }
@@ -73,11 +83,16 @@
   function onRole (key: keyof PermissionScheme, e: Event): void {
     void setRole(key, (e.currentTarget as HTMLSelectElement).value as AccountRole)
   }
-  async function setEvent (key: keyof NotificationScheme, on: boolean): Promise<void> {
+  async function toggle (ev: keyof NotificationScheme, who: keyof NotificationRecipients): Promise<void> {
     if (project === undefined) return
+    const cur: NotificationRecipients = { assignee: on(ev, 'assignee'), reporter: on(ev, 'reporter'), watchers: on(ev, 'watchers'), others: on(ev, 'others') }
+    cur[who] = !cur[who]
+    const all = WHO.every((w) => cur[w.key] === true)
+    const none = WHO.every((w) => cur[w.key] === false)
     const next: NotificationScheme = { ...notify }
-    if (on) delete next[key]
-    else next[key] = false
+    if (all) delete next[ev]
+    else if (none) next[ev] = false
+    else next[ev] = cur
     await client.update(project, { notificationScheme: next })
   }
 </script>
@@ -98,18 +113,27 @@
         </select>
       </div>
     {/each}
-    <p class="muted">Owners are never restricted. For issues only some people may <i>see</i>, make the project private — visibility is decided by the space, and this is deliberate: a field-level filter that pretends to hide data is worse than none.</p>
+    <p class="muted">Owners are never restricted. For issues only some people may <i>see</i>, make the project private — visibility is decided by the space.</p>
   </section>
 
   <section class="card motion-rise" style="--i: 1">
-    <span class="card__title">Notifications from this project</span>
-    {#each EVENTS as ev, idx (ev.key)}
-      <div class="row motion-rise" style="--i: {idx}">
-        <div class="row__main"><span class="row__name">{ev.label}</span><span class="row__hint">{ev.hint}</span></div>
-        <Toggle on={notify[ev.key] !== false} on:change={(e) => { void setEvent(ev.key, e.detail) }} />
-      </div>
-    {/each}
-    <p class="muted">People's own notification preferences still apply on top; this only removes events the project has switched off. Email delivery uses the mail service when it is configured; the daily digest comes from the integrations service.</p>
+    <span class="card__title">Who is notified</span>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th class="th th--name">Event</th>{#each WHO as w (w.key)}<th class="th">{w.label}</th>{/each}</tr></thead>
+        <tbody>
+          {#each EVENTS as ev (ev.key)}
+            <tr>
+              <td class="td td--name">{ev.label}</td>
+              {#each WHO as w (w.key)}
+                <td class="td"><input type="checkbox" checked={on(ev.key, w.key)} on:change={() => { void toggle(ev.key, w.key) }} /></td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">People's own notification preferences still apply on top. Email delivery uses the mail service when configured; the daily digest comes from the integrations service.</p>
   </section>
 </div>
 
@@ -125,4 +149,9 @@
   .row__name { color: var(--theme-caption-color); font-weight: 500; }
   .row__hint { font-size: 0.75rem; color: var(--theme-dark-color); }
   .select { padding: 0.3rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.4rem; background: var(--theme-bg-color); color: var(--theme-caption-color); font: inherit; font-size: 0.8125rem; }
+  .table-wrap { overflow-x: auto; }
+  .table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+  .th, .td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--theme-divider-color); text-align: center; }
+  .th { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--theme-dark-color); &--name { text-align: left; } }
+  .td { color: var(--theme-content-color); &--name { text-align: left; color: var(--theme-caption-color); } }
 </style>

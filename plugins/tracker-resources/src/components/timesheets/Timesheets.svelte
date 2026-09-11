@@ -22,7 +22,7 @@
   import contact, { formatName, getCurrentEmployee, type Employee, type Person } from '@hcengineering/contact'
   import core, { AccountRole, getCurrentAccount, hasAccountRole, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import { type BillingRate, type TimeSpendReport, type TimesheetApproval } from '@hcengineering/tracker'
+  import { type BillingRate, type Project, type TimeSpendReport, type TimesheetApproval } from '@hcengineering/tracker'
   import { Button, IconBack, IconForward, Label } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
@@ -33,6 +33,9 @@
   const query = createQuery()
   const approvalsQ = createQuery()
   const ratesQ = createQuery()
+  const prevQ = createQuery()
+  const prevApprovalQ = createQuery()
+  const projQ = createQuery()
   const DAY = 86_400_000
 
   function startOfWeek (t: number): number {
@@ -97,6 +100,87 @@
   $: grandCost = rows.reduce((a, r) => a + r.cost, 0)
   $: currency = rates[0]?.currency ?? ''
 
+  // ---- reminder: last week has my hours but no submitted timesheet ---------------
+  const prevWeek = startOfWeek(Date.now()) - 7 * DAY
+  let prevReports: TimeSpendReport[] = []
+  let prevApproval: TimesheetApproval | undefined
+  let projects: Project[] = []
+  prevQ.query(tracker.class.TimeSpendReport, { employee: me as any, date: { $gte: prevWeek, $lt: prevWeek + 7 * DAY } }, (r) => { prevReports = r }, { limit: 1000 })
+  prevApprovalQ.query(tracker.class.TimesheetApproval, { employee: me as any, weekStart: prevWeek }, (r) => { prevApproval = r[0] })
+  projQ.query(tracker.class.Project, {}, (r) => { projects = r })
+  $: prevHours = prevReports.reduce((a, r) => a + r.value, 0)
+  $: needsSubmit = prevHours > 0 && (prevApproval === undefined || prevApproval.state === 'rejected')
+  $: unsubmitted = canApprove ? rows.filter((r) => r.employee !== undefined && r.total > 0 && r.approval === undefined) : []
+  async function submitLastWeek (): Promise<void> {
+    if (prevApproval !== undefined) await client.update(prevApproval, { state: 'submitted', approver: undefined, note: undefined, decidedOn: undefined })
+    else await client.createDoc(tracker.class.TimesheetApproval, core.space.Workspace, { employee: me as any, weekStart: prevWeek, state: 'submitted' })
+  }
+
+  // ---- invoicing export: hours × rate, grouped by project then person ------------
+  interface InvoiceLine {
+    project: string
+    person: string
+    hours: number
+    rate: number
+    currency: string
+    amount: number
+  }
+  function linesFor (list: TimeSpendReport[]): InvoiceLine[] {
+    const projectName = new Map(projects.map((p) => [p._id, `${p.name} (${p.identifier})`]))
+    const m = new Map<string, InvoiceLine>()
+    for (const r of list) {
+      const project = projectName.get(r.space as any) ?? String(r.space)
+      const person = r.employee != null ? names.get(r.employee) ?? '…' : '—'
+      const rate = r.employee != null ? rateOf.get(r.employee) : undefined
+      const k = project + '|' + person
+      const line = m.get(k) ?? { project, person, hours: 0, rate: rate?.rate ?? 0, currency: rate?.currency ?? currency, amount: 0 }
+      line.hours += r.value
+      line.amount = line.hours * line.rate
+      m.set(k, line)
+    }
+    return Array.from(m.values()).sort((a, b) => a.project.localeCompare(b.project) || b.amount - a.amount)
+  }
+  async function exportInvoice (scope: 'week' | 'month'): Promise<void> {
+    let start = weekStart
+    let end = weekStart + 7 * DAY
+    if (scope === 'month') {
+      const d = new Date(weekStart)
+      start = new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+      end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime()
+    }
+    const list = scope === 'week' ? reports : await client.findAll(tracker.class.TimeSpendReport, { date: { $gte: start, $lt: end } }, { limit: 20000 })
+    await resolveNames(list)
+    const lines = linesFor(list)
+    const total = lines.reduce((a, l) => a + l.amount, 0)
+    const hours = lines.reduce((a, l) => a + l.hours, 0)
+    const cur = lines.find((l) => l.currency !== '')?.currency ?? currency
+    const fmtN = (n: number): string => (Math.round(n * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const period = `${new Date(start).toLocaleDateString()} – ${new Date(end - 1).toLocaleDateString()}`
+    const esc = (v: unknown): string => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch] ?? ch)
+    let project = ''
+    const rowsHtml = lines.map((l) => {
+      const head = l.project !== project ? `<tr class="g"><td colspan="5">${esc(l.project)}</td></tr>` : ''
+      project = l.project
+      return head + `<tr><td></td><td>${esc(l.person)}</td><td class="n">${fmtN(l.hours)}</td><td class="n">${l.rate > 0 ? fmtN(l.rate) + ' ' + esc(l.currency) : '—'}</td><td class="n">${l.rate > 0 ? fmtN(l.amount) + ' ' + esc(l.currency) : '—'}</td></tr>`
+    }).join('')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${esc(period)}</title><style>body{font:14px/1.5 system-ui,sans-serif;color:#15171c;margin:2rem;max-width:56rem}h1{font-size:1.4rem;margin:0}p.m{color:#6b7280;margin:.2rem 0 1.2rem}table{width:100%;border-collapse:collapse}th,td{padding:.45rem .5rem;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:#6b7280}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.g td{font-weight:700;background:#f6f7f9}tfoot td{font-weight:700;border-top:2px solid #15171c}.bar{display:flex;gap:.5rem;margin-bottom:1rem}button{padding:.45rem .9rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer}@media print{.bar{display:none}}  .remind { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; padding: 0.6rem 0.9rem; border: 1px solid var(--accent-brand); border-radius: 0.6rem; background: var(--accent-brand-soft); font-size: 0.875rem; color: var(--theme-caption-color); &--soft { border-style: dashed; background: transparent; color: var(--theme-dark-color); font-size: 0.8125rem; } i { color: var(--theme-dark-color); } }
+</style></head><body><div class="bar"><button onclick="window.print()">Print / save as PDF</button></div><h1>Timesheet invoice</h1><p class="m">Period ${esc(period)} · generated ${esc(new Date().toLocaleString())}</p><table><thead><tr><th>Project</th><th>Person</th><th class="n">Hours</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead><tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td class="n">${fmtN(hours)}</td><td></td><td class="n">${fmtN(total)} ${esc(cur)}</td></tr></tfoot></table></body></html>`
+    const w = window.open('', '_blank')
+    if (w !== null) {
+      w.document.open()
+      w.document.write(html)
+      w.document.close()
+    }
+    const csvEsc = (v: unknown): string => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const csv = [['Project', 'Person', 'Hours', 'Rate', 'Currency', 'Amount'].map(csvEsc).join(','), ...lines.map((l) => [l.project, l.person, Math.round(l.hours * 100) / 100, l.rate, l.currency, Math.round(l.amount * 100) / 100].map(csvEsc).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `invoice-${scope}-${new Date(start).toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   // ---- approvals ----------------------------------------------------------
   async function setState (row: Row, state: TimesheetApproval['state'], note?: string): Promise<void> {
     if (row.employee === undefined) return
@@ -158,8 +242,20 @@
       <Button icon={IconForward} kind={'ghost'} on:click={() => { weekStart += 7 * DAY }} />
       <Button kind={'ghost'} label={tracker.string.ThisWeek} on:click={() => { weekStart = startOfWeek(Date.now()) }} />
       <Button kind={'ghost'} label={tracker.string.ExportCsv} disabled={rows.length === 0} on:click={exportCsv} />
+      <Button kind={'ghost'} label={tracker.string.InvoiceWeek} disabled={rows.length === 0} on:click={() => { void exportInvoice('week') }} />
+      <Button kind={'ghost'} label={tracker.string.InvoiceMonth} on:click={() => { void exportInvoice('month') }} />
     </div>
   </header>
+
+  {#if needsSubmit}
+    <div class="remind motion-pop">
+      <span>You logged <b>{Math.round(prevHours * 10) / 10}h</b> last week{prevApproval?.state === 'rejected' ? ' and the timesheet was returned' : ' but the timesheet is not submitted'}.{#if prevApproval?.note} <i>{prevApproval.note}</i>{/if}</span>
+      <Button kind={'primary'} label={tracker.string.SubmitTimesheet} on:click={() => { void submitLastWeek() }} />
+    </div>
+  {/if}
+  {#if unsubmitted.length > 0}
+    <p class="remind remind--soft">Not yet submitted this week: {unsubmitted.map((r) => r.name).join(', ')}. The daily digest reminds people once the week has ended.</p>
+  {/if}
 
   <div class="table-wrap">
     <table class="table">

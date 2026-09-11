@@ -19,15 +19,17 @@
 // reopening, deleting, reassigning and editing certain fields. Enforced
 // here, on every write path. Owners and the system account are exempt.
 //
-// Notifications: the project can switch off event kinds; the matching
-// inbox notifications are removed before anyone sees them. People's own
-// preferences still apply on top.
+// Notifications: per event kind the project says who receives it -- the
+// assignee, the reporter, watchers, everyone else -- or nobody. Inbox
+// notifications that do not match are removed before anyone sees them.
+// People's own preferences still apply on top.
 
-import core, { AccountRole, hasAccountRole, type Class, type Doc, type Ref, type SessionData, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
+import contact from '@hcengineering/contact'
+import core, { AccountRole, hasAccountRole, type AccountUuid, type Class, type Doc, type Ref, type SessionData, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
 import platform, { PlatformError, Severity, Status } from '@hcengineering/platform'
 import { type TriggerControl } from '@hcengineering/server-core'
 import task from '@hcengineering/task'
-import tracker, { type Issue, type IssueStatus, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
+import tracker, { type Issue, type IssueStatus, type NotificationRecipients, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
 
 const DOC_UPDATE_MESSAGE = 'activity:class:DocUpdateMessage' as Ref<Class<Doc>>
 const CHAT_MESSAGE = 'chunter:class:ChatMessage' as Ref<Class<Doc>>
@@ -63,13 +65,8 @@ export async function OnIssuePermissions (txes: Tx[], control: TriggerControl): 
       const statuses = await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: { $in: ids } })
       const cat = new Map(statuses.map((s) => [s._id, s.category]))
       const done = (st: Ref<IssueStatus> | undefined): boolean => st !== undefined && (cat.get(st) === task.statusCategory.Won || cat.get(st) === task.statusCategory.Lost)
-      // the trigger runs after apply, so `issue.status` is already the new value; the previous one is not
-      // available here. Treat any move into a terminal status as "close" and any move out of one as "reopen".
       if (done(ops.status)) need('close')
-      else if (issue !== undefined && !done(ops.status) && scheme.reopen !== undefined) {
-        // moving to an open status: only a reopen if the issue is otherwise resolved (resolution set)
-        if (issue.resolution != null) need('reopen')
-      }
+      else if (issue !== undefined && scheme.reopen !== undefined && issue.resolution != null) need('reopen')
     }
     if (ops.assignee !== undefined) need('reassign')
     if (ops.priority !== undefined) need('changePriority')
@@ -78,6 +75,30 @@ export async function OnIssuePermissions (txes: Tx[], control: TriggerControl): 
     if (ops.sprint !== undefined || ops.milestone !== undefined) need('moveSprint')
   }
   return []
+}
+
+// ---- notification recipients ----------------------------------------------
+
+async function accountOfPerson (personRef: Ref<any> | null | undefined, control: TriggerControl): Promise<AccountUuid | undefined> {
+  if (personRef == null) return undefined
+  const emp = (await control.findAll(control.ctx, contact.mixin.Employee, { _id: personRef }, { limit: 1 }))[0]
+  return emp?.personUuid
+}
+
+async function reporterAccount (issue: Issue, control: TriggerControl): Promise<AccountUuid | undefined> {
+  if (issue.createdBy === undefined) return undefined
+  const sid = (await control.findAll(control.ctx, contact.class.SocialIdentity, { _id: issue.createdBy as any }, { limit: 1 }))[0]
+  return await accountOfPerson(sid?.attachedTo, control)
+}
+
+async function allowed (recipients: NotificationRecipients, user: AccountUuid, issue: Issue, control: TriggerControl): Promise<boolean> {
+  const isAssignee = (await accountOfPerson(issue.assignee, control)) === user
+  if (isAssignee) return recipients.assignee !== false
+  const isReporter = (await reporterAccount(issue, control)) === user
+  if (isReporter) return recipients.reporter !== false
+  const watchers = await control.findAll(control.ctx, core.class.Collaborator, { attachedTo: issue._id, collaborator: user }, { limit: 1 })
+  if (watchers.length > 0) return recipients.watchers !== false
+  return recipients.others !== false
 }
 
 export async function OnNotificationScheme (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
@@ -104,9 +125,18 @@ export async function OnNotificationScheme (txes: Tx[], control: TriggerControl)
         event = key === 'assignee' ? 'assigned' : key === 'status' ? 'statusChanged' : 'otherChanges'
       }
     }
-    if (scheme[event] === false) {
+    const setting = scheme[event]
+    if (setting === undefined || setting === true) continue
+    const remove = (): void => {
       out.push(control.txFactory.createTxRemoveDoc(cud.objectClass, cud.objectSpace, cud.objectId))
     }
+    if (setting === false) {
+      remove()
+      continue
+    }
+    const user = attrs.user as AccountUuid | undefined
+    if (user === undefined) continue
+    if (!(await allowed(setting, user, issue, control))) remove()
   }
   return out
 }

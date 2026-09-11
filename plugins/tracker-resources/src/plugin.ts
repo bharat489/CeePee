@@ -281,7 +281,6 @@ export default mergeIds(trackerId, tracker, {
     NoIssueTemplate: '' as IntlString,
     TemplateReplace: '' as IntlString,
     TemplateReplaceConfirm: '' as IntlString,
-    Apply: '' as IntlString,
 
     CurrentWorkDay: '' as IntlString,
     PreviousWorkDay: '' as IntlString,

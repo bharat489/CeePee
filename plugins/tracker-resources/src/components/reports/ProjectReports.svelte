@@ -137,7 +137,7 @@
   }
 
   // ---- report selection ---------------------------------------------------
-  type ReportId = 'burndown' | 'velocity' | 'cfd' | 'sprint' | 'control' | 'cvr' | 'restime' | 'stats' | 'time' | 'epic' | 'version' | 'csat'
+  type ReportId = 'burndown' | 'velocity' | 'cfd' | 'sprint' | 'control' | 'cvr' | 'restime' | 'stats' | 'time' | 'epic' | 'version' | 'twodim' | 'avgage' | 'recent' | 'csat'
   const reports: Array<{ id: ReportId, label: string }> = [
     { id: 'burndown', label: 'Burndown' },
     { id: 'velocity', label: 'Velocity' },
@@ -150,6 +150,9 @@
     { id: 'time', label: 'Time tracking' },
     { id: 'epic', label: 'Epic burndown' },
     { id: 'version', label: 'Version report' },
+    { id: 'twodim', label: 'Two-dimensional statistics' },
+    { id: 'avgage', label: 'Average age' },
+    { id: 'recent', label: 'Recently created' },
     { id: 'csat', label: 'Satisfaction' }
   ]
   let report: ReportId = 'burndown'
@@ -167,6 +170,75 @@
   let window = 30
   let statsField: 'status' | 'priority' | 'assignee' | 'component' | 'kind' | 'milestone' | 'sprint' = 'status'
   let statsOpenOnly = true
+
+  // ---- 13. two-dimensional statistics ------------------------------------------
+  type StatField = 'status' | 'priority' | 'assignee' | 'component' | 'kind' | 'milestone' | 'sprint'
+  let xField: StatField = 'status'
+  let yField: StatField = 'assignee'
+  let tdOpenOnly = true
+  function fieldKey (i: Issue, f: StatField): string {
+    switch (f) {
+      case 'status':
+        return statusName.get(i.status) ?? '—'
+      case 'priority':
+        return prioLabel[i.priority]
+      case 'assignee':
+        return i.assignee != null ? names.get(i.assignee) ?? '—' : 'Unassigned'
+      case 'component':
+        return components.find((c) => c._id === i.component)?.label ?? 'None'
+      case 'kind':
+        return i.kind === tracker.taskTypes.Epic ? 'Epic' : i.kind === tracker.taskTypes.Initiative ? 'Initiative' : 'Issue'
+      case 'milestone':
+        return milestones.find((m) => m._id === i.milestone)?.label ?? 'None'
+      case 'sprint':
+        return sprints.find((s) => s._id === i.sprint)?.name ?? 'None'
+    }
+  }
+  $: twoDim = ((): { x: string[], y: string[], cells: number[][], rowSums: number[], colSums: number[], total: number } => {
+    const list = tdOpenOnly ? issues.filter((i) => !isDone(i.status)) : issues
+    const xs = Array.from(new Set(list.map((i) => fieldKey(i, xField)))).sort()
+    const ys = Array.from(new Set(list.map((i) => fieldKey(i, yField)))).sort()
+    const xi = new Map(xs.map((v, k) => [v, k]))
+    const yi = new Map(ys.map((v, k) => [v, k]))
+    const cells = ys.map(() => xs.map(() => 0))
+    for (const i of list) cells[yi.get(fieldKey(i, yField)) ?? 0][xi.get(fieldKey(i, xField)) ?? 0]++
+    const rowSums = cells.map((r) => r.reduce((a, b) => a + b, 0))
+    const colSums = xs.map((_, k) => cells.reduce((a, r) => a + r[k], 0))
+    return { x: xs, y: ys, cells, rowSums, colSums, total: list.length }
+  })()
+
+  // ---- 14. average age of open issues -------------------------------------------
+  $: avgAge = ((): { days: number[], values: number[] } => {
+    const today = startOfDay(Date.now())
+    const since = today - (window - 1) * DAY
+    const days: number[] = []
+    for (let d = since; d <= today; d += DAY) days.push(d)
+    const values = days.map((d) => {
+      const eod = d + DAY - 1
+      const open = issues.filter((i) => (i.createdOn ?? 0) <= eod && !isDone(statusAt(i, eod)))
+      return open.length === 0 ? 0 : Math.round((open.reduce((a, i) => a + (eod - (i.createdOn ?? eod)) / DAY, 0) / open.length) * 10) / 10
+    })
+    return { days, values }
+  })()
+  $: avgAgeNow = avgAge.values[avgAge.values.length - 1] ?? 0
+  $: oldestOpen = issues.filter((i) => !isDone(i.status)).sort((a, b) => (a.createdOn ?? 0) - (b.createdOn ?? 0)).slice(0, 5)
+
+  // ---- 15. recently created --------------------------------------------------------
+  $: recent = issues.filter((i) => (i.createdOn ?? 0) >= Date.now() - window * DAY).sort((a, b) => (b.createdOn ?? 0) - (a.createdOn ?? 0))
+  $: recentPerDay = ((): { days: number[], created: number[], stillOpen: number[] } => {
+    const today = startOfDay(Date.now())
+    const since = today - (window - 1) * DAY
+    const days: number[] = []
+    for (let d = since; d <= today; d += DAY) days.push(d)
+    const created = days.map(() => 0)
+    const stillOpen = days.map(() => 0)
+    for (const i of recent) {
+      const k = Math.min(days.length - 1, Math.max(0, Math.floor(((i.createdOn ?? 0) - since) / DAY)))
+      created[k]++
+      if (!isDone(i.status)) stillOpen[k]++
+    }
+    return { days, created, stillOpen }
+  })()
 
   const size = (i: Issue, usePts: boolean): number => (usePts ? i.storyPoints ?? 0 : 1)
   const usePoints = (list: Issue[]): boolean => list.some((i) => (i.storyPoints ?? 0) > 0)
@@ -461,7 +533,7 @@
         </button>
       {/each}
     </nav>
-    {#if ['cfd', 'control', 'cvr', 'restime'].includes(report)}
+    {#if ['cfd', 'control', 'cvr', 'restime', 'avgage', 'recent'].includes(report)}
       <select class="select" bind:value={window}>
         <option value={14}>14d</option>
         <option value={30}>30d</option>
@@ -775,6 +847,88 @@
     </section>
   {/if}
 
+  <!-- ===== Two-dimensional statistics ===== -->
+  {#if report === 'twodim'}
+    <section class="card motion-rise">
+      <div class="card__head">
+        <span class="card__title">Two-dimensional statistics</span>
+        <div class="card__tools">
+          <select class="select" bind:value={xField}>
+            <option value="status">columns: status</option><option value="priority">columns: priority</option><option value="assignee">columns: assignee</option><option value="component">columns: component</option><option value="kind">columns: type</option><option value="milestone">columns: milestone</option><option value="sprint">columns: sprint</option>
+          </select>
+          <select class="select" bind:value={yField}>
+            <option value="assignee">rows: assignee</option><option value="status">rows: status</option><option value="priority">rows: priority</option><option value="component">rows: component</option><option value="kind">rows: type</option><option value="milestone">rows: milestone</option><option value="sprint">rows: sprint</option>
+          </select>
+          <label class="check"><input type="checkbox" bind:checked={tdOpenOnly} /> open only</label>
+        </div>
+      </div>
+      {#if twoDim.total === 0}
+        <p class="muted">No issues.</p>
+      {:else}
+        <div class="tdt-wrap">
+          <table class="tdt">
+            <thead><tr><th class="tdt__th tdt__th--l">{yField} \ {xField}</th>{#each twoDim.x as x}<th class="tdt__th">{x}</th>{/each}<th class="tdt__th tdt__th--sum">Total</th></tr></thead>
+            <tbody>
+              {#each twoDim.y as y, yi}
+                <tr><td class="tdt__td tdt__td--l">{y}</td>{#each twoDim.cells[yi] as n}<td class="tdt__td" class:tdt__td--hot={n > 0} style="--heat: {Math.min(1, n / Math.max(1, twoDim.total / Math.max(1, twoDim.x.length)))}">{n === 0 ? '' : n}</td>{/each}<td class="tdt__td tdt__td--sum">{twoDim.rowSums[yi]}</td></tr>
+              {/each}
+              <tr><td class="tdt__td tdt__td--l tdt__td--sum">Total</td>{#each twoDim.colSums as n}<td class="tdt__td tdt__td--sum">{n}</td>{/each}<td class="tdt__td tdt__td--sum">{twoDim.total}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </section>
+  {/if}
+
+  <!-- ===== Average age ===== -->
+  {#if report === 'avgage'}
+    {@const n = avgAge.days.length}
+    {@const max = Math.max(1, ...avgAge.values)}
+    <section class="card motion-rise">
+      <div class="card__head"><span class="card__title">Average age of open issues</span><span class="muted">{window}d</span></div>
+      <div class="kpis">
+        <div class="kpi"><span class="kpi__n">{avgAgeNow}d</span><span class="kpi__l">average today</span></div>
+        <div class="kpi"><span class="kpi__n">{issues.filter((i) => !isDone(i.status)).length}</span><span class="kpi__l">open issues</span></div>
+        <div class="kpi"><span class="kpi__n">{avgAge.values.length > 1 ? (avgAgeNow - avgAge.values[0] >= 0 ? '+' : '') + Math.round((avgAgeNow - avgAge.values[0]) * 10) / 10 : '—'}d</span><span class="kpi__l">vs {window} days ago</span></div>
+      </div>
+      <svg viewBox="0 0 {W} {H}" class="chart" role="img">
+        {#each ticks(max) as t}<line x1={PAD.l} x2={W - PAD.r} y1={y(t, max)} y2={y(t, max)} class="grid" /><text x={PAD.l - 6} y={y(t, max) + 4} class="tick" text-anchor="end">{t}d</text>{/each}
+        <path d={line(avgAge.values, n, max)} class="actual" />
+        <text x={PAD.l} y={H - 8} class="tick">{fmtDay(avgAge.days[0])}</text>
+        <text x={W - PAD.r} y={H - 8} class="tick" text-anchor="end">{fmtDay(avgAge.days[n - 1])}</text>
+      </svg>
+      {#if oldestOpen.length > 0}
+        <span class="card__title">Oldest open</span>
+        {#each oldestOpen as i (i._id)}
+          <button class="rec" on:click={() => { open(i) }}><span class="rec__id">{i.identifier}</span><span class="rec__title">{i.title}</span><span class="muted">{Math.floor((Date.now() - (i.createdOn ?? Date.now())) / DAY)}d</span></button>
+        {/each}
+      {/if}
+    </section>
+  {/if}
+
+  <!-- ===== Recently created ===== -->
+  {#if report === 'recent'}
+    {@const n = recentPerDay.days.length}
+    {@const max = Math.max(1, ...recentPerDay.created)}
+    {@const bw = Math.max(2, (W - PAD.l - PAD.r) / n - 2)}
+    <section class="card motion-rise">
+      <div class="card__head"><span class="card__title">Recently created</span><span class="muted">{window}d · {recent.length} created · {recent.filter((i) => !isDone(i.status)).length} still open</span></div>
+      <svg viewBox="0 0 {W} {H}" class="chart" role="img">
+        {#each ticks(max) as t}<line x1={PAD.l} x2={W - PAD.r} y1={y(t, max)} y2={y(t, max)} class="grid" /><text x={PAD.l - 6} y={y(t, max) + 4} class="tick" text-anchor="end">{t}</text>{/each}
+        {#each recentPerDay.created as c, k}
+          <rect x={x(k, n) - bw / 2} y={y(c, max)} width={bw} height={Math.max(0, y(0, max) - y(c, max))} class="bar bar--soft" />
+          <rect x={x(k, n) - bw / 2} y={y(recentPerDay.stillOpen[k], max)} width={bw} height={Math.max(0, y(0, max) - y(recentPerDay.stillOpen[k], max))} class="bar" />
+        {/each}
+        <text x={PAD.l} y={H - 8} class="tick">{fmtDay(recentPerDay.days[0])}</text>
+        <text x={W - PAD.r} y={H - 8} class="tick" text-anchor="end">{fmtDay(recentPerDay.days[n - 1])}</text>
+      </svg>
+      <div class="legend"><span><i class="sw sw--blue" />Still open</span><span><i class="sw sw--grey" />Created (resolved since)</span></div>
+      {#each recent.slice(0, 25) as i (i._id)}
+        <button class="rec" on:click={() => { open(i) }}><span class="rec__id">{i.identifier}</span><span class="rec__title">{i.title}</span><span class="muted">{statusName.get(i.status) ?? ''} · {fmtDay(i.createdOn ?? i.modifiedOn)}</span></button>
+      {/each}
+    </section>
+  {/if}
+
   <!-- ===== Satisfaction ===== -->
   {#if report === 'csat'}
     <section class="card motion-rise">
@@ -848,4 +1002,13 @@
   .donut__n { fill: var(--theme-caption-color); font-size: 22px; font-weight: 700; }
   .donut__legend { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8125rem; li { display: flex; align-items: center; gap: 0.5rem; } }
   .donut__label { min-width: 8rem; color: var(--theme-content-color); }
+  .tdt-wrap { overflow-x: auto; }
+  .tdt { border-collapse: collapse; font-size: 0.8125rem; }
+  .tdt__th, .tdt__td { padding: 0.3rem 0.6rem; border-bottom: 1px solid var(--theme-divider-color); text-align: right; white-space: nowrap; &--l { text-align: left; } }
+  .tdt__th { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--theme-dark-color); }
+  .tdt__td { color: var(--theme-content-color); font-variant-numeric: tabular-nums; &--l { color: var(--theme-caption-color); } &--hot { background: color-mix(in srgb, var(--accent-brand) calc(var(--heat, 0) * 45%), transparent); } &--sum { font-weight: 600; color: var(--theme-caption-color); } }
+  .rec { display: flex; align-items: baseline; gap: 0.5rem; width: 100%; padding: 0.3rem 0.4rem; border: none; border-top: 1px solid var(--theme-divider-color); background: transparent; color: var(--theme-content-color); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; &:hover { background: var(--theme-button-hovered); } }
+  .rec__id { flex-shrink: 0; font-size: 0.7rem; color: var(--theme-trans-color); }
+  .rec__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--theme-caption-color); }
+  .bar--soft { fill: var(--theme-trans-color); opacity: 0.5; }
 </style>

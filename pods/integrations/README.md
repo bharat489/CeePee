@@ -25,6 +25,10 @@ It signs in to one workspace as a service account and authorises callers with st
 | `MAIL_URL` / `MAIL_API_KEY` | Mail service for the digest (empty = digest disabled) |
 | `DIGEST_HOUR` | Local hour to send the digest (default `8`) |
 | `PUBLIC_FRONT_URL` | URL used in emails, e.g. `http://huly.local:8087` |
+| `PUBLIC_INTEGRATIONS_URL` | Where this service is reachable from the outside, e.g. `http://huly.local:8095` (portal links, rule webhook URLs) |
+| `PORTAL_ENABLED` / `PORTAL_PROJECT` | Public help centre at `/portal`; requests land in this project key. Empty project = portal off |
+| `PORTAL_NAME` / `PORTAL_COLOR` / `PORTAL_LOGO_URL` | Branding for the help centre |
+| `HEARTBEAT_MINUTES` | How often the automation heartbeat is written (scheduled rules are evaluated server-side on each beat; default 5) |
 
 ## Inbound endpoints
 
@@ -40,6 +44,26 @@ Bodies may be JSON, form-encoded, or multipart (text parts only).
 | `/inbound/deploy` | `{environment, version, status, url, issues:["CEE-12"]}` from CI → comment + link on each issue. |
 
 Email-to-ticket therefore needs no mail server of its own: any provider that can POST received mail as a webhook works.
+
+## Customer portal (public, no login)
+
+- `GET /portal` — help centre: search the knowledge base (documents), pick a request type, submit a request, check a request by key + email.
+- `GET /portal/kb?q=` · `GET /portal/article/<id>` — knowledge base search and article view.
+- `POST /portal/submit` (form or JSON: `type, summary, description, email, priority`) → request key + status URL.
+- `GET|POST /portal/status?key=&email=` — status of one request, gated on the email it was raised with.
+- `POST /portal/rate` (`key, email, rating, comment`) — satisfaction rating once resolved.
+
+Rate-limited per address. Requests are ordinary issues with `portalEmail` set and the chosen request type.
+
+## Per-rule webhooks and scheduled rules
+
+- `POST /inbound/rule/<ruleId>?token=<rule token>` — fires an automation rule whose trigger is "incoming webhook". The token is generated in the rule builder; the JSON body is available to actions as `{payload.field}` and can target one issue with `issue` or `identifier`.
+- Every `HEARTBEAT_MINUTES` the service writes a heartbeat document; the server trigger then runs every scheduled rule that is due.
+
+## Jira Cloud import (REST API)
+
+- `POST /inbound/jira-import` (bearer `INBOUND_TOKEN`; JSON `baseUrl, email, token, jql, project, attachments, history, comments, worklogs`) → job id.
+- `GET /inbound/jira-import/<id>` → progress. Attachments are downloaded with the Jira credentials and stored; change history becomes a dated comment per issue.
 
 ## SCIM
 

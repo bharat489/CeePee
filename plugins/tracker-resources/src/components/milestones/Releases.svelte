@@ -14,17 +14,18 @@
 -->
 <!--
   Release hub. Every milestone as a release: status, dates, progress, the
-  warnings that matter before shipping (unresolved, blocked, overdue), and
-  the actions -- release (optionally moving what is left to the next one),
-  archive, release notes. Milestones are the versions; nothing new to learn.
+  warnings that matter before shipping, and the actions -- release
+  (optionally moving what is left to the next one), merge into another
+  version, archive, release notes with a shareable link.
 -->
 <script lang="ts">
   import { SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import task from '@hcengineering/task'
   import { MilestoneStatus, type Issue, type IssueStatus, type Milestone, type Project } from '@hcengineering/tracker'
-  import { Button, Label, showPanel, showPopup } from '@hcengineering/ui'
+  import { Button, getCurrentLocation, Label, navigate, showPanel, showPopup } from '@hcengineering/ui'
   import view from '@hcengineering/view'
+  import { onMount } from 'svelte'
 
   import tracker from '../../plugin'
   import ReleaseNotesPopup from './ReleaseNotesPopup.svelte'
@@ -58,20 +59,29 @@
     daysLeft: number
   }
   $: rows = milestones
-    .filter((m) => showArchived || (m as any).archived !== true)
+    .filter((m) => showArchived || m.archived !== true)
     .map((m): Row => {
       const list = issues.filter((i) => i.milestone === m._id)
       const open = list.filter((i) => !isDone(i.status))
-      return {
-        m,
-        total: list.length,
-        done: list.length - open.length,
-        open,
-        blocked: open.filter((i) => (i.blockedBy?.length ?? 0) > 0).length,
-        overdue: open.filter((i) => i.dueDate != null && i.dueDate < Date.now()).length,
-        daysLeft: Math.ceil((m.targetDate - Date.now()) / DAY)
-      }
+      return { m, total: list.length, done: list.length - open.length, open, blocked: open.filter((i) => (i.blockedBy?.length ?? 0) > 0).length, overdue: open.filter((i) => i.dueDate != null && i.dueDate < Date.now()).length, daysLeft: Math.ceil((m.targetDate - Date.now()) / DAY) }
     })
+
+  // ?notes=<milestone> opens the release notes straight away (shareable link)
+  let opened = false
+  onMount(() => {
+    const id = getCurrentLocation().query?.notes
+    if (id != null && !opened) {
+      opened = true
+      const stop = setInterval(() => {
+        const m = milestones.find((x) => x._id === id)
+        if (m !== undefined) {
+          clearInterval(stop)
+          notes(m)
+        }
+      }, 200)
+      setTimeout(() => { clearInterval(stop) }, 8000)
+    }
+  })
 
   async function release (r: Row): Promise<void> {
     const next = milestones.find((x) => x._id !== r.m._id && x.status !== MilestoneStatus.Completed && x.status !== MilestoneStatus.Canceled && x.targetDate > r.m.targetDate)
@@ -80,13 +90,32 @@
       if (!move) return
       if (next !== undefined) for (const i of r.open) await client.update(i, { milestone: next._id })
     }
-    await client.update(r.m, { status: MilestoneStatus.Completed, releasedOn: Date.now() } as any)
+    await client.update(r.m, { status: MilestoneStatus.Completed, releasedOn: Date.now() })
+  }
+  async function merge (r: Row): Promise<void> {
+    const others = milestones.filter((x) => x._id !== r.m._id && x.archived !== true)
+    if (others.length === 0) return
+    const pick = prompt(`Merge "${r.m.label}" into which version?\n\n${others.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}\n\nEnter a number:`)
+    if (pick === null) return
+    const target = others[Number(pick) - 1]
+    if (target === undefined) return
+    const list = issues.filter((i) => i.milestone === r.m._id)
+    for (const i of list) await client.update(i, { milestone: target._id })
+    const affected = await client.findAll(tracker.class.Issue, { affectsMilestone: r.m._id })
+    for (const i of affected) await client.update(i, { affectsMilestone: target._id })
+    await client.update(r.m, { archived: true, status: MilestoneStatus.Canceled })
   }
   async function archive (r: Row, on: boolean): Promise<void> {
-    await client.update(r.m, { archived: on } as any)
+    await client.update(r.m, { archived: on })
   }
   function notes (m: Milestone): void {
     showPopup(ReleaseNotesPopup, { milestone: m }, 'top')
+  }
+  function copyNotesLink (m: Milestone): void {
+    const loc = getCurrentLocation()
+    const url = `${window.location.origin}/workbench/${loc.path[1]}/tracker/${currentSpace}/releases?notes=${m._id}`
+    void navigator.clipboard.writeText(url)
+    navigate({ ...loc, query: { ...(loc.query ?? {}), notes: m._id } })
   }
   function open (m: Milestone): void {
     showPanel(view.component.EditDoc, m._id, m._class, 'content')
@@ -124,6 +153,8 @@
       {/if}
       <div class="card__actions">
         <Button kind={'ghost'} label={tracker.string.ReleaseNotes} on:click={() => { notes(r.m) }} />
+        <Button kind={'ghost'} label={tracker.string.CopyLink} on:click={() => { copyNotesLink(r.m) }} />
+        {#if r.m.archived !== true}<Button kind={'ghost'} label={tracker.string.MergeInto} on:click={() => { void merge(r) }} />{/if}
         {#if r.m.status !== MilestoneStatus.Completed && r.m.status !== MilestoneStatus.Canceled}
           <Button kind={'primary'} label={tracker.string.Release} on:click={() => { void release(r) }} />
         {:else}
@@ -140,23 +171,15 @@
   .rel__title { font-size: 1.125rem; font-weight: 600; color: var(--theme-caption-color); }
   .check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8125rem; color: var(--theme-content-color); }
   .muted { margin: 0; font-size: 0.875rem; color: var(--theme-trans-color); }
-  .card {
-    display: flex; flex-direction: column; gap: 0.5rem; padding: 0.9rem 1rem;
-    border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; background: var(--theme-panel-color);
-    &--released { border-color: var(--accent-brand); }
-    &--archived { opacity: 0.6; }
-  }
+  .card { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.9rem 1rem; border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; background: var(--theme-panel-color); &--released { border-color: var(--accent-brand); } &--archived { opacity: 0.6; } }
   .card__main { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
   .card__name { border: none; background: transparent; padding: 0; color: var(--theme-caption-color); font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer; &:hover { text-decoration: underline; } }
   .card__dates { font-size: 0.75rem; color: var(--theme-trans-color); }
-  .pill { padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; background: var(--theme-button-pressed); color: var(--theme-caption-color);
-    &--2 { background: var(--accent-brand); color: #1a2400; }
-    &--1 { background: var(--primary-button-default); color: #fff; }
-  }
+  .pill { padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; background: var(--theme-button-pressed); color: var(--theme-caption-color); &--2 { background: var(--accent-brand); color: #1a2400; } &--1 { background: var(--primary-button-default); color: #fff; } }
   .card__progress { display: flex; align-items: center; gap: 0.75rem; }
   .track { flex: 1; height: 0.5rem; border-radius: 999px; background: var(--theme-button-pressed); overflow: hidden; }
   .fill { display: block; height: 100%; background: var(--accent-brand); transition: width var(--motion-slow) var(--ease-enter); }
   .card__n { font-size: 0.75rem; color: var(--theme-dark-color); flex-shrink: 0; }
   .warn { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0; padding: 0; list-style: none; font-size: 0.75rem; color: #b8860b; li::before { content: '⚠ '; } }
-  .card__actions { display: flex; justify-content: flex-end; gap: 0.4rem; }
+  .card__actions { display: flex; justify-content: flex-end; gap: 0.4rem; flex-wrap: wrap; }
 </style>

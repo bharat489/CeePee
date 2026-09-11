@@ -97,6 +97,13 @@ services:
       - MAIL_URL=${MAIL_URL:-}
       - MAIL_API_KEY=${MAIL_API_KEY:-}
       - DIGEST_HOUR=${DIGEST_HOUR:-8}
+      - PUBLIC_INTEGRATIONS_URL=${PUBLIC_INTEGRATIONS_URL:-http://huly.local:8095}
+      - PORTAL_ENABLED=${PORTAL_ENABLED:-true}
+      - PORTAL_NAME=${PORTAL_NAME:-Help centre}
+      - PORTAL_COLOR=${PORTAL_COLOR:-#2b6bea}
+      - PORTAL_LOGO_URL=${PORTAL_LOGO_URL:-}
+      - PORTAL_PROJECT=${PORTAL_PROJECT:-}
+      - HEARTBEAT_MINUTES=${HEARTBEAT_MINUTES:-5}
     depends_on:
       - front
       - account

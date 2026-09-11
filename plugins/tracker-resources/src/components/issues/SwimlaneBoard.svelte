@@ -14,9 +14,9 @@
 -->
 <!--
   Board with swimlanes: one kanban per lane, stacked. Lanes by assignee,
-  epic, or priority. Each lane is the ordinary board filtered to its value,
-  so drag between columns keeps working; moving a card between lanes is a
-  field change and happens on the card, not by dragging across lanes.
+  epic, or priority. Drag a card between columns to change status; drag it
+  into another lane to change the lane's field (assignee, parent epic or
+  priority) -- the lane under the pointer at drop time wins.
 -->
 <script lang="ts">
   import contact, { formatName, type Person } from '@hcengineering/contact'
@@ -35,9 +35,7 @@
 
   const client = getClient()
   let viewlet: WithLookup<Viewlet> | undefined
-  void client.findOne(view.class.Viewlet, { attachTo: tracker.class.Issue, descriptor: tracker.viewlet.Kanban }).then((v) => {
-    viewlet = v
-  })
+  void client.findOne(view.class.Viewlet, { attachTo: tracker.class.Issue, descriptor: tracker.viewlet.Kanban }).then((v) => { viewlet = v })
   let viewOptions: ViewOptions | undefined
   $: if (viewlet !== undefined) viewOptions = { ...getViewOptions(viewlet, $viewOptionStore), groupBy: ['status'] }
 
@@ -71,44 +69,77 @@
     title: string
     query: Record<string, any>
     count: number
+    apply: (issue: Issue) => Promise<void>
   }
   const prioLabel: Record<IssuePriority, string> = { [IssuePriority.Urgent]: 'Urgent', [IssuePriority.High]: 'High', [IssuePriority.Medium]: 'Medium', [IssuePriority.Low]: 'Low', [IssuePriority.NoPriority]: 'No priority' }
   $: visible = hideDone ? issues.filter((i) => openIds.includes(i.status)) : issues
+  $: epics = issues.filter((i) => i.kind === tracker.taskTypes.Epic)
   $: lanes = ((): Lane[] => {
     if (laneBy === 'assignee') {
       const ids = Array.from(new Set(visible.map((i) => i.assignee ?? null)))
-      return ids
-        .map((id) => ({
-          key: id ?? 'none',
-          title: id != null ? names.get(id) ?? '…' : 'Unassigned',
-          query: { assignee: id },
-          count: visible.filter((i) => (i.assignee ?? null) === id).length
-        }))
-        .sort((a, b) => (a.key === 'none' ? 1 : b.key === 'none' ? -1 : b.count - a.count))
+      return ids.map((id) => ({
+        key: id ?? 'none',
+        title: id != null ? names.get(id) ?? '…' : 'Unassigned',
+        query: { assignee: id },
+        count: visible.filter((i) => (i.assignee ?? null) === id).length,
+        apply: async (issue: Issue) => { if ((issue.assignee ?? null) !== id) await client.update(issue, { assignee: id }) }
+      })).sort((a, b) => (a.key === 'none' ? 1 : b.key === 'none' ? -1 : b.count - a.count))
     }
     if (laneBy === 'priority') {
       return [IssuePriority.Urgent, IssuePriority.High, IssuePriority.Medium, IssuePriority.Low, IssuePriority.NoPriority].map((p) => ({
         key: String(p),
         title: prioLabel[p],
         query: { priority: p },
-        count: visible.filter((i) => i.priority === p).length
-      })).filter((l) => l.count > 0)
+        count: visible.filter((i) => i.priority === p).length,
+        apply: async (issue: Issue) => { if (issue.priority !== p) await client.update(issue, { priority: p }) }
+      }))
     }
-    const epics = issues.filter((i) => i.kind === tracker.taskTypes.Epic)
     const withEpic = epics.map((e) => ({
       key: e._id,
       title: `${e.identifier} ${e.title}`,
       query: { attachedTo: e._id },
-      count: visible.filter((i) => i.attachedTo === e._id).length
+      count: visible.filter((i) => i.attachedTo === e._id).length,
+      apply: async (issue: Issue) => { await reparent(issue, e) }
     }))
-    const noEpic = {
+    const noEpic: Lane = {
       key: 'none',
       title: 'No epic',
       query: { attachedTo: { $nin: epics.map((e) => e._id) }, kind: { $ne: tracker.taskTypes.Epic } },
-      count: visible.filter((i) => !epics.some((e) => e._id === i.attachedTo) && i.kind !== tracker.taskTypes.Epic).length
+      count: visible.filter((i) => !epics.some((e) => e._id === i.attachedTo) && i.kind !== tracker.taskTypes.Epic).length,
+      apply: async (issue: Issue) => { await reparent(issue, undefined) }
     }
-    return [...withEpic.filter((l) => l.count > 0), noEpic]
+    return [...withEpic, noEpic]
   })()
+
+  // moving an issue under a different epic: the parent chain and the parents' child counters
+  async function reparent (issue: Issue, epic: Issue | undefined): Promise<void> {
+    if (issue.kind === tracker.taskTypes.Epic) return
+    const target = epic?._id ?? tracker.ids.NoParent
+    if (issue.attachedTo === target) return
+    await client.update(issue, {
+      attachedTo: target,
+      parents: epic !== undefined ? [{ parentId: epic._id, parentTitle: epic.title, space: epic.space, identifier: epic.identifier }, ...epic.parents] : []
+    } as any)
+  }
+
+  // cross-lane drag: remember what is being dragged, resolve the lane under the pointer at drop
+  let dragging: Ref<Issue> | undefined
+  function onDragStart (e: DragEvent): void {
+    const el = (e.target as HTMLElement | null)?.closest?.('[data-issue]') as HTMLElement | null
+    dragging = (el?.dataset.issue as Ref<Issue> | undefined) ?? undefined
+  }
+  async function onDragEnd (e: DragEvent): Promise<void> {
+    const id = dragging
+    dragging = undefined
+    if (id === undefined) return
+    const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-lane]') as HTMLElement | null
+    const key = under?.dataset.lane
+    if (key === undefined) return
+    const lane = lanes.find((l) => l.key === key)
+    const issue = issues.find((i) => i._id === id)
+    if (lane === undefined || issue === undefined) return
+    await lane.apply(issue)
+  }
 
   function toggle (key: string): void {
     const next = new Set(collapsed)
@@ -118,7 +149,8 @@
   }
 </script>
 
-<div class="swim">
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div class="swim" on:dragstart|capture={onDragStart} on:dragend|capture={(e) => { void onDragEnd(e) }}>
   <header class="swim__head">
     <span class="swim__title"><Label label={tracker.string.Swimlanes} /></span>
     <div class="swim__tools">
@@ -128,6 +160,7 @@
         <option value="priority">by priority</option>
       </select>
       <label class="check"><input type="checkbox" bind:checked={hideDone} /> hide done</label>
+      <span class="muted">drag a card into another lane to move it</span>
     </div>
   </header>
 
@@ -135,7 +168,7 @@
     <p class="muted">…</p>
   {:else}
     {#each lanes as lane, idx (lane.key)}
-      <section class="lane motion-rise" style="--i: {idx}">
+      <section class="lane motion-rise" style="--i: {idx}" data-lane={lane.key} class:lane--target={dragging !== undefined}>
         <button class="lane__head" on:click={() => { toggle(lane.key) }}>
           <span class="lane__chev" class:lane__chev--closed={collapsed.has(lane.key)}>▾</span>
           <span class="lane__title">{lane.title}</span>
@@ -159,13 +192,11 @@
   .swim__tools { display: flex; align-items: center; gap: 0.75rem; }
   .select { padding: 0.3rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.375rem; background: var(--theme-panel-color); color: var(--theme-caption-color); font: inherit; font-size: 0.8125rem; }
   .check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8125rem; color: var(--theme-content-color); }
-  .muted { margin: 0; font-size: 0.8125rem; color: var(--theme-trans-color); }
-  .lane { border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; overflow: hidden; }
-  .lane__head {
-    display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.55rem 0.9rem; border: none;
-    background: var(--theme-comp-header-color); color: var(--theme-caption-color); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
-    &:hover { background: var(--theme-button-hovered); }
+  .muted { margin: 0; font-size: 0.75rem; color: var(--theme-trans-color); }
+  .lane { border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; overflow: hidden; transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+    &--target:hover { border-color: var(--accent-brand); box-shadow: 0 0 0 3px var(--accent-brand-soft); }
   }
+  .lane__head { display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.55rem 0.9rem; border: none; background: var(--theme-comp-header-color); color: var(--theme-caption-color); font: inherit; font-weight: 600; text-align: left; cursor: pointer; &:hover { background: var(--theme-button-hovered); } }
   .lane__chev { color: var(--theme-trans-color); transition: transform var(--motion-base) var(--ease-standard); &--closed { transform: rotate(-90deg); } }
   .lane__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lane__n { font-size: 0.75rem; font-weight: 500; color: var(--theme-trans-color); }

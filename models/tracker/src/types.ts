@@ -58,6 +58,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationRule,
+  AutomationHeartbeat,
   AutomationTrigger,
   BillingRate,
   Dashboard,
@@ -194,6 +195,10 @@ export class TProject extends TTaskProject implements Project {
   @Prop(TypeRecord(), tracker.string.Permissions)
   @Hidden()
     notificationScheme?: NotificationScheme
+
+  @Prop(TypeString(), tracker.string.ProjectTemplates)
+  @Hidden()
+    projectTemplate?: string
 }
 /**
  * @public
@@ -372,6 +377,10 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeString(), tracker.string.Satisfaction)
   @Hidden()
     csatComment?: string
+
+  @Prop(TypeString(), getEmbeddedLabel('Portal email'))
+  @Hidden()
+    portalEmail?: string
 
   @Prop(TypeReportedTime(), tracker.string.ReportedTime)
     reportedTime!: number
@@ -984,4 +993,16 @@ export class TAutomationRule extends TDoc implements AutomationRule {
   runs?: number
   lastRun?: Timestamp
   lastError?: string | null
+  every?: number
+  scope?: AutomationRule['scope']
+  token?: string
+  lastWebhook?: Timestamp
+  lastPayload?: Record<string, any>
+  lastMatched?: number
+}
+
+@Model(tracker.class.AutomationHeartbeat, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Automation)
+export class TAutomationHeartbeat extends TDoc implements AutomationHeartbeat {
+  at!: Timestamp
 }

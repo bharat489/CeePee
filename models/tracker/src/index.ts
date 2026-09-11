@@ -51,6 +51,7 @@ import {
   TAuditPolicy,
   TRequestType,
   TAutomationRule,
+  TAutomationHeartbeat,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -420,6 +421,13 @@ function defineApplication (
             component: tracker.component.Roadmap
           },
           {
+            id: 'new-project',
+            position: 'top',
+            label: tracker.string.ProjectTemplates,
+            icon: tracker.icon.Project,
+            component: tracker.component.ProjectTemplates
+          },
+          {
             id: 'submit-request',
             position: 'top',
             label: tracker.string.SubmitRequest,
@@ -630,7 +638,8 @@ export function createModel (builder: Builder): void {
     TAuditEvent,
     TAuditPolicy,
     TRequestType,
-    TAutomationRule
+    TAutomationRule,
+    TAutomationHeartbeat
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the

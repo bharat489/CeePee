@@ -14,13 +14,15 @@
 -->
 <!--
   Rule builder: WHEN a trigger fires, IF every condition holds, THEN run the
-  actions. Rules are project documents evaluated on the server (see
-  server-plugins/tracker-resources/src/rules.ts), so they also apply to
-  imports, API writes and other rules -- with a depth limit against loops.
+  actions -- on the issue, or on its parent, children, blockers or the
+  issues it blocks. Triggers include a schedule (the integrations service
+  heartbeat, or any issue traffic once due) and an incoming webhook with a
+  per-rule token. Rules are evaluated on the server
+  (server-plugins/tracker-resources/src/rules.ts), depth-limited to two.
 -->
 <script lang="ts">
   import contact, { formatName, type Person } from '@hcengineering/contact'
-  import { SortingOrder, type Ref } from '@hcengineering/core'
+  import { generateId, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
@@ -51,7 +53,6 @@
   $: mq.query(tracker.class.Milestone, { space: currentSpace }, (r) => { milestones = r })
   void client.findAll(contact.mixin.Employee, { active: true }).then((r) => { people = r.map((p) => ({ _id: p._id, name: formatName(p.name) })) })
   void client.findAll(tags.class.TagElement, { targetClass: tracker.class.Issue }).then((r) => { labels = r.map((t) => ({ _id: t._id, title: t.title })) })
-  // project statuses only
   let projectStatuses: IssueStatus[] = []
   $: void (async () => {
     const p = await client.findOne(tracker.class.Project, { _id: currentSpace })
@@ -66,8 +67,19 @@
     { id: 'priority', label: 'priority changes' },
     { id: 'assignee', label: 'assignee changes' },
     { id: 'commented', label: 'a comment is added' },
-    { id: 'updated', label: 'any field changes' }
+    { id: 'updated', label: 'any field changes' },
+    { id: 'scheduled', label: 'on a schedule' },
+    { id: 'webhook', label: 'an incoming webhook is called' }
   ]
+  const SCOPES: Array<{ id: NonNullable<AutomationRule['scope']>, label: string }> = [
+    { id: 'open', label: 'all open issues' },
+    { id: 'stale7', label: 'open issues untouched for 7 days' },
+    { id: 'due3', label: 'open issues due within 3 days' },
+    { id: 'overdue', label: 'open issues past their due date' },
+    { id: 'unassigned', label: 'open unassigned issues' },
+    { id: 'all', label: 'every issue (incl. done)' }
+  ]
+  const EVERY = [{ v: 15, l: 'every 15 min' }, { v: 60, l: 'hourly' }, { v: 240, l: 'every 4 hours' }, { v: 1440, l: 'daily' }, { v: 10080, l: 'weekly' }]
   const FIELDS: Array<{ id: AutomationCondition['field'], label: string }> = [
     { id: 'status', label: 'status' }, { id: 'priority', label: 'priority' }, { id: 'assignee', label: 'assignee' }, { id: 'kind', label: 'type' },
     { id: 'component', label: 'component' }, { id: 'labels', label: 'labels' }, { id: 'title', label: 'title' }, { id: 'sprint', label: 'sprint' }, { id: 'milestone', label: 'milestone' }
@@ -75,31 +87,45 @@
   const OPS: Array<{ id: AutomationCondition['op'], label: string }> = [
     { id: 'is', label: 'is' }, { id: 'is-not', label: 'is not' }, { id: 'contains', label: 'contains' }, { id: 'empty', label: 'is empty' }, { id: 'not-empty', label: 'is not empty' }
   ]
-  const ACTIONS: Array<{ id: AutomationAction['type'], label: string }> = [
-    { id: 'set-status', label: 'set status to' }, { id: 'set-priority', label: 'set priority to' }, { id: 'set-assignee', label: 'assign to' },
-    { id: 'add-label', label: 'add label' }, { id: 'add-comment', label: 'add comment' }, { id: 'set-sprint', label: 'move to sprint' },
-    { id: 'set-milestone', label: 'set milestone' }, { id: 'set-due', label: 'set due date to now +' }, { id: 'webhook', label: 'call webhook' }
+  const ACTIONS: Array<{ id: AutomationAction['type'], label: string, issue: boolean }> = [
+    { id: 'set-status', label: 'set status to', issue: true }, { id: 'set-priority', label: 'set priority to', issue: true }, { id: 'set-assignee', label: 'assign to', issue: true },
+    { id: 'add-label', label: 'add label', issue: true }, { id: 'add-comment', label: 'add comment', issue: true }, { id: 'set-sprint', label: 'move to sprint', issue: true },
+    { id: 'set-milestone', label: 'set milestone', issue: true }, { id: 'set-due', label: 'set due date to now +', issue: true },
+    { id: 'slack', label: 'post to Slack', issue: false }, { id: 'teams', label: 'post to Microsoft Teams', issue: false }, { id: 'webhook', label: 'call webhook', issue: false }
+  ]
+  const TARGETS: Array<{ id: NonNullable<AutomationAction['target']>, label: string }> = [
+    { id: 'self', label: 'this issue' }, { id: 'parent', label: 'its parent' }, { id: 'children', label: 'its sub-issues' }, { id: 'blocked-by', label: 'issues blocking it' }, { id: 'blocking', label: 'issues it blocks' }
   ]
   const PRIOS = [IssuePriority.Urgent, IssuePriority.High, IssuePriority.Medium, IssuePriority.Low, IssuePriority.NoPriority]
   const prio: Record<IssuePriority, string> = { [IssuePriority.Urgent]: 'Urgent', [IssuePriority.High]: 'High', [IssuePriority.Medium]: 'Medium', [IssuePriority.Low]: 'Low', [IssuePriority.NoPriority]: 'None' }
   const KINDS = [{ id: tracker.taskTypes.Issue, label: 'Issue' }, { id: tracker.taskTypes.Epic, label: 'Epic' }, { id: tracker.taskTypes.Initiative, label: 'Initiative' }]
+  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
 
   // ---- editor -------------------------------------------------------------
   let editing: AutomationRule | undefined | null = null
   let name = ''
   let trigger: AutomationTrigger = 'created'
+  let every = 60
+  let scope: NonNullable<AutomationRule['scope']> = 'open'
+  let token = ''
   let conditions: AutomationCondition[] = []
   let actions: AutomationAction[] = []
+  function newToken (): string {
+    return generateId().replace(/[^a-z0-9]/gi, '').slice(0, 24)
+  }
   function edit (r?: AutomationRule): void {
     editing = r
     name = r?.name ?? ''
     trigger = r?.trigger ?? 'created'
+    every = r?.every ?? 60
+    scope = r?.scope ?? 'open'
+    token = r?.token ?? newToken()
     conditions = r?.conditions.map((c) => ({ ...c })) ?? []
-    actions = r?.actions.map((a) => ({ ...a })) ?? [{ type: 'add-comment', value: 'Hello from automation' }]
+    actions = r?.actions.map((a) => ({ ...a })) ?? [{ type: 'add-comment', value: 'Automation: {identifier} matched this rule', target: 'self' }]
   }
   async function save (): Promise<void> {
     if (name.trim() === '' || actions.length === 0) return
-    const data = { name: name.trim(), trigger, conditions, actions }
+    const data = { name: name.trim(), trigger, conditions, actions, every: trigger === 'scheduled' ? every : undefined, scope: trigger === 'scheduled' || trigger === 'webhook' ? scope : undefined, token: trigger === 'webhook' ? token : undefined }
     if (editing === undefined) await client.createDoc(tracker.class.AutomationRule, currentSpace, { ...data, enabled: true, runs: 0 })
     else if (editing !== null) await client.update(editing, data)
     editing = null
@@ -108,8 +134,11 @@
     if (!confirm(`Delete rule "${r.name}"?`)) return
     await client.remove(r)
   }
-  const describe = (r: AutomationRule): string =>
-    `when ${TRIGGERS.find((t) => t.id === r.trigger)?.label ?? r.trigger}${r.conditions.length > 0 ? ` if ${r.conditions.length} condition${r.conditions.length > 1 ? 's' : ''}` : ''} → ${r.actions.map((a) => ACTIONS.find((x) => x.id === a.type)?.label ?? a.type).join(', ')}`
+  const describe = (r: AutomationRule): string => {
+    const when = r.trigger === 'scheduled' ? `${EVERY.find((e) => e.v === r.every)?.l ?? 'on a schedule'} over ${SCOPES.find((s) => s.id === r.scope)?.label ?? 'open issues'}` : r.trigger === 'webhook' ? 'an incoming webhook is called' : TRIGGERS.find((t) => t.id === r.trigger)?.label ?? r.trigger
+    return `when ${when}${r.conditions.length > 0 ? ` if ${r.conditions.length} condition${r.conditions.length > 1 ? 's' : ''}` : ''} → ${r.actions.map((a) => `${ACTIONS.find((x) => x.id === a.type)?.label ?? a.type}${a.target !== undefined && a.target !== 'self' ? ` (${TARGETS.find((t) => t.id === a.target)?.label})` : ''}`).join(', ')}`
+  }
+  const isIssueAction = (t: AutomationAction['type']): boolean => ACTIONS.find((a) => a.id === t)?.issue === true
 </script>
 
 <section class="card motion-rise" style="--i: 2">
@@ -117,12 +146,30 @@
     <span class="card__title">Rules</span>
     <Button kind={'primary'} icon={IconAdd} label={tracker.string.NewRule} on:click={() => { edit(undefined) }} />
   </div>
-  <p class="hint">Rules run on the server after every change. A rule's own changes can trigger other rules, two levels deep at most.</p>
+  <p class="hint">Rules run on the server after every change. Scheduled rules fire on the integrations service heartbeat (or on issue traffic once due). A rule's own changes can trigger other rules, two levels deep at most. Templates: {'{identifier}'} {'{title}'} {'{status}'} {'{assignee}'} {'{priority}'} {'{url}'} {'{payload.field}'}.</p>
 
   {#if editing !== null}
     <div class="editor motion-pop">
       <input class="input input--name" placeholder="Rule name" bind:value={name} />
-      <div class="line"><span class="kw">WHEN</span><select class="input" bind:value={trigger}>{#each TRIGGERS as t (t.id)}<option value={t.id}>{t.label}</option>{/each}</select></div>
+      <div class="line">
+        <span class="kw">WHEN</span>
+        <select class="input" bind:value={trigger}>{#each TRIGGERS as t (t.id)}<option value={t.id}>{t.label}</option>{/each}</select>
+        {#if trigger === 'scheduled'}
+          <select class="input" bind:value={every}>{#each EVERY as e (e.v)}<option value={e.v}>{e.l}</option>{/each}</select>
+          over <select class="input" bind:value={scope}>{#each SCOPES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}</select>
+        {/if}
+        {#if trigger === 'webhook'}
+          over <select class="input" bind:value={scope}>{#each SCOPES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}</select>
+        {/if}
+      </div>
+      {#if trigger === 'webhook'}
+        <div class="line line--sub">
+          <span class="kw" />
+          <code class="url">POST {integrationsUrl}/inbound/rule/{editing?._id ?? '<saved-rule-id>'}?token={token}</code>
+          <button class="lnk" on:click={() => { token = newToken() }}>regenerate token</button>
+        </div>
+        <p class="hint hint--indent">Send JSON. A body with <code>issue: "KEY-12"</code> targets that issue; otherwise the scope above is used. Payload fields are available in templates as {'{payload.name}'}.</p>
+      {/if}
       {#each conditions as c, i}
         <div class="line">
           <span class="kw">{i === 0 ? 'IF' : 'AND'}</span>
@@ -155,11 +202,17 @@
           {:else if a.type === 'set-milestone'}<select class="input" bind:value={a.value}><option value="none">none</option>{#each milestones as m (m._id)}<option value={m._id}>{m.label}</option>{/each}</select>
           {:else if a.type === 'set-due'}<input class="input input--n" type="number" min="0" bind:value={a.value} /> days
           {:else if a.type === 'webhook'}<input class="input input--wide" placeholder="https://…" bind:value={a.value} />
-          {:else}<input class="input input--wide" placeholder="Comment text — {'{'}identifier{'}'} and {'{'}title{'}'} are filled in" bind:value={a.value} />{/if}
+          {:else if a.type === 'slack' || a.type === 'teams'}
+            <input class="input input--wide" placeholder={a.type === 'slack' ? 'https://hooks.slack.com/services/…' : 'https://….webhook.office.com/…'} bind:value={a.url} />
+            <input class="input input--wide" placeholder="Message — {'{identifier}'} {'{title}'} {'{status}'} {'{url}'}" bind:value={a.value} />
+          {:else}<input class="input input--wide" placeholder="Comment text — {'{identifier}'} and {'{title}'} are filled in" bind:value={a.value} />{/if}
+          {#if isIssueAction(a.type)}
+            on <select class="input" bind:value={a.target}>{#each TARGETS as t (t.id)}<option value={t.id}>{t.label}</option>{/each}</select>
+          {/if}
           <button class="x" on:click={() => { actions = actions.filter((_, k) => k !== i) }}>×</button>
         </div>
       {/each}
-      <button class="lnk" on:click={() => { actions = [...actions, { type: 'set-priority', value: String(IssuePriority.High) }] }}>+ action</button>
+      <button class="lnk" on:click={() => { actions = [...actions, { type: 'set-priority', value: String(IssuePriority.High), target: 'self' }] }}>+ action</button>
       <div class="editor__actions">
         <Button kind={'ghost'} label={tracker.string.Cancel} on:click={() => { editing = null }} />
         <Button kind={'primary'} label={tracker.string.Save} disabled={name.trim() === '' || actions.length === 0} on:click={save} />
@@ -172,7 +225,8 @@
       <div class="rule__main">
         <span class="rule__name">{r.name}</span>
         <span class="rule__desc">{describe(r)}</span>
-        <span class="rule__meta">{r.runs ?? 0} runs{#if r.lastRun} · last {new Date(r.lastRun).toLocaleString()}{/if}{#if r.lastError} · <span class="bad">{r.lastError}</span>{/if}</span>
+        <span class="rule__meta">{r.runs ?? 0} runs{#if r.lastMatched !== undefined} · last matched {r.lastMatched}{/if}{#if r.lastRun} · last {new Date(r.lastRun).toLocaleString()}{/if}{#if r.lastError} · <span class="bad">{r.lastError}</span>{/if}</span>
+        {#if r.trigger === 'webhook'}<code class="url url--small">POST {integrationsUrl}/inbound/rule/{r._id}?token={r.token ?? ''}</code>{/if}
       </div>
       <div class="rule__tools">
         <button class="lnk" on:click={() => { edit(r) }}>edit</button>
@@ -188,12 +242,13 @@
   .card { display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem 1.1rem; border: 1px solid var(--theme-divider-color); border-radius: 0.75rem; background: var(--theme-panel-color); }
   .card__head { display: flex; align-items: center; justify-content: space-between; }
   .card__title { font-weight: 600; color: var(--theme-caption-color); }
-  .hint { margin: 0; font-size: 0.8125rem; color: var(--theme-dark-color); }
+  .hint { margin: 0; font-size: 0.8125rem; color: var(--theme-dark-color); &--indent { margin-left: 3.6rem; } }
   .editor { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.85rem; border: 1px dashed var(--accent-brand); border-radius: 0.6rem; }
   .editor__actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
-  .line { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--theme-content-color); }
+  .line { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--theme-content-color); &--sub { margin-top: -0.2rem; } }
   .kw { width: 3.2rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: var(--accent-brand-ink); }
   .input { padding: 0.3rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.4rem; background: var(--theme-bg-color); color: var(--theme-caption-color); font: inherit; font-size: 0.8125rem; outline: none; &:focus { border-color: var(--accent-brand); } &--name { font-weight: 600; } &--wide { min-width: 18rem; } &--n { width: 4rem; } }
+  .url { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 0.3rem; background: var(--theme-button-pressed); color: var(--theme-caption-color); word-break: break-all; &--small { margin-top: 0.2rem; font-size: 0.65rem; } }
   .x { border: none; background: transparent; color: var(--theme-trans-color); font: inherit; cursor: pointer; &:hover { color: var(--negative-button-default); } }
   .lnk { align-self: flex-start; border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.75rem; cursor: pointer; &:hover { text-decoration: underline; } &--bad { color: var(--negative-button-default); } }
   .rule { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-top: 1px solid var(--theme-divider-color); &--off { opacity: 0.55; } }
