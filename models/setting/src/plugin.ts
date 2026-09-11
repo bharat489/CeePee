@@ -65,7 +65,6 @@ export default mergeIds(settingId, setting, {
     DeleteMixin: '' as ViewAction<Record<string, any>>
   },
   string: {
-    Identity: '' as IntlString,
     Value: '' as IntlString
   },
   function: {
