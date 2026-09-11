@@ -251,7 +251,9 @@ const server = createServer((req, res) => {
           return
         }
         const payload = await readBody(req)
-        await c.updateDoc(tracker.class.AutomationRule, rule.space, rule._id, { lastWebhook: Date.now(), lastPayload: JSON.parse(JSON.stringify(payload).slice(0, 20_000).replace(/[^\\]"[^"]*$/, '"') + (JSON.stringify(payload).length > 20_000 ? '}' : '')) })
+        const raw = JSON.stringify(payload)
+        const lastPayload = raw.length > 20_000 ? { truncated: true, text: raw.slice(0, 20_000) } : payload
+        await c.updateDoc(tracker.class.AutomationRule, rule.space, rule._id, { lastWebhook: Date.now(), lastPayload })
         log(`rule webhook ${rule.name} (${rule._id})`)
         send(res, 202, { ok: true, rule: rule.name })
         return
