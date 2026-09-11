@@ -76,6 +76,8 @@ export default mergeIds(settingId, setting, {
     Guest: '' as IntlString,
     Owner: '' as IntlString,
     TeamSetup: '' as IntlString,
+    Identity: '' as IntlString,
+    IdentityHint: '' as IntlString,
     TeamSetupHint: '' as IntlString,
     AddPeople: '' as IntlString,
     Email: '' as IntlString,

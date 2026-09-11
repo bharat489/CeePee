@@ -55,6 +55,18 @@ export function createModel (builder: Builder): void {
   // writes through the API meets the same rule.
   // Automation rules and SLA deadlines, then outbound webhooks. Both watch
   // every issue transaction and decide inside what applies.
+  // Permission scheme: minimum role per action, checked on every issue write.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnIssuePermissions,
+    txMatch: { objectClass: tracker.class.Issue, _class: { $in: [core.class.TxUpdateDoc, core.class.TxRemoveDoc] } }
+  })
+
+  // Notification scheme: drop inbox notifications for event kinds a project switched off.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnNotificationScheme,
+    txMatch: { _class: core.class.TxCreateDoc, objectClass: { $in: ['notification:class:ActivityInboxNotification' as any, 'notification:class:MentionInboxNotification' as any] } }
+  })
+
   // Project automation rules (WHEN/IF/THEN), on issue changes and comments.
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnAutomationRules,

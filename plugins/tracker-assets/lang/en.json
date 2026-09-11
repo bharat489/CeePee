@@ -726,7 +726,9 @@
     "Watchers": "Watchers",
     "ExternalLinks": "External links",
     "MentionedIn": "Mentioned in",
-    "CloneWithSubIssues": "Clone with sub-issues"
+    "CloneWithSubIssues": "Clone with sub-issues",
+    "Permissions": "Permissions & notifications",
+    "PermissionsHint": "Who may close, delete or change what, and which events this project sends. Enforced on the server."
   },
   "status": {}
 }

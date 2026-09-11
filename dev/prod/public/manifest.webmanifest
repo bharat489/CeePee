@@ -1,0 +1,20 @@
+{
+  "name": "CeePee",
+  "short_name": "CeePee",
+  "description": "Work platform: issues, sprints, docs and chat in one place.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0E0F10",
+  "theme_color": "#0E0F10",
+  "icons": [
+    { "src": "/ceepee/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/ceepee/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/ceepee/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard", "url": "/?goto=dashboard" },
+    { "name": "Submit a request", "url": "/?goto=submit-request" }
+  ]
+}

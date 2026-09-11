@@ -316,6 +316,21 @@ export function createModel (builder: Builder): void {
     'setting:ids:TeamSetup' as Ref<any>
   )
 
+  // Settings → Identity & access: sign-in providers, SSO and SCIM.
+  builder.createDoc(
+    setting.class.WorkspaceSettingCategory,
+    core.space.Model,
+    {
+      name: 'identity',
+      label: setting.string.Identity,
+      icon: setting.icon.Password,
+      component: setting.component.IdentitySettings,
+      order: 991,
+      role: AccountRole.Owner
+    },
+    'setting:ids:IdentitySettings' as Ref<any>
+  )
+
   builder.createDoc(
     setting.class.WorkspaceSettingCategory,
     core.space.Model,

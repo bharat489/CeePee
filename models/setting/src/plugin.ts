@@ -47,6 +47,7 @@ export default mergeIds(settingId, setting, {
     General: '' as AnyComponent,
     Members: '' as AnyComponent,
     TeamSetup: '' as AnyComponent,
+    IdentitySettings: '' as AnyComponent,
     CreateMixin: '' as AnyComponent,
     InviteSetting: '' as AnyComponent,
     ArrayEditor: '' as AnyComponent,
@@ -64,6 +65,7 @@ export default mergeIds(settingId, setting, {
     DeleteMixin: '' as ViewAction<Record<string, any>>
   },
   string: {
+    Identity: '' as IntlString,
     Value: '' as IntlString
   },
   function: {

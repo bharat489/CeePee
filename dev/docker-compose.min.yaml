@@ -41,10 +41,14 @@ services:
     profiles: ["full"]
   account:
     links: !override []
+    environment:
+      - MAIL_URL=${MAIL_URL:-}
   workspace_cockroach:
     links: !override
       - cockroach
       - minio
+    environment:
+      - MAIL_URL=${MAIL_URL:-}
   collaborator:
     links: !override
       - minio
@@ -56,6 +60,8 @@ services:
       - cockroach
       - minio
       - account
+    environment:
+      - MAIL_URL=${MAIL_URL:-}
   export:
     links: !override
       - minio
@@ -67,3 +73,72 @@ services:
         condition: service_started
       account:
         condition: service_started
+
+  # CeePee integrations: inbound webhooks (email-to-ticket, Sentry, GitHub/GitLab/Bitbucket, deployments),
+  # SCIM provisioning and the daily digest. See pods/integrations/README.md; secrets come from dev/.env.
+  integrations:
+    image: hardcoreeng/integrations
+    restart: unless-stopped
+    ports:
+      - 8095:8095
+    environment:
+      - PORT=8095
+      - FRONT_URL=http://front:8080
+      - ACCOUNTS_URL=http://account:3000
+      - PUBLIC_FRONT_URL=http://huly.local:8087
+      - WORKSPACE=${INTEGRATIONS_WORKSPACE:-cready}
+      - INTEGRATIONS_EMAIL=${INTEGRATIONS_EMAIL:-}
+      - INTEGRATIONS_PASSWORD=${INTEGRATIONS_PASSWORD:-}
+      - INBOUND_TOKEN=${INBOUND_TOKEN:-}
+      - INBOUND_PROJECT=${INBOUND_PROJECT:-}
+      - SCIM_TOKEN=${SCIM_TOKEN:-}
+      - SCIM_ROLE_MAP=${SCIM_ROLE_MAP:-}
+      - SCIM_DEFAULT_ROLE=${SCIM_DEFAULT_ROLE:-USER}
+      - MAIL_URL=${MAIL_URL:-}
+      - MAIL_API_KEY=${MAIL_API_KEY:-}
+      - DIGEST_HOUR=${DIGEST_HOUR:-8}
+    depends_on:
+      - front
+      - account
+
+  # Outbound email (invites, notifications, digest). Start with: docker compose --profile mail up -d
+  # after filling SMTP_* (or SES_*) in dev/.env and setting MAIL_URL=http://mail:8097 there.
+  mail:
+    image: hardcoreeng/mail
+    profiles: ["mail"]
+    restart: unless-stopped
+    ports:
+      - 8097:8097
+    environment:
+      - PORT=8097
+      - SOURCE=${MAIL_SOURCE:-noreply@ceepee.local}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_TLS_MODE=${SMTP_TLS_MODE:-upgrade}
+      - SES_ACCESS_KEY=${SES_ACCESS_KEY:-}
+      - SES_SECRET_KEY=${SES_SECRET_KEY:-}
+      - SES_REGION=${SES_REGION:-}
+
+  # GitHub app integration (two-way sync of issues and PRs). Needs a GitHub App:
+  # https://docs.github.com/en/apps/creating-github-apps — then fill GITHUB_* in dev/.env and
+  # start with: docker compose --profile github up -d   (image built by: rush docker:build --to @hcengineering/pod-github)
+  github:
+    image: hardcoreeng/github
+    profiles: ["github"]
+    restart: unless-stopped
+    ports:
+      - 3078:3078
+    environment:
+      - PORT=3078
+      - ACCOUNTS_URL=http://account:3000
+      - APP_ID=${GITHUB_APP_ID:-}
+      - CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - PRIVATE_KEY=${GITHUB_PRIVATE_KEY:-}
+      - WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - COLLABORATOR_URL=http://collaborator:3078
+      - SECRET=secret
+      - QUEUE_CONFIG=${QUEUE_CONFIG}
+      - STORAGE_CONFIG=${STORAGE_CONFIG}

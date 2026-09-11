@@ -981,6 +981,11 @@
       "shouldPublish": false
     },
     {
+      "packageName": "@hcengineering/pod-integrations",
+      "projectFolder": "pods/integrations",
+      "shouldPublish": false
+    },
+    {
       "packageName": "@hcengineering/pod-server",
       "projectFolder": "pods/server",
       "shouldPublish": false

@@ -40,6 +40,8 @@ export default plugin(serverTrackerId, {
     OnIssueWebhook: '' as Resource<TriggerFunc>,
     OnIssueAutomation: '' as Resource<TriggerFunc>,
     OnAutomationRules: '' as Resource<TriggerFunc>,
+    OnIssuePermissions: '' as Resource<TriggerFunc>,
+    OnNotificationScheme: '' as Resource<TriggerFunc>,
     OnComponentRemove: '' as Resource<TriggerFunc>,
     OnProjectRemove: '' as Resource<TriggerFunc>,
     OnDependencyShiftRequest: '' as Resource<TriggerFunc>

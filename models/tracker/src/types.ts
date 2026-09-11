@@ -62,6 +62,8 @@ import type {
   BillingRate,
   Dashboard,
   DashboardWidget,
+  NotificationScheme,
+  PermissionScheme,
   ProjectAutomation,
   RequestType,
   TimesheetApproval,
@@ -184,6 +186,14 @@ export class TProject extends TTaskProject implements Project {
   @Prop(TypeRecord(), tracker.string.ServiceLevels)
   @Hidden()
     sla?: Record<string, number>
+
+  @Prop(TypeRecord(), tracker.string.Permissions)
+  @Hidden()
+    permissions?: PermissionScheme
+
+  @Prop(TypeRecord(), tracker.string.Permissions)
+  @Hidden()
+    notificationScheme?: NotificationScheme
 }
 /**
  * @public

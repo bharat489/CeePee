@@ -578,6 +578,12 @@ function defineApplication (
                 component: tracker.component.FieldsSetup
               },
               {
+                id: 'permissions',
+                label: tracker.string.Permissions,
+                icon: tracker.icon.Issues,
+                component: tracker.component.ProjectPermissions
+              },
+              {
                 id: opt.templatesId,
                 label: tracker.string.IssueTemplates,
                 icon: tracker.icon.IssueTemplates,

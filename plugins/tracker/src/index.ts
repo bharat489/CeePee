@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 
+import type { AccountRole } from '@hcengineering/core'
 import { Employee, Person } from '@hcengineering/contact'
 import { Department } from '@hcengineering/hr'
 import {
@@ -132,6 +133,10 @@ export interface Project extends TaskProject, IconProps {
   automation?: ProjectAutomation
   /** Hours to resolve, keyed by IssuePriority as a string. Absent = no SLA. */
   sla?: Record<string, number>
+  /** Minimum role per action; see PermissionScheme. */
+  permissions?: PermissionScheme
+  /** Event kinds this project delivers; see NotificationScheme. */
+  notificationScheme?: NotificationScheme
 }
 
 /**
@@ -143,6 +148,27 @@ export interface ProjectAutomation {
   assignComponentLead?: boolean
   parentFollowsChildren?: boolean
   startParentOnChildStart?: boolean
+}
+
+/** Minimum workspace role needed for an action. Absent = any member. Owners are never restricted. @public */
+export interface PermissionScheme {
+  close?: AccountRole
+  reopen?: AccountRole
+  delete?: AccountRole
+  reassign?: AccountRole
+  changePriority?: AccountRole
+  editEstimates?: AccountRole
+  editDates?: AccountRole
+  moveSprint?: AccountRole
+}
+
+/** false switches an event kind off for the project. @public */
+export interface NotificationScheme {
+  assigned?: boolean
+  statusChanged?: boolean
+  commented?: boolean
+  mentioned?: boolean
+  otherChanges?: boolean
 }
 
 /** @public */
@@ -1029,6 +1055,7 @@ const pluginState = plugin(trackerId, {
     Roadmap: '' as AnyComponent,
     ServiceDesk: '' as AnyComponent,
     SubmitRequest: '' as AnyComponent,
+    ProjectPermissions: '' as AnyComponent,
     DecisionPresenter: '' as AnyComponent,
     CreateDecisionPopup: '' as AnyComponent,
     DepartmentSegmentsSection: '' as AnyComponent,
@@ -1263,6 +1290,8 @@ const pluginState = plugin(trackerId, {
     ExternalLinks: '' as IntlString,
     MentionedIn: '' as IntlString,
     CloneWithSubIssues: '' as IntlString,
+    Permissions: '' as IntlString,
+    PermissionsHint: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,

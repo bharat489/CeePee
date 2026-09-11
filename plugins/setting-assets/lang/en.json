@@ -296,6 +296,8 @@
     "LinkCopied": "Copied",
     "PendingInvites": "Invite links",
     "NoDepartment": "No department",
-    "TeamSetupEmpty": "No one here yet. Add the first person below."
+    "TeamSetupEmpty": "No one here yet. Add the first person below.",
+    "Identity": "Identity & access",
+    "IdentityHint": "Sign-in providers, single sign-on and automatic provisioning from your identity provider."
   }
 }
