@@ -118,6 +118,8 @@ import ApiAccess from './components/settings/ApiAccess.svelte'
 import ImportHub from './components/import/ImportHub.svelte'
 import CascadingTypeEditor from './components/fields/CascadingTypeEditor.svelte'
 import CascadingSelectEditor from './components/fields/CascadingSelectEditor.svelte'
+import Forms from './components/forms/Forms.svelte'
+import Portfolio from './components/portfolio/Portfolio.svelte'
 import { bulkChange, archiveIssue, unarchiveIssue } from './bulk'
 import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
@@ -487,6 +489,8 @@ export default async (): Promise<Resources> => ({
     ImportHub,
     CascadingTypeEditor,
     CascadingSelectEditor,
+    Forms,
+    Portfolio,
     Assistant,
     NopeComponent,
     DepartmentSegments,

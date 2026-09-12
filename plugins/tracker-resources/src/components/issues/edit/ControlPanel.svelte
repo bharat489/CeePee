@@ -41,6 +41,7 @@
   import CustomerConversation from '../../servicedesk/CustomerConversation.svelte'
   import IncidentPanel from '../../itsm/IncidentPanel.svelte'
   import AssetsPanel from '../../itsm/AssetsPanel.svelte'
+  import DevelopmentPanel from './DevelopmentPanel.svelte'
   import { activeProjects } from '../../../utils'
   import { taskTypeStore } from '@hcengineering/task-resources'
   import AssigneeEditor from '../AssigneeEditor.svelte'
@@ -283,6 +284,7 @@
   </span>
   <IncidentPanel {issue} {readonly} />
   <AssetsPanel {issue} {readonly} />
+  <DevelopmentPanel {issue} {readonly} />
   <MentionedIn {issue} />
 
   <div class="divider" />

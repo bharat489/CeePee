@@ -67,6 +67,8 @@
     { type: 'labels', label: 'Top labels', hint: 'Most used labels on open issues', knobs: ['limit'] },
     { type: 'heatmap', label: 'Created by weekday', hint: 'When work arrives', knobs: ['days'] },
     { type: 'csat', label: 'Satisfaction', hint: 'Ratings from the service desk', knobs: [] },
+    { type: 'time-in-status', label: 'Time in status', hint: 'Average days per status over N days', knobs: ['days', 'limit'] },
+    { type: 'goals', label: 'Goals', hint: 'Progress of every goal', knobs: [] },
     { type: 'activity', label: 'Recent activity', hint: 'Latest changes', knobs: ['limit'] },
     { type: 'hours', label: 'Hours this week', hint: 'Logged time per person', knobs: [] },
     { type: 'text', label: 'Note', hint: 'Free text for the team', knobs: ['text'] },

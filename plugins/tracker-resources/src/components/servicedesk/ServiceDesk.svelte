@@ -307,6 +307,15 @@ import contact, { formatName, type Employee, type Person } from '@hcengineering/
       <textarea class="input input--area" placeholder="Welcome text shown at the top of the portal" value={portal.welcome ?? ''} on:change={(e) => { void savePortal({ welcome: e.currentTarget.value }) }} />
       {#if portal.enabled && portal.slug}<p class="muted">Address: <code>{integrationsUrl}/portal/{portal.slug}</code></p>{/if}
     </section>
+    <section class="card">
+      <div class="card__head"><span class="card__title">Public incident status page</span><label class="check"><input type="checkbox" checked={project?.statusPage?.enabled === true} on:change={(e) => { if (project !== undefined) void client.update(project, { statusPage: { ...(project.statusPage ?? {}), enabled: e.currentTarget.checked } }) }} /> published</label></div>
+      <p class="muted">Components are this project's assets of kind Service; their state comes from open incidents linked to them. Timeline entries marked "public" on an incident are the updates; changes with a future window show as scheduled maintenance.</p>
+      <div class="form__row">
+        <label>Page name <input class="input" value={project?.statusPage?.name ?? ''} placeholder={portal.name} on:change={(e) => { if (project !== undefined) void client.update(project, { statusPage: { ...(project.statusPage ?? { enabled: false }), name: e.currentTarget.value } }) }} /></label>
+        <label>Banner note <input class="input input--w" value={project?.statusPage?.note ?? ''} placeholder="e.g. Support hours 9–18 IST" on:change={(e) => { if (project !== undefined) void client.update(project, { statusPage: { ...(project.statusPage ?? { enabled: false }), note: e.currentTarget.value } }) }} /></label>
+      </div>
+      {#if project?.statusPage?.enabled === true}<p class="muted">Address: <code>{integrationsUrl}/status/{portal.slug}</code> · JSON: <code>{integrationsUrl}/status/{portal.slug}.json</code>{#if !portal.slug} (set the portal slug above){/if}</p>{/if}
+    </section>
   {/if}
 </div>
 

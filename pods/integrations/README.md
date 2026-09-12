@@ -65,6 +65,32 @@ Rate-limited per address. Requests are ordinary issues with `portalEmail` set an
 - `POST /inbound/jira-import` (bearer `INBOUND_TOKEN`; JSON `baseUrl, email, token, jql, project, attachments, history, comments, worklogs`) → job id.
 - `GET /inbound/jira-import/<id>` → progress. Attachments are downloaded with the Jira credentials and stored; change history becomes a dated comment per issue.
 
+## Slack and Teams bots
+
+Slack (create an app at api.slack.com/apps, add the bot scopes `commands`, `chat:write`, `links:read`, `links:write`, `app_mentions:read`, `users:read`, `users:read.email`; set `SLACK_SIGNING_SECRET` and `SLACK_BOT_TOKEN`):
+- Slash command `/ceepee` → Request URL `<PUBLIC_INTEGRATIONS_URL>/slack/commands`
+- Event subscriptions → `<PUBLIC_INTEGRATIONS_URL>/slack/events`, events `link_shared` (add your CeePee domain under app unfurl domains) and `app_mention`
+- Interactivity → `<PUBLIC_INTEGRATIONS_URL>/slack/interactions`
+
+Teams (Team → Manage team → Apps → Create an outgoing webhook, callback `<PUBLIC_INTEGRATIONS_URL>/teams/webhook`; put the generated security token in `TEAMS_WEBHOOK_SECRET`).
+
+Commands, the same in both (`/ceepee …` in Slack, `@CeePee …` in Teams):
+- `KEY-12` — show the issue (Slack also unfurls pasted issue links, with Assign to me and status buttons)
+- `create KEY the title` — create an issue in project KEY
+- `assign KEY-12 me` / `assign KEY-12 name@company.com`
+- `status KEY-12 In progress`
+- `search assignee = me AND status != done` — the query language, first 10 results
+- `help`
+
+## Development panel
+
+GitHub, GitLab and Bitbucket webhooks (`/inbound/github` etc.) now record branches, pull requests, commits and deployments on every issue whose key appears in the branch name, PR title or body, or commit message; the issue's Development panel lists them with their state. Project → Automation → Development flow can move the issue when a branch appears, a PR opens, or a PR merges.
+
+## Forms and the status page
+
+- Forms (project → Forms) create issues from a fixed set of fields, in the app or publicly at `/portal[/<slug>]/form/<form slug>`.
+- The incident status page is served at `/status/<portal slug>` (JSON at `/status/<portal slug>.json`): components are the project's assets of kind Service, their state comes from open incidents linked to them, and timeline entries marked public are the updates.
+
 ## Per-project portals, replies, organisations
 
 - Every project can switch on its own help centre under Service desk → Portal: it is served at `/portal/<slug>` with the project's name, colour, logo and welcome text; `/portal` stays the environment default (`PORTAL_PROJECT`).

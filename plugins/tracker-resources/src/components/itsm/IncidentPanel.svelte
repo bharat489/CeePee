@@ -43,6 +43,7 @@
   const SEV = [{ v: 1, l: 'Sev 1 · outage' }, { v: 2, l: 'Sev 2 · major' }, { v: 3, l: 'Sev 3 · minor' }, { v: 4, l: 'Sev 4 · low' }]
   const RISK: Array<{ v: 'low' | 'medium' | 'high', l: string }> = [{ v: 'low', l: 'Low' }, { v: 'medium', l: 'Medium' }, { v: 'high', l: 'High' }]
   let entry = ''
+  let entryPublic = false
   let postmortem = issue.postmortem ?? ''
   $: postmortem = issue.postmortem ?? postmortem
   const toLocal = (t: number | null | undefined): string => (t == null ? '' : new Date(t - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16))
@@ -64,8 +65,9 @@
   async function addEntry (): Promise<void> {
     if (entry.trim() === '') return
     const me = getCurrentEmployee()
-    await client.update(issue, { timeline: [...(issue.timeline ?? []), { at: Date.now(), text: entry.trim(), by: me }] } as any)
+    await client.update(issue, { timeline: [...(issue.timeline ?? []), { at: Date.now(), text: entry.trim(), by: me, public: entryPublic }] } as any)
     entry = ''
+    entryPublic = false
   }
   const fmt = (t: number): string => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 </script>
@@ -83,8 +85,8 @@
       {#if !readonly}<button class="lnk" on:click={() => { void clearIncident() }}>not an incident</button>{/if}
     </div>
     <div class="row row--col"><span class="lbl">Timeline</span>
-      <ul class="tl">{#each issue.timeline ?? [] as t}<li><span class="tl__at">{fmt(t.at)}</span><span>{t.text}</span></li>{/each}</ul>
-      {#if !readonly}<div class="compose"><input class="input" placeholder="What happened / what was done…" bind:value={entry} on:keydown={(e) => { if (e.key === 'Enter') void addEntry() }} /><button class="lnk" on:click={() => { void addEntry() }}>add</button></div>{/if}
+      <ul class="tl">{#each issue.timeline ?? [] as t}<li><span class="tl__at">{fmt(t.at)}</span><span>{t.text}</span>{#if t.public}<span class="pub">public</span>{/if}</li>{/each}</ul>
+      {#if !readonly}<div class="compose"><input class="input" placeholder="What happened / what was done…" bind:value={entry} on:keydown={(e) => { if (e.key === 'Enter') void addEntry() }} /><label class="chk"><input type="checkbox" bind:checked={entryPublic} /> public</label><button class="lnk" on:click={() => { void addEntry() }}>add</button></div>{/if}
     </div>
     <div class="row row--col"><span class="lbl">Post-mortem</span>
       <textarea class="input input--area" placeholder="Impact, root cause, what we change so it does not happen again." disabled={readonly} bind:value={postmortem} on:blur={() => { if (postmortem !== (issue.postmortem ?? '')) void client.update(issue, { postmortem }) }} />
@@ -118,4 +120,6 @@
   .tl__at { min-width: 8rem; color: var(--theme-trans-color); font-size: 0.75rem; }
   .compose { display: flex; gap: 0.4rem; align-items: center; .input { flex: 1; } }
   .lnk { border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.75rem; cursor: pointer; &:hover { text-decoration: underline; } }
+  .pub { margin-left: 0.4rem; padding: 0 0.4rem; border-radius: 999px; font-size: 0.65rem; font-weight: 600; background: var(--accent-brand-soft); color: var(--theme-caption-color); }
+  .chk { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--theme-content-color); white-space: nowrap; }
 </style>

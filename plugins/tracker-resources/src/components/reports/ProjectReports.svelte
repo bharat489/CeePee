@@ -137,7 +137,7 @@
   }
 
   // ---- report selection ---------------------------------------------------
-  type ReportId = 'burndown' | 'velocity' | 'cfd' | 'sprint' | 'control' | 'cvr' | 'restime' | 'stats' | 'time' | 'epic' | 'version' | 'twodim' | 'avgage' | 'recent' | 'csat'
+  type ReportId = 'burndown' | 'velocity' | 'cfd' | 'sprint' | 'control' | 'cvr' | 'restime' | 'stats' | 'time' | 'epic' | 'version' | 'twodim' | 'avgage' | 'recent' | 'timeinstatus' | 'csat'
   const reports: Array<{ id: ReportId, label: string }> = [
     { id: 'burndown', label: 'Burndown' },
     { id: 'velocity', label: 'Velocity' },
@@ -153,6 +153,7 @@
     { id: 'twodim', label: 'Two-dimensional statistics' },
     { id: 'avgage', label: 'Average age' },
     { id: 'recent', label: 'Recently created' },
+    { id: 'timeinstatus', label: 'Time in status' },
     { id: 'csat', label: 'Satisfaction' }
   ]
   let report: ReportId = 'burndown'
@@ -222,6 +223,58 @@
   })()
   $: avgAgeNow = avgAge.values[avgAge.values.length - 1] ?? 0
   $: oldestOpen = issues.filter((i) => !isDone(i.status)).sort((a, b) => (a.createdOn ?? 0) - (b.createdOn ?? 0)).slice(0, 5)
+
+  // ---- 16. time in status ---------------------------------------------------------
+  // Segments per issue: (status, from, to). Before the first recorded change the
+  // status is unknown, so that stretch is attributed to the project's default status.
+  interface Segment {
+    issue: Issue
+    status: Ref<IssueStatus>
+    from: number
+    to: number
+    open: boolean
+  }
+  $: segments = ((): Segment[] => {
+    const out: Segment[] = []
+    const since = Date.now() - window * DAY
+    for (const i of issues) {
+      const changes = (byIssue.get(i._id) ?? []).filter((c) => c.field === 'status' && c.value !== null)
+      let cur: Ref<IssueStatus> = changes.length > 0 ? ((project?.defaultIssueStatus as Ref<IssueStatus> | undefined) ?? (changes[0].value as Ref<IssueStatus>)) : i.status
+      let start = i.createdOn ?? i.modifiedOn
+      for (const c of changes) {
+        if (c.at > start) out.push({ issue: i, status: cur, from: start, to: c.at, open: false })
+        cur = c.value as Ref<IssueStatus>
+        start = c.at
+      }
+      out.push({ issue: i, status: cur, from: start, to: Date.now(), open: !isDone(i.status) })
+    }
+    return out.filter((sg) => sg.to >= since)
+  })()
+  $: tisRows = ((): Array<{ status: Ref<IssueStatus>, name: string, visits: number, avg: number, median: number, max: number, total: number }> => {
+    const by = new Map<Ref<IssueStatus>, number[]>()
+    for (const sg of segments) by.set(sg.status, [...(by.get(sg.status) ?? []), (sg.to - sg.from) / DAY])
+    return Array.from(by.entries()).map(([status, list]) => {
+      const sorted = [...list].sort((a, b) => a - b)
+      return { status, name: statusName.get(status) ?? '?', visits: list.length, avg: list.reduce((a, b) => a + b, 0) / list.length, median: sorted[Math.floor(sorted.length / 2)] ?? 0, max: sorted[sorted.length - 1] ?? 0, total: list.reduce((a, b) => a + b, 0) }
+    }).sort((a, b) => b.avg - a.avg)
+  })()
+  $: tisMax = Math.max(1, ...tisRows.map((r) => r.avg))
+  $: transitions = ((): Array<{ from: string, to: string, n: number }> => {
+    const m = new Map<string, number>()
+    for (const i of issues) {
+      const changes = (byIssue.get(i._id) ?? []).filter((c) => c.field === 'status' && c.value !== null && c.at >= Date.now() - window * DAY)
+      let prev: string | undefined
+      for (const c of changes) {
+        const to = statusName.get(c.value as Ref<IssueStatus>) ?? '?'
+        if (prev !== undefined) m.set(`${prev}→${to}`, (m.get(`${prev}→${to}`) ?? 0) + 1)
+        prev = to
+      }
+    }
+    return Array.from(m.entries()).map(([k, n]) => ({ from: k.split('→')[0], to: k.split('→')[1], n })).sort((a, b) => b.n - a.n).slice(0, 15)
+  })()
+  $: longestOpen = segments.filter((sg) => sg.open).sort((a, b) => (b.to - b.from) - (a.to - a.from)).slice(0, 10)
+  let project: Project | undefined
+  $: void client.findOne(tracker.class.Project, { _id: currentSpace }).then((p) => { project = p })
 
   // ---- 15. recently created --------------------------------------------------------
   $: recent = issues.filter((i) => (i.createdOn ?? 0) >= Date.now() - window * DAY).sort((a, b) => (b.createdOn ?? 0) - (a.createdOn ?? 0))
@@ -533,7 +586,7 @@
         </button>
       {/each}
     </nav>
-    {#if ['cfd', 'control', 'cvr', 'restime', 'avgage', 'recent'].includes(report)}
+    {#if ['cfd', 'control', 'cvr', 'restime', 'avgage', 'recent', 'timeinstatus'].includes(report)}
       <select class="select" bind:value={window}>
         <option value={14}>14d</option>
         <option value={30}>30d</option>
@@ -929,6 +982,32 @@
     </section>
   {/if}
 
+  <!-- ===== Time in status ===== -->
+  {#if report === 'timeinstatus'}
+    <section class="card motion-rise">
+      <div class="card__head"><span class="card__title">Time in status</span><span class="muted">{window}d · {segments.length} stays</span></div>
+      <p class="muted">How long issues sit in each status (days). Median beats average when a few issues linger. The stretch before an issue's first recorded change counts as the project's default status.</p>
+      {#if tisRows.length === 0}<p class="muted">No history yet.</p>{/if}
+      {#each tisRows as r (r.status)}
+        <div class="bar-row"><span class="bar-row__label bar-row__label--wide">{r.name}</span><span class="bar-track"><span class="bar-fill" style="width: {(r.avg / tisMax) * 100}%" /></span><span class="muted">avg {r.avg.toFixed(1)}d · median {r.median.toFixed(1)}d · max {r.max.toFixed(1)}d · {r.visits} stays</span></div>
+      {/each}
+    </section>
+    <section class="card motion-rise">
+      <div class="card__head"><span class="card__title">Longest current stays</span></div>
+      {#each longestOpen as sg (sg.issue._id + sg.status)}
+        <button class="rec" on:click={() => { open(sg.issue) }}><span class="rec__id">{sg.issue.identifier}</span><span class="rec__title">{sg.issue.title}</span><span class="muted">{statusName.get(sg.status) ?? ''} for {((sg.to - sg.from) / DAY).toFixed(1)}d</span></button>
+      {/each}
+      {#if longestOpen.length === 0}<p class="muted">Nothing open.</p>{/if}
+    </section>
+    <section class="card motion-rise">
+      <div class="card__head"><span class="card__title">Transitions</span><span class="muted">most frequent moves</span></div>
+      {#each transitions as t (t.from + t.to)}
+        <div class="bar-row"><span class="bar-row__label bar-row__label--wide">{t.from} → {t.to}</span><span class="bar-track"><span class="bar-fill bar-fill--blue" style="width: {(t.n / Math.max(1, transitions[0]?.n ?? 1)) * 100}%" /></span><span class="muted">{t.n}</span></div>
+      {/each}
+      {#if transitions.length === 0}<p class="muted">No transitions in the window.</p>{/if}
+    </section>
+  {/if}
+
   <!-- ===== Satisfaction ===== -->
   {#if report === 'csat'}
     <section class="card motion-rise">
@@ -1011,4 +1090,6 @@
   .rec__id { flex-shrink: 0; font-size: 0.7rem; color: var(--theme-trans-color); }
   .rec__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--theme-caption-color); }
   .bar--soft { fill: var(--theme-trans-color); opacity: 0.5; }
+  .bar-row__label--wide { width: 12rem; }
+  .bar-fill--blue { background: var(--primary-button-default); }
 </style>

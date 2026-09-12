@@ -22,9 +22,9 @@
 import { type PlatformClient } from '@hcengineering/api-client'
 import { type Class, type Doc, type Ref } from '@hcengineering/core'
 import task from '@hcengineering/task'
-import tracker, { IssuePriority, type CustomerOrg, type CustomerReply, type Issue, type Project, type RequestType } from '@hcengineering/tracker'
+import tracker, { IssuePriority, type CustomerOrg, type CustomerReply, type FormField, type Issue, type IssueForm, type Project, type RequestType } from '@hcengineering/tracker'
 
-import { addComment, createIssue, findIssue, findProject } from './platform'
+import { addComment, createIssue, findIssue, findProject, personByEmail } from './platform'
 
 export interface PortalConfig {
   name: string
@@ -58,7 +58,7 @@ export async function resolvePortal (c: PlatformClient, env: PortalConfig, slug:
   return { name: p.portal.name || p.name, color: p.portal.color || env.color, logoUrl: p.portal.logoUrl ?? '', project: p.identifier, publicUrl: env.publicUrl, base: `/portal/${slug}`, welcome: p.portal.welcome }
 }
 
-function page (cfg: PortalConfig, title: string, body: string): string {
+export function page (cfg: PortalConfig, title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · ${esc(cfg.name)}</title>
 <style>
 :root{--c:${esc(cfg.color)};--bg:#f6f7f9;--ink:#15171c;--mut:#6b7280;--line:#e5e7eb}
@@ -236,6 +236,119 @@ export async function portalOrg (c: PlatformClient, cfg: PortalConfig, email: st
   if (!wantsHtml) return { status: 200, body: { organisation: org?.name ?? domain, requests: issues.map((i) => ({ key: i.identifier, title: i.title, status: nameOf.get(i.status) ?? '', updated: i.modifiedOn })) } }
   const rows = issues.map((i) => `<tr><td><a href="${cfg.base}/status?key=${encodeURIComponent(i.identifier)}&email=${encodeURIComponent(i.portalEmail ?? email)}">${esc(i.identifier)}</a></td><td>${esc(i.title)}</td><td>${esc(nameOf.get(i.status) ?? '')}</td><td>${esc(i.portalEmail ?? '')}</td><td>${new Date(i.modifiedOn).toLocaleDateString()}</td></tr>`).join('')
   return { status: 200, body: page(cfg, org?.name ?? domain, `<div class="card"><h2>${esc(org?.name ?? domain)} · ${issues.length} request${issues.length === 1 ? '' : 's'}</h2><p class="m">Everyone with an @${esc(domain)} address sees this list. Open a request with the email it was raised with.</p>${issues.length > 0 ? `<table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Raised by</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>` : ''}</div><p><a class="btn" href="${cfg.base}">${esc(cfg.name)}</a></p>`), html: true }
+}
+
+const PRIORITY_WORDS: Record<string, IssuePriority> = { highest: IssuePriority.Urgent, urgent: IssuePriority.Urgent, critical: IssuePriority.Urgent, high: IssuePriority.High, medium: IssuePriority.Medium, normal: IssuePriority.Medium, low: IssuePriority.Low, lowest: IssuePriority.Low }
+
+function fieldHtml (f: FormField, value: string): string {
+  const req = f.required === true ? ' required' : ''
+  const name = esc(f.key)
+  const label = `<label>${esc(f.label)}${f.required === true ? ' *' : ''}</label>`
+  switch (f.type) {
+    case 'textarea':
+      return `${label}<textarea name="${name}" rows="5" placeholder="${esc(f.placeholder ?? '')}"${req}>${esc(value)}</textarea>`
+    case 'select':
+      return `${label}<select name="${name}"${req}><option value="">—</option>${(f.options ?? []).map((o) => `<option${o === value ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+    case 'multiselect':
+      return `${label}<div>${(f.options ?? []).map((o) => `<label style="display:inline-flex;gap:.3rem;margin-right:.8rem;text-transform:none;font-weight:400;color:inherit"><input type="checkbox" name="${name}" value="${esc(o)}" style="width:auto">${esc(o)}</label>`).join('')}</div>`
+    case 'checkbox':
+      return `<label style="display:inline-flex;gap:.4rem;align-items:center;text-transform:none;font-weight:400;color:inherit"><input type="checkbox" name="${name}" value="yes" style="width:auto">${esc(f.label)}</label>`
+    case 'number':
+      return `${label}<input type="number" name="${name}" value="${esc(value)}"${req}>`
+    case 'date':
+      return `${label}<input type="date" name="${name}" value="${esc(value)}"${req}>`
+    case 'email':
+      return `${label}<input type="email" name="${name}" value="${esc(value)}" placeholder="${esc(f.placeholder ?? 'you@company.com')}"${req}>`
+    case 'url':
+      return `${label}<input type="url" name="${name}" value="${esc(value)}" placeholder="https://…"${req}>`
+    default:
+      return `${label}<input name="${name}" value="${esc(value)}" placeholder="${esc(f.placeholder ?? '')}"${req}>`
+  }
+}
+
+/** GET renders a public form; POST creates the issue from its answers. */
+export async function portalForm (c: PlatformClient, cfg: PortalConfig, formSlug: string, method: string, o: Record<string, unknown>, wantsHtml: boolean): Promise<Result> {
+  const project = cfg.project !== '' ? await findProject(c, cfg.project) : undefined
+  const form: IssueForm | undefined = project !== undefined ? (await c.findAll(tracker.class.IssueForm, { space: project._id, slug: formSlug, public: true }, { limit: 1 }))[0] : undefined
+  if (project === undefined || form === undefined) {
+    return wantsHtml ? { status: 404, body: page(cfg, 'Not found', `<div class="card"><h2>No such form.</h2><p><a class="btn" href="${cfg.base}">Back</a></p></div>`), html: true } : { status: 404, body: { error: 'no such form' } }
+  }
+  const hasEmail = form.fields.some((f) => f.mapTo === 'portalEmail' || f.type === 'email')
+  const render = (errors: string[], values: Record<string, string>): Result => ({
+    status: errors.length > 0 ? 400 : 200,
+    html: true,
+    body: page(cfg, form.name, `<div class="card"><h2>${esc(form.name)}</h2>${form.description ? `<p class="m">${esc(form.description)}</p>` : ''}${errors.length > 0 ? `<p class="m" style="color:#dc2626">${errors.map(esc).join('<br>')}</p>` : ''}
+<form method="post" action="${cfg.base}/form/${esc(form.slug)}">${form.fields.map((f) => fieldHtml(f, values[f.key] ?? '')).join('')}${hasEmail ? '' : `<label>Your email</label><input type="email" name="__email" value="${esc(values.__email ?? '')}" placeholder="you@company.com" required>`}<p></p><button type="submit">Send</button></form></div>`)
+  })
+  if (method !== 'POST') return wantsHtml ? render([], {}) : { status: 200, body: { name: form.name, description: form.description, fields: form.fields } }
+  const val = (k: string): string => {
+    const v = o[k]
+    return Array.isArray(v) ? v.map(String).join(', ') : v == null ? '' : String(v)
+  }
+  const errors: string[] = []
+  for (const f of form.fields) {
+    const v = val(f.key)
+    if (f.required === true && v.trim() === '' && !(f.type === 'checkbox' && v === 'yes')) errors.push(`${f.label} is required`)
+    if (f.type === 'email' && v !== '' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) errors.push(`${f.label} must be an email address`)
+  }
+  const emailField = form.fields.find((f) => f.mapTo === 'portalEmail') ?? form.fields.find((f) => f.type === 'email')
+  const email = (emailField !== undefined ? val(emailField.key) : val('__email')).trim().toLowerCase()
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.push('A valid email is required')
+  if (errors.length > 0) return wantsHtml ? render(errors, Object.fromEntries(form.fields.map((f) => [f.key, val(f.key)]).concat([['__email', val('__email')]]))) : { status: 400, body: { errors } }
+  let title = ''
+  const lines: string[] = []
+  const extra: Record<string, unknown> = {}
+  let priority: IssuePriority | undefined
+  let assignee = null as Awaited<ReturnType<typeof personByEmail>>
+  let dueDate: number | undefined
+  const labels: string[] = []
+  for (const f of form.fields) {
+    const v = val(f.key).trim()
+    if (v === '') continue
+    switch (f.mapTo) {
+      case 'title': title = v; break
+      case 'description': lines.push(v); break
+      case 'priority': priority = PRIORITY_WORDS[v.toLowerCase()]; break
+      case 'assignee': assignee = v.includes('@') ? await personByEmail(c, v) : null; break
+      case 'dueDate': dueDate = Number.isNaN(Date.parse(v)) ? undefined : Date.parse(v); break
+      case 'labels': labels.push(...v.split(',').map((x) => x.trim()).filter((x) => x !== '')); break
+      case 'estimation': extra.estimation = Number(v) || 0; break
+      case 'severity': extra.severity = Math.min(4, Math.max(1, Number(v) || 3)); break
+      case 'risk': extra.risk = ['low', 'medium', 'high'].includes(v.toLowerCase()) ? v.toLowerCase() : 'medium'; break
+      case 'portalEmail': break
+      default: lines.push(`${f.label}: ${v}`)
+    }
+  }
+  if (title === '') title = `${form.name} · ${new Date().toLocaleDateString()}`
+  const org = await orgFor(c, project, email)
+  const issue = await createIssue(c, project, {
+    title,
+    description: `From: ${email}${org !== undefined ? ` (${org.name})` : ''} via form "${form.name}"\n\n${lines.join('\n\n')}`,
+    priority,
+    assignee,
+    requestType: form.requestType != null,
+    requestTypeId: form.requestType ?? undefined,
+    portalEmail: email,
+    customerOrg: org?._id,
+    dueDate
+  })
+  if (Object.keys(extra).length > 0) await c.updateDoc(tracker.class.Issue, issue.space, issue._id, extra as any)
+  for (const l of [...labels, `form: ${form.slug}`]) await addTag(c, issue, l)
+  await c.updateDoc(tracker.class.IssueForm, form.space, form._id, { submissions: (form.submissions ?? 0) + 1 })
+  const statusUrl = `${cfg.publicUrl.replace(/\/$/, '')}${cfg.base}/status?key=${encodeURIComponent(issue.identifier)}&email=${encodeURIComponent(email)}`
+  if (wantsHtml) return { status: 200, html: true, body: page(cfg, 'Thank you', `<div class="card"><h2>${esc(form.successText ?? 'Thank you')} <span class="pill">${esc(issue.identifier)}</span></h2><p class="m">Follow progress and talk to us here: <a href="${esc(statusUrl)}">${esc(statusUrl)}</a></p><p><a class="btn" href="${cfg.base}">${esc(cfg.name)}</a></p></div>`) }
+  return { status: 200, body: { created: issue.identifier, status: statusUrl } }
+}
+
+async function addTag (c: PlatformClient, issue: Issue, title: string): Promise<void> {
+  const TAG_ELEMENT = 'tags:class:TagElement' as Ref<Class<Doc>>
+  const TAG_REFERENCE = 'tags:class:TagReference' as Ref<Class<Doc>>
+  let el = (await c.findAll(TAG_ELEMENT, { title, targetClass: tracker.class.Issue } as any, { limit: 1 }))[0] as any
+  if (el === undefined) {
+    const _id = await c.createDoc(TAG_ELEMENT, 'core:space:Workspace' as any, { title, description: '', targetClass: tracker.class.Issue, color: Math.floor(Math.random() * 20), category: 'tags:category:NoCategory' } as any)
+    el = { _id, title, color: 0 }
+  }
+  await c.addCollection(TAG_REFERENCE, issue.space, issue._id, tracker.class.Issue, 'labels', { tag: el._id, title, color: el.color ?? 0 } as any)
 }
 
 export async function portalRate (c: PlatformClient, cfg: PortalConfig, o: Record<string, unknown>, wantsHtml: boolean): Promise<Result> {

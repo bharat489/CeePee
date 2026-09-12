@@ -60,6 +60,9 @@ import {
   TAsset,
   TOnCallRotation,
   TTypeCascadingSelect,
+  TIssueForm,
+  TDevLink,
+  TGoal,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -430,6 +433,13 @@ function defineApplication (
             component: tracker.component.Roadmap
           },
           {
+            id: 'portfolio',
+            position: 'top',
+            label: tracker.string.Portfolio,
+            icon: tracker.icon.Project,
+            component: tracker.component.Portfolio
+          },
+          {
             id: 'boards',
             position: 'top',
             label: tracker.string.Boards,
@@ -615,6 +625,12 @@ function defineApplication (
                 component: tracker.component.OnCall
               },
               {
+                id: 'forms',
+                label: tracker.string.Forms,
+                icon: tracker.icon.NewIssue,
+                component: tracker.component.Forms
+              },
+              {
                 id: 'fields',
                 label: tracker.string.Fields,
                 icon: tracker.icon.Issues,
@@ -682,7 +698,10 @@ export function createModel (builder: Builder): void {
     TCustomerOrg,
     TAsset,
     TOnCallRotation,
-    TTypeCascadingSelect
+    TTypeCascadingSelect,
+    TIssueForm,
+    TDevLink,
+    TGoal
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the

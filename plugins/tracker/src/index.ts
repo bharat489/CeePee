@@ -146,6 +146,7 @@ export interface Project extends TaskProject, IconProps {
   freezeWindows?: FreezeWindow[]
   /** Per-project field overrides keyed by attribute name. */
   fieldContext?: Record<string, FieldContext>
+  statusPage?: StatusPageSettings
 }
 
 /**
@@ -157,6 +158,10 @@ export interface ProjectAutomation {
   assignComponentLead?: boolean
   parentFollowsChildren?: boolean
   startParentOnChildStart?: boolean
+  /** Development flow: move the issue when a branch appears, a PR opens, a PR merges. */
+  branchStatus?: Ref<IssueStatus> | null
+  prOpenStatus?: Ref<IssueStatus> | null
+  prMergeStatus?: Ref<IssueStatus> | null
 }
 
 /** Minimum workspace role needed for an action. Absent = any member. Owners are never restricted. @public */
@@ -330,6 +335,8 @@ export interface TimelineEntry {
   at: Timestamp
   text: string
   by?: string
+  /** Shown on the public status page. */
+  public?: boolean
 }
 
 /** One evaluation of an automation rule. @public */
@@ -406,6 +413,70 @@ export interface OnCallRotation extends Doc {
   /** Incidents with severity at or below this are assigned to whoever is on call. */
   autoAssignSeverity?: number
 }
+/** A field on a form. @public */
+export interface FormField {
+  key: string
+  label: string
+  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'number' | 'date' | 'email' | 'checkbox' | 'url'
+  required?: boolean
+  options?: string[]
+  placeholder?: string
+  hint?: string
+  /** Where the answer goes; anything unmapped is written into the description. */
+  mapTo?: 'title' | 'description' | 'priority' | 'assignee' | 'dueDate' | 'labels' | 'severity' | 'risk' | 'estimation' | 'portalEmail' | 'component' | 'milestone'
+}
+/** A form that creates issues, inside the app or on the public portal. @public */
+export interface IssueForm extends Doc {
+  space: Ref<Project>
+  name: string
+  slug: string
+  description?: string
+  fields: FormField[]
+  requestType?: Ref<RequestType> | null
+  public: boolean
+  submissions?: number
+  successText?: string
+}
+/** A branch, pull request, commit or deployment linked to an issue. @public */
+export interface DevLink extends AttachedDoc {
+  attachedTo: Ref<Issue>
+  kind: 'branch' | 'pr' | 'commit' | 'deploy'
+  provider: string
+  title: string
+  url: string
+  state?: string
+  ref?: string
+  repo?: string
+  author?: string
+  at: Timestamp
+  environment?: string
+}
+/** @public */
+export interface KeyResult {
+  text: string
+  current: number
+  target: number
+  unit?: string
+}
+/** A goal with key results; progress from linked epics or by hand. @public */
+export interface Goal extends Doc {
+  name: string
+  description?: string
+  owner: Ref<Employee>
+  targetDate?: Timestamp | null
+  status: 'on-track' | 'at-risk' | 'off-track' | 'done'
+  progress?: number
+  keyResults: KeyResult[]
+  projects: Ref<Project>[]
+  epics: Ref<Issue>[]
+}
+/** Public incident status page for a project; served at /status/<portal slug>. @public */
+export interface StatusPageSettings {
+  enabled: boolean
+  name?: string
+  note?: string
+}
+
 /** Attribute type: a parent value with dependent child values, stored as "Parent / Child". @public */
 export interface TypeCascadingSelect extends Type<string> {
   options: Array<{ parent: string, children: string[] }>
@@ -651,6 +722,8 @@ export interface Issue extends Task {
   archived?: boolean
   /** Customer-visible messages (CustomerReply). */
   customerReplies?: number
+  /** Branches, pull requests, commits, deployments (DevLink). */
+  devLinks?: number
   /** Approval before work may start (service requests, changes). */
   approval?: ApprovalState
   customerOrg?: Ref<CustomerOrg> | null
@@ -1210,7 +1283,10 @@ const pluginState = plugin(trackerId, {
     CustomerOrg: '' as Ref<Class<CustomerOrg>>,
     Asset: '' as Ref<Class<SupportAsset>>,
     OnCallRotation: '' as Ref<Class<OnCallRotation>>,
-    TypeCascadingSelect: '' as Ref<Class<TypeCascadingSelect>>
+    TypeCascadingSelect: '' as Ref<Class<TypeCascadingSelect>>,
+    IssueForm: '' as Ref<Class<IssueForm>>,
+    DevLink: '' as Ref<Class<DevLink>>,
+    Goal: '' as Ref<Class<Goal>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -1280,6 +1356,8 @@ const pluginState = plugin(trackerId, {
     CascadingTypeEditor: '' as AnyComponent,
     CascadingSelectEditor: '' as AnyComponent,
     Subscriptions: '' as AnyComponent,
+    Forms: '' as AnyComponent,
+    Portfolio: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
     SwimlaneBoard: '' as AnyComponent,
     Releases: '' as AnyComponent,
@@ -1537,6 +1615,16 @@ const pluginState = plugin(trackerId, {
     InvoiceWeek: '' as IntlString,
     InvoiceMonth: '' as IntlString,
     Workflow: '' as IntlString,
+    Forms: '' as IntlString,
+    NewForm: '' as IntlString,
+    OpenForm: '' as IntlString,
+    Portfolio: '' as IntlString,
+    Goals: '' as IntlString,
+    NewGoal: '' as IntlString,
+    Development: '' as IntlString,
+    TimeInStatus: '' as IntlString,
+    StatusPage: '' as IntlString,
+    Submit: '' as IntlString,
     Continue: '' as IntlString,
     Send: '' as IntlString,
     Run: '' as IntlString,

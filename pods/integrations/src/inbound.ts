@@ -29,7 +29,7 @@
 // request in the configured project.
 
 import { type PlatformClient } from '@hcengineering/api-client'
-import tracker, { IssuePriority, type Issue, type Project } from '@hcengineering/tracker'
+import tracker, { IssuePriority, type DevLink, type Issue, type Project } from '@hcengineering/tracker'
 
 import { addComment, addLink, createIssue, findIssue, findProject, keysIn, personByEmail, priorityOf } from './platform'
 
@@ -163,6 +163,37 @@ function commitsOf (o: Record<string, unknown>): Commit[] {
   }))
 }
 
+type DevLinkInput = Omit<DevLink, keyof import('@hcengineering/core').AttachedDoc | 'at'> & { at?: number }
+/** One DevLink per issue and url; state and title refresh on every event. */
+async function upsertDevLink (c: PlatformClient, issue: Issue, link: DevLinkInput): Promise<void> {
+  if (link.url === '') return
+  const existing = (await c.findAll(tracker.class.DevLink, { attachedTo: issue._id, url: link.url }, { limit: 1 }))[0]
+  if (existing !== undefined) {
+    await c.updateDoc(tracker.class.DevLink, existing.space, existing._id, { state: link.state, title: link.title, at: Date.now(), ...(link.environment !== undefined ? { environment: link.environment } : {}) })
+    return
+  }
+  await c.addCollection(tracker.class.DevLink, issue.space, issue._id, tracker.class.Issue, 'devLinks', { ...link, at: link.at ?? Date.now() })
+}
+/** Move the issue per the project's development-flow settings; the workflow guard may refuse. */
+async function applyDevFlow (c: PlatformClient, issue: Issue, step: 'branchStatus' | 'prOpenStatus' | 'prMergeStatus'): Promise<void> {
+  const project = await c.findOne(tracker.class.Project, { _id: issue.space })
+  const target = project?.automation?.[step]
+  if (target == null || issue.status === target) return
+  try {
+    await c.updateDoc(tracker.class.Issue, issue.space, issue._id, { status: target })
+  } catch {
+    // refused by the workflow; the link is still recorded
+  }
+}
+function repoOf (o: Record<string, unknown>): { name: string, url: string } {
+  const r = (o.repository ?? o.project) as Record<string, unknown> | undefined
+  return { name: str(r?.full_name ?? r?.path_with_namespace ?? r?.name), url: str(r?.html_url ?? r?.web_url ?? (r?.links as Record<string, Record<string, unknown>> | undefined)?.html?.href) }
+}
+function branchUrl (kind: string, repo: { url: string }, branch: string): string {
+  if (repo.url === '' || branch === '') return ''
+  return kind === 'gitlab' ? `${repo.url}/-/tree/${branch}` : kind === 'bitbucket' ? `${repo.url}/branch/${branch}` : `${repo.url}/tree/${branch}`
+}
+
 export async function handleGit (kind: 'github' | 'gitlab' | 'bitbucket', c: PlatformClient, o: Record<string, unknown>, headers: Record<string, string | string[] | undefined>): Promise<Result> {
   const touched = new Set<string>()
   // pull / merge requests
@@ -177,6 +208,55 @@ export async function handleGit (kind: 'github' | 'gitlab' | 'bitbucket', c: Pla
     const keys = keysIn(title, branch, str(pr.body ?? pr.description))
     const text = `${kind === 'gitlab' ? 'Merge request' : 'Pull request'} #${number} ${merged ? 'merged' : action !== '' ? action : 'updated'}: ${title}${url !== '' ? `\n${url}` : ''}`
     for (const k of await commentOnKeys(c, keys, text, url !== '' ? { url, label: `${kind === 'gitlab' ? 'MR' : 'PR'} #${number}` } : undefined)) touched.add(k)
+    const repo = repoOf(o)
+    const state = merged ? 'merged' : ['closed', 'close', 'declined', 'rejected'].includes(action) || str(pr.state).toLowerCase() === 'closed' ? 'closed' : pr.draft === true || str(pr.work_in_progress) === 'true' ? 'draft' : 'open'
+    for (const k of keys) {
+      const issue = await findIssue(c, k)
+      if (issue === undefined) continue
+      await upsertDevLink(c, issue, { kind: 'pr', provider: kind, title: `#${number} ${title}`, url, state, ref: branch, repo: repo.name, author: str((pr.user as Record<string, unknown> | undefined)?.login ?? (o.user as Record<string, unknown> | undefined)?.name ?? (pr.author as Record<string, unknown> | undefined)?.display_name) })
+      if (merged) await applyDevFlow(c, issue, 'prMergeStatus')
+      else if (['opened', 'open', 'reopened', 'reopen', 'ready_for_review', 'created'].includes(action) || o.pullrequest !== undefined) await applyDevFlow(c, issue, 'prOpenStatus')
+    }
+  }
+  // branches: pushes and branch-created events whose branch name carries a key
+  {
+    const repo = repoOf(o)
+    const branches = new Set<string>()
+    const ref = str(o.ref)
+    if (ref.startsWith('refs/heads/')) branches.add(ref.slice('refs/heads/'.length))
+    if (str(o.ref_type) === 'branch' && ref !== '' && !ref.startsWith('refs/')) branches.add(ref)
+    for (const ch of ((o.push as Record<string, unknown> | undefined)?.changes as Array<Record<string, unknown>> | undefined) ?? []) {
+      const nw = ch.new as Record<string, unknown> | undefined
+      if (str(nw?.type) === 'branch') branches.add(str(nw?.name))
+    }
+    for (const b of branches) {
+      for (const k of keysIn(b)) {
+        const issue = await findIssue(c, k)
+        if (issue === undefined) continue
+        await upsertDevLink(c, issue, { kind: 'branch', provider: kind, title: b, url: branchUrl(kind, repo, b), ref: b, repo: repo.name })
+        await applyDevFlow(c, issue, 'branchStatus')
+        touched.add(issue.identifier)
+      }
+    }
+  }
+  // deployments (GitHub deployment_status, GitLab deployment)
+  {
+    const dep = o.deployment as Record<string, unknown> | undefined
+    const ds = o.deployment_status as Record<string, unknown> | undefined
+    const isGitlabDeploy = str(o.object_kind) === 'deployment'
+    if ((dep !== undefined && ds !== undefined) || isGitlabDeploy) {
+      const environment = isGitlabDeploy ? str(o.environment) : str(dep?.environment)
+      const state = isGitlabDeploy ? str(o.status) : str(ds?.state)
+      const url = isGitlabDeploy ? str(o.deployable_url) : str(ds?.environment_url ?? ds?.target_url ?? ds?.log_url)
+      const refText = isGitlabDeploy ? str(o.ref) : `${str(dep?.ref)} ${str(dep?.description)} ${str(dep?.task)}`
+      const repo = repoOf(o)
+      for (const k of keysIn(refText, str(o.commit_title))) {
+        const issue = await findIssue(c, k)
+        if (issue === undefined) continue
+        await upsertDevLink(c, issue, { kind: 'deploy', provider: kind, title: `${environment || 'deploy'} · ${state}`, url: url !== '' ? url : repo.url, state, environment, repo: repo.name })
+        touched.add(issue.identifier)
+      }
+    }
   }
   // pushes
   const commits = commitsOf(o)
@@ -186,6 +266,11 @@ export async function handleGit (kind: 'github' | 'gitlab' | 'bitbucket', c: Pla
     for (const [k, list] of byKey) {
       const text = list.map((cm) => `Commit ${cm.id}${cm.author !== '' ? ` by ${cm.author}` : ''}: ${cm.message.split('\n')[0]}${cm.url !== '' ? `\n${cm.url}` : ''}`).join('\n\n')
       for (const t of await commentOnKeys(c, [k], text)) touched.add(t)
+      const issue = await findIssue(c, k)
+      if (issue !== undefined) {
+        const repo = repoOf(o)
+        for (const cm of list) await upsertDevLink(c, issue, { kind: 'commit', provider: kind, title: `${cm.id} ${cm.message.split('\n')[0]}`.slice(0, 120), url: cm.url, ref: cm.id, repo: repo.name, author: cm.author })
+      }
     }
   }
   void headers

@@ -29,9 +29,12 @@ import { scheduleDigest } from './digest'
 import { handleDeploy, handleEmail, handleGeneric, handleGit, handleSentry, type InboundConfig, type Result } from './inbound'
 import { jobStatus, startJiraImport, type JiraImportRequest } from './jira'
 import { getPlatform, heartbeat, resetPlatform, type PlatformConfig } from './platform'
-import { portalArticle, portalHome, portalKb, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
+import { portalArticle, portalHome, portalKb, portalForm, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
 import { scheduleSubscriptions } from './subscriptions'
 import { handleScim, parseRoleMap } from './scim'
+import { handleSlackCommand, handleSlackEvent, handleSlackInteraction, verifySlack, type SlackConfig } from './slack'
+import { handleTeams, verifyTeams } from './teams'
+import { statusPage } from './status'
 
 const env = process.env
 const PORT = Number(env.PORT ?? 8095)
@@ -57,6 +60,8 @@ const portalCfg: PortalConfig = {
 }
 const PORTAL_ENABLED = (env.PORTAL_ENABLED ?? 'true') !== 'false'
 const HEARTBEAT_MINUTES = Math.max(1, Number(env.HEARTBEAT_MINUTES ?? 5))
+const slackCfg: SlackConfig = { signingSecret: env.SLACK_SIGNING_SECRET ?? '', botToken: env.SLACK_BOT_TOKEN ?? '', frontUrl: env.PUBLIC_FRONT_URL ?? platformCfg.url, workspace: platformCfg.workspace }
+const TEAMS_SECRET = env.TEAMS_WEBHOOK_SECRET ?? ''
 
 const log = (m: string): void => {
   console.log(new Date().toISOString(), m)
@@ -68,15 +73,24 @@ function bearer (req: IncomingMessage, query: URLSearchParams): string {
   return query.get('token') ?? ''
 }
 
-async function readBody (req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readRaw (req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
   for await (const ch of req) chunks.push(ch as Buffer)
-  const raw = Buffer.concat(chunks).toString('utf8')
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+async function readBody (req: IncomingMessage): Promise<Record<string, unknown>> {
+  return parseBody(await readRaw(req), (req.headers['content-type'] ?? '').toLowerCase())
+}
+
+function parseBody (raw: string, ct: string): Record<string, unknown> {
   if (raw.trim() === '') return {}
-  const ct = (req.headers['content-type'] ?? '').toLowerCase()
   if (ct.includes('application/x-www-form-urlencoded')) {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of new URLSearchParams(raw)) out[k] = v
+    for (const [k, v] of new URLSearchParams(raw)) {
+      const arr = out[k]
+      out[k] = arr === undefined ? v : Array.isArray(arr) ? [...arr, v] : [arr, v]
+    }
     return out
   }
   if (ct.includes('multipart/form-data')) {
@@ -182,12 +196,76 @@ const server = createServer((req, res) => {
         return
       }
       if (path === '/health') {
-        send(res, 200, { ok: true, service: 'ceepee-integrations', workspace: platformCfg.workspace, inbound: INBOUND_TOKEN !== '', scim: SCIM_TOKEN !== '', portal: PORTAL_ENABLED, heartbeatMinutes: HEARTBEAT_MINUTES })
+        send(res, 200, { ok: true, service: 'ceepee-integrations', workspace: platformCfg.workspace, inbound: INBOUND_TOKEN !== '', scim: SCIM_TOKEN !== '', portal: PORTAL_ENABLED, heartbeatMinutes: HEARTBEAT_MINUTES, slack: slackCfg.signingSecret !== '', teams: TEAMS_SECRET !== '' })
         return
       }
       if (method === 'OPTIONS') {
         cors(res)
         send(res, 204, undefined)
+        return
+      }
+
+      // ---- public status page ----------------------------------------------------
+      if (path === '/status' || path.startsWith('/status/') || path === '/status.json') {
+        if (limited(req, 120)) {
+          send(res, 429, { error: 'too many requests' })
+          return
+        }
+        cors(res)
+        const c = await platform(res)
+        if (c === undefined) return
+        const rest = path === '/status' || path === '/status.json' ? '' : path.slice('/status/'.length)
+        const json = path.endsWith('.json')
+        const slug = rest.replace(/\.json$/, '')
+        sendPortal(res, await statusPage(c, portalCfg, slug, json))
+        return
+      }
+
+      // ---- Slack app -----------------------------------------------------------------
+      if (path.startsWith('/slack/')) {
+        if (method !== 'POST') {
+          send(res, 405, { error: 'POST only' })
+          return
+        }
+        const raw = await readRaw(req)
+        if (!verifySlack(slackCfg.signingSecret, String(req.headers['x-slack-request-timestamp'] ?? ''), raw, String(req.headers['x-slack-signature'] ?? ''))) {
+          send(res, 401, { error: 'bad signature' })
+          return
+        }
+        const c = await platform(res)
+        if (c === undefined) return
+        const ct = String(req.headers['content-type'] ?? '').toLowerCase()
+        if (path === '/slack/events') {
+          send(res, 200, await handleSlackEvent(c, slackCfg, parseBody(raw, ct) as Record<string, any>, log))
+          return
+        }
+        if (path === '/slack/commands') {
+          send(res, 200, await handleSlackCommand(c, slackCfg, new URLSearchParams(raw)))
+          return
+        }
+        if (path === '/slack/interactions') {
+          const payload = JSON.parse(new URLSearchParams(raw).get('payload') ?? '{}') as Record<string, any>
+          send(res, 200, await handleSlackInteraction(c, slackCfg, payload, log))
+          return
+        }
+        send(res, 404, { error: 'not found' })
+        return
+      }
+
+      // ---- Teams outgoing webhook ----------------------------------------------------
+      if (path === '/teams/webhook') {
+        if (method !== 'POST') {
+          send(res, 405, { error: 'POST only' })
+          return
+        }
+        const raw = await readRaw(req)
+        if (!verifyTeams(TEAMS_SECRET, raw, String(req.headers.authorization ?? ''))) {
+          send(res, 401, { type: 'message', text: 'Bad signature' })
+          return
+        }
+        const c = await platform(res)
+        if (c === undefined) return
+        send(res, 200, await handleTeams(c, slackCfg, parseBody(raw, 'application/json') as Record<string, any>))
         return
       }
 
@@ -205,7 +283,7 @@ const server = createServer((req, res) => {
         const c = await platform(res)
         if (c === undefined) return
         const parts = path === '/' || path === '/portal' ? [] : path.slice('/portal/'.length).split('/').filter((x) => x !== '')
-        const KNOWN = ['kb', 'article', 'submit', 'status', 'rate', 'reply', 'org']
+        const KNOWN = ['kb', 'article', 'submit', 'status', 'rate', 'reply', 'org', 'form']
         const slug = parts.length > 0 && !KNOWN.includes(parts[0]) ? parts[0] : ''
         const rest = slug !== '' ? parts.slice(1) : parts
         const cfg = await resolvePortal(c, portalCfg, slug)
@@ -227,6 +305,7 @@ const server = createServer((req, res) => {
           const o = method === 'POST' ? await readBody(req) : {}
           r = await portalOrg(c, cfg, String(o.email ?? url.searchParams.get('email') ?? ''), wantsHtml || method === 'GET')
         } else if (sub === 'rate' && method === 'POST') r = await portalRate(c, cfg, await readBody(req), wantsHtml)
+        else if (sub.startsWith('form/')) r = await portalForm(c, cfg, decodeURIComponent(sub.slice('form/'.length)), method, method === 'POST' ? await readBody(req) : {}, wantsHtml || method === 'GET')
         else r = { status: 404, body: { error: 'not found' } }
         sendPortal(res, r)
         return
@@ -378,7 +457,7 @@ export function start (): void {
     log('INTEGRATIONS_EMAIL / INTEGRATIONS_PASSWORD / WORKSPACE are required; inbound endpoints, the portal and the heartbeat will fail until set')
   }
   server.listen(PORT, () => {
-    log(`integrations service on :${PORT} (inbound ${INBOUND_TOKEN !== '' ? 'on' : 'off'}, scim ${SCIM_TOKEN !== '' ? 'on' : 'off'}, portal ${PORTAL_ENABLED ? PUBLIC_URL + '/portal' : 'off'}, heartbeat every ${HEARTBEAT_MINUTES}m)`)
+    log(`integrations service on :${PORT} (inbound ${INBOUND_TOKEN !== '' ? 'on' : 'off'}, scim ${SCIM_TOKEN !== '' ? 'on' : 'off'}, portal ${PORTAL_ENABLED ? PUBLIC_URL + '/portal' : 'off'}, heartbeat every ${HEARTBEAT_MINUTES}m, slack ${slackCfg.signingSecret !== '' ? 'on' : 'off'}, teams ${TEAMS_SECRET !== '' ? 'on' : 'off'})`)
   })
   scheduleDigest(async () => await getPlatform(platformCfg), {
     mailUrl: env.MAIL_URL,

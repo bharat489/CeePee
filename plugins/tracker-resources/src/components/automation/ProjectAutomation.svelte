@@ -21,7 +21,8 @@
 <script lang="ts">
   import { type Ref } from '@hcengineering/core'
   import presentation, { createQuery, getClient } from '@hcengineering/presentation'
-  import { IssuePriority, type Project, type ProjectAutomation } from '@hcengineering/tracker'
+  import { IssuePriority, type IssueStatus, type Project, type ProjectAutomation } from '@hcengineering/tracker'
+  import task from '@hcengineering/task'
   import { Button, EditBox, Label, Toggle } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
@@ -58,6 +59,27 @@
       hint: 'When any sub-issue moves to an in-progress status, a parent that has not started moves to in progress.'
     }
   ]
+
+  // ---- development flow: statuses for branch / PR opened / PR merged --------------
+  const stq = createQuery()
+  let allStatuses: IssueStatus[] = []
+  stq.query(tracker.class.IssueStatus, {}, (r) => { allStatuses = r })
+  let projectStatuses: IssueStatus[] = []
+  $: void (async () => {
+    if (project === undefined) return
+    const ptype = await client.findOne(task.class.ProjectType, { _id: project.type })
+    const ids = new Set((ptype?.statuses ?? []).map((x) => x._id))
+    projectStatuses = allStatuses.filter((x) => ids.has(x._id))
+  })()
+  const DEV: Array<{ key: 'branchStatus' | 'prOpenStatus' | 'prMergeStatus', label: string }> = [
+    { key: 'branchStatus', label: 'When a branch with the issue key appears' },
+    { key: 'prOpenStatus', label: 'When a pull request opens' },
+    { key: 'prMergeStatus', label: 'When a pull request merges' }
+  ]
+  async function setDev (key: 'branchStatus' | 'prOpenStatus' | 'prMergeStatus', v: string): Promise<void> {
+    if (project === undefined) return
+    await client.update(project, { automation: { ...(project.automation ?? {}), [key]: v === '' ? null : v } })
+  }
 
   async function toggle (key: keyof ProjectAutomation, on: boolean): Promise<void> {
     if (project === undefined) return
@@ -118,6 +140,20 @@
   </section>
 
   <section class="card motion-rise" style="--i: 1">
+    <span class="card__title"><Label label={tracker.string.Development} /></span>
+    <p class="card__hint">Driven by the GitHub, GitLab and Bitbucket webhooks on the integrations service. The workflow may still refuse a move.</p>
+    {#each DEV as d (d.key)}
+      <div class="rule">
+        <div class="rule__text"><span class="rule__label">{d.label}</span></div>
+        <select class="devsel" value={project?.automation?.[d.key] ?? ''} on:change={(e) => { void setDev(d.key, e.currentTarget.value) }}>
+          <option value="">do nothing</option>
+          {#each projectStatuses as st (st._id)}<option value={st._id}>move to {st.name}</option>{/each}
+        </select>
+      </div>
+    {/each}
+  </section>
+
+  <section class="card motion-rise" style="--i: 2">
     <span class="card__title"><Label label={tracker.string.ServiceLevels} /></span>
     <p class="card__hint"><Label label={tracker.string.ServiceLevelsHint} /></p>
     <div class="sla">
@@ -222,4 +258,5 @@
     font-size: 0.8125rem;
     color: var(--theme-trans-color);
   }
+  .devsel { padding: 0.3rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.4rem; background: var(--theme-bg-color); color: var(--theme-caption-color); font: inherit; font-size: 0.8125rem; }
 </style>

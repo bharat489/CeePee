@@ -67,6 +67,10 @@ import type {
   SupportAsset,
   OnCallRotation,
   TypeCascadingSelect,
+  IssueForm,
+  DevLink,
+  Goal,
+  StatusPageSettings,
   ApprovalState,
   SlaCalendar,
   PortalSettings,
@@ -239,6 +243,10 @@ export class TProject extends TTaskProject implements Project {
   @Prop(TypeRecord(), tracker.string.ThisProjectOnly)
   @Hidden()
     fieldContext?: Record<string, FieldContext>
+
+  @Prop(TypeRecord(), tracker.string.StatusPage)
+  @Hidden()
+    statusPage?: StatusPageSettings
 }
 /**
  * @public
@@ -434,6 +442,10 @@ export class TIssue extends TTask implements Issue {
   @Prop(Collection(tracker.class.CustomerReply), tracker.string.CustomerConversation)
   @Hidden()
     customerReplies?: number
+
+  @Prop(Collection(tracker.class.DevLink), tracker.string.Development)
+  @Hidden()
+    devLinks?: number
 
   @Prop(TypeRef(tracker.class.CustomerOrg), tracker.string.Organisations)
   @Hidden()
@@ -1217,6 +1229,68 @@ export class TOnCallRotation extends TDoc implements OnCallRotation {
   shiftDays!: number
   handoffHour!: number
   autoAssignSeverity?: number
+}
+
+@Model(tracker.class.IssueForm, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Forms)
+export class TIssueForm extends TDoc implements IssueForm {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Name)
+  @Index(IndexKind.Indexed)
+    slug!: string
+
+  description?: string
+  fields!: IssueForm['fields']
+  requestType?: Ref<RequestType> | null
+  public!: boolean
+  submissions?: number
+  successText?: string
+}
+
+@Model(tracker.class.DevLink, core.class.AttachedDoc, DOMAIN_TRACKER)
+@UX(tracker.string.Development)
+export class TDevLink extends TAttachedDoc implements DevLink {
+  @Prop(TypeRef(tracker.class.Issue), tracker.string.Issue)
+  @Index(IndexKind.Indexed)
+  declare attachedTo: Ref<Issue>
+
+  kind!: DevLink['kind']
+  provider!: string
+  @Prop(TypeString(), tracker.string.Title)
+    title!: string
+
+  @Prop(TypeString(), tracker.string.Development)
+  @Index(IndexKind.Indexed)
+    url!: string
+
+  state?: string
+  ref?: string
+  repo?: string
+  author?: string
+  at!: Timestamp
+  environment?: string
+}
+
+@Model(tracker.class.Goal, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Goals)
+export class TGoal extends TDoc implements Goal {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  description?: string
+  owner!: Ref<Employee>
+  targetDate?: Timestamp | null
+  status!: Goal['status']
+  progress?: number
+  keyResults!: Goal['keyResults']
+  projects!: Ref<Project>[]
+  epics!: Ref<Issue>[]
 }
 
 @UX(tracker.string.CascadingSelect)

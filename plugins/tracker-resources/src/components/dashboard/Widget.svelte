@@ -25,7 +25,7 @@
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
-  import { IssuePriority, MilestoneStatus, type Decision, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
+  import { IssuePriority, MilestoneStatus, type Decision, type Goal, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
   import { showPanel } from '@hcengineering/ui'
   import view from '@hcengineering/view'
 
@@ -341,6 +341,49 @@
           groups = dow.map((d, k) => ({ label: d, n: counts[k] }))
           break
         }
+        case 'time-in-status': {
+          const days = params.days ?? 30
+          const list = await baseIssues({})
+          const msgs = await client.findAll(activity.class.DocUpdateMessage, { objectClass: tracker.class.Issue, action: 'update', createdOn: { $gte: Date.now() - (days + 90) * DAY } }, { limit: 50000, sort: { createdOn: SortingOrder.Ascending } })
+          const ids = new Set(list.map((i) => i._id))
+          const by = new Map<Ref<IssueStatus>, number[]>()
+          const changes = new Map<string, Array<{ at: number, status: Ref<IssueStatus> }>>()
+          for (const m of msgs) if (m.attributeUpdates?.attrKey === 'status' && ids.has(m.objectId as Ref<Issue>)) changes.set(m.objectId, [...(changes.get(m.objectId) ?? []), { at: m.createdOn ?? m.modifiedOn, status: m.attributeUpdates.set[0] as Ref<IssueStatus> }])
+          const since = Date.now() - days * DAY
+          for (const i of list) {
+            const l = changes.get(i._id) ?? []
+            let cur: Ref<IssueStatus> | undefined = l.length > 0 ? undefined : i.status
+            let start = i.createdOn ?? i.modifiedOn
+            for (const c of l) {
+              if (cur !== undefined && c.at >= since) by.set(cur, [...(by.get(cur) ?? []), (c.at - start) / DAY])
+              cur = c.status
+              start = c.at
+            }
+            if (cur !== undefined) by.set(cur, [...(by.get(cur) ?? []), (Date.now() - start) / DAY])
+          }
+          groups = Array.from(by.entries()).map(([st, l]) => ({ label: statusName.get(st) ?? '?', n: Math.round((l.reduce((a, b) => a + b, 0) / l.length) * 10) / 10 })).sort((a, b) => b.n - a.n).slice(0, params.limit ?? 8)
+          break
+        }
+        case 'goals': {
+          const goals: Goal[] = await client.findAll(tracker.class.Goal, {}, { limit: 50 })
+          const epicIds = Array.from(new Set(goals.flatMap((g) => g.epics)))
+          const epics = epicIds.length > 0 ? await client.findAll(tracker.class.Issue, { _id: { $in: epicIds } }) : []
+          const children = epicIds.length > 0 ? await client.findAll(tracker.class.Issue, { attachedTo: { $in: epicIds } }, { limit: 5000 }) : []
+          const epicPct = (id: Ref<Issue>): number => {
+            const kids = children.filter((c) => c.attachedTo === id)
+            const e = epics.find((x) => x._id === id)
+            if (kids.length === 0) return e !== undefined && doneIds.includes(e.status) ? 100 : 0
+            return (kids.filter((c) => doneIds.includes(c.status)).length / kids.length) * 100
+          }
+          groups = goals.map((g) => {
+            if (g.progress !== undefined) return { label: g.name, n: g.progress }
+            const fromEpics = g.epics.length > 0 ? g.epics.reduce((a, id) => a + epicPct(id), 0) / g.epics.length : undefined
+            const fromKrs = g.keyResults.length > 0 ? g.keyResults.reduce((a, k) => a + (k.target > 0 ? Math.min(100, (k.current / k.target) * 100) : 0), 0) / g.keyResults.length : undefined
+            const n = fromEpics !== undefined && fromKrs !== undefined ? (fromEpics + fromKrs) / 2 : fromEpics ?? fromKrs ?? 0
+            return { label: `${g.name}${g.status !== 'on-track' ? ` · ${g.status}` : ''}`, n: Math.round(n) }
+          })
+          break
+        }
         case 'text':
         case 'links':
           break
@@ -410,10 +453,10 @@
   {#if params.filter}<span class="filt">filter: {params.filter}</span>{/if}
   {#if kpi !== undefined}<div class="kpi"><span class="kpi__v">{kpi.value}</span><span class="kpi__s">{kpi.sub}</span></div>{/if}
 
-  {#if ['mine', 'workload', 'hours', 'labels', 'csat', 'heatmap'].includes(type)}
+  {#if ['mine', 'workload', 'hours', 'labels', 'csat', 'heatmap', 'time-in-status', 'goals'].includes(type)}
     <div class="bars">
       {#each groups as g (g.label)}
-        <div class="bar-row"><span class="bar-row__label" class:bar-row__label--wide={['workload', 'hours', 'labels'].includes(type)}>{g.label}</span><span class="track"><span class="fill" class:fill--blue={type === 'workload' || type === 'heatmap'} style="width: {(g.n / maxN) * 100}%" /></span><span class="bar-row__n">{g.n}{type === 'hours' ? 'h' : ''}</span></div>
+        <div class="bar-row"><span class="bar-row__label" class:bar-row__label--wide={['workload', 'hours', 'labels', 'time-in-status', 'goals'].includes(type)}>{g.label}</span><span class="track"><span class="fill" class:fill--blue={type === 'workload' || type === 'heatmap'} style="width: {(g.n / maxN) * 100}%" /></span><span class="bar-row__n">{g.n}{type === 'hours' ? 'h' : type === 'time-in-status' ? 'd' : type === 'goals' ? '%' : ''}</span></div>
       {/each}
       {#if groups.length === 0 && !busy}<p class="muted">Nothing here.</p>{/if}
     </div>
