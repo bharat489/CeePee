@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 // SPDX-License-Identifier: EPL-2.0
 //
 // Minimal, faithful `svelte/store` stand-in for the Jest (node) environment.

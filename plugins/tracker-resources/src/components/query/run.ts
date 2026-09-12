@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -35,5 +35,5 @@ export async function loadAux (issues: Issue[], needLabels: boolean, historyFiel
 }
 
 export async function runQuery (text: string, limit = 500): Promise<{ issues: Issue[], errors: string[] }> {
-  return await runQueryWith(getClient(), await loadQueryContext(), text, limit)
+  return await runQueryWith(getClient(), await loadQueryContext(), text, limit, { me: getCurrentEmployee(), socialIds: getCurrentAccount().socialIds, uuid: getCurrentAccount().uuid })
 }

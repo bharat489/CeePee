@@ -1,5 +1,5 @@
 <!--
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -25,7 +25,7 @@
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
-  import { IssuePriority, MilestoneStatus, type Decision, type Goal, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
+  import { IssuePriority, MilestoneStatus, type Decision, type Goal, type Idea, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
   import { showPanel } from '@hcengineering/ui'
   import view from '@hcengineering/view'
 
@@ -362,6 +362,12 @@
             if (cur !== undefined) by.set(cur, [...(by.get(cur) ?? []), (Date.now() - start) / DAY])
           }
           groups = Array.from(by.entries()).map(([st, l]) => ({ label: statusName.get(st) ?? '?', n: Math.round((l.reduce((a, b) => a + b, 0) / l.length) * 10) / 10 })).sort((a, b) => b.n - a.n).slice(0, params.limit ?? 8)
+          break
+        }
+        case 'ideas': {
+          const ideas: Idea[] = await client.findAll(tracker.class.Idea, params.project ? { space: params.project } : {}, { limit: 500 })
+          const rice = (i: Idea): number => Math.round((Math.max(1, i.reach) * i.impact * i.confidence) / Math.max(1, i.effort))
+          groups = ideas.filter((i) => i.status !== 'shipped' && i.status !== 'declined').sort((a, b) => rice(b) - rice(a)).slice(0, params.limit ?? 8).map((i) => ({ label: `${i.title} · ▲ ${i.voters.length}`, n: rice(i) }))
           break
         }
         case 'goals': {

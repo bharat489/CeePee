@@ -63,6 +63,10 @@ import {
   TIssueForm,
   TDevLink,
   TGoal,
+  TNotifyPrefs,
+  TReminder,
+  TIdea,
+  TWorkflowScheme,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -631,6 +635,12 @@ function defineApplication (
                 component: tracker.component.Forms
               },
               {
+                id: 'ideas',
+                label: tracker.string.Ideas,
+                icon: tracker.icon.Issues,
+                component: tracker.component.Ideas
+              },
+              {
                 id: 'fields',
                 label: tracker.string.Fields,
                 icon: tracker.icon.Issues,
@@ -701,7 +711,11 @@ export function createModel (builder: Builder): void {
     TTypeCascadingSelect,
     TIssueForm,
     TDevLink,
-    TGoal
+    TGoal,
+    TNotifyPrefs,
+    TReminder,
+    TIdea,
+    TWorkflowScheme
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the
@@ -732,6 +746,17 @@ export function createModel (builder: Builder): void {
     component: tracker.component.ImportHub,
     order: 1170,
     role: AccountRole.Maintainer
+  })
+
+  // Personal: quiet hours, muted projects, reminder thresholds, pending reminders.
+  builder.createDoc(setting.class.SettingsCategory, core.space.Model, {
+    name: 'reminders',
+    label: tracker.string.NotificationPrefs,
+    icon: notification.icon.Notifications,
+    component: tracker.component.NotificationPrefs,
+    group: 'settings-account',
+    role: AccountRole.Guest,
+    order: 1650
   })
 
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {

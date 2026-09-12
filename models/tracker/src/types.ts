@@ -71,6 +71,10 @@ import type {
   DevLink,
   Goal,
   StatusPageSettings,
+  NotifyPrefs,
+  Reminder,
+  Idea,
+  WorkflowScheme,
   ApprovalState,
   SlaCalendar,
   PortalSettings,
@@ -434,6 +438,18 @@ export class TIssue extends TTask implements Issue {
   @Hidden()
   @Index(IndexKind.Indexed)
     archived?: boolean
+
+  @Prop(TypeDate(), tracker.string.SlaDue)
+  @Hidden()
+    slaPausedAt?: Timestamp | null
+
+  @Prop(TypeDate(), tracker.string.Reminders)
+  @Hidden()
+    remindedDue?: Timestamp
+
+  @Prop(TypeDate(), tracker.string.Reminders)
+  @Hidden()
+    remindedSla?: Timestamp
 
   @Prop(TypeRecord(), tracker.string.Approval)
   @Hidden()
@@ -1291,6 +1307,82 @@ export class TGoal extends TDoc implements Goal {
   keyResults!: Goal['keyResults']
   projects!: Ref<Project>[]
   epics!: Ref<Issue>[]
+}
+
+@Model(tracker.class.NotifyPrefs, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.NotificationPrefs)
+export class TNotifyPrefs extends TDoc implements NotifyPrefs {
+  @Index(IndexKind.Indexed)
+    user!: AccountUuid
+
+  quietFrom?: number
+  quietTo?: number
+  tzOffset!: number
+  mutedProjects!: Ref<Project>[]
+  remindDueDays!: number
+  remindSlaHours!: number
+  remindOverdue!: boolean
+}
+
+@Model(tracker.class.Reminder, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Reminders)
+export class TReminder extends TDoc implements Reminder {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeRef(tracker.class.Issue), tracker.string.Issue)
+  @Index(IndexKind.Indexed)
+    issue!: Ref<Issue>
+
+  @Index(IndexKind.Indexed)
+    user!: AccountUuid
+
+  at!: Timestamp
+  note?: string
+  fired?: boolean
+}
+
+@Model(tracker.class.Idea, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Idea)
+export class TIdea extends TDoc implements Idea {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Title)
+  @Index(IndexKind.FullText)
+    title!: string
+
+  @Prop(TypeString(), tracker.string.Description)
+    description!: string
+
+  status!: Idea['status']
+  impact!: number
+  effort!: number
+  confidence!: number
+  reach!: number
+  voters!: string[]
+  tags!: string[]
+  owner?: Ref<Employee> | null
+  insights!: Idea['insights']
+  linkedIssues!: Ref<Issue>[]
+  goal?: Ref<Goal> | null
+  public!: boolean
+}
+
+@Model(tracker.class.WorkflowScheme, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.WorkflowSchemes)
+export class TWorkflowScheme extends TDoc implements WorkflowScheme {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  description?: string
+  statuses!: string[]
+  transitions!: Record<string, string[]>
+  rules!: Array<Record<string, any>>
+  statusProps!: Record<string, Record<string, any>>
+  layout?: Record<string, { x: number, y: number }>
 }
 
 @UX(tracker.string.CascadingSelect)

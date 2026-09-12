@@ -1,5 +1,5 @@
 <!--
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -326,6 +326,7 @@
     <header class="q__head">
       <span class="q__title"><Label label={tracker.string.Query} /></span>
       <span class="q__hint"><Label label={tracker.string.QueryHint} /></span>
+      <span class="q__hint">functions: membersOf("Team") · linkedIssues(KEY-1) · subtasksOf(KEY-1) · issueHistory() · watchedIssues() · votedIssues() · openSprints() · releasedVersions() · componentsLeadByUser() · startOfWeek() · startOfDay(-3d) · endOfMonth()</span>
     </header>
 
     <div class="q__form">

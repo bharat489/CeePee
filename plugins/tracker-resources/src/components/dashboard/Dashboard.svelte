@@ -1,5 +1,5 @@
 <!--
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -69,6 +69,7 @@
     { type: 'csat', label: 'Satisfaction', hint: 'Ratings from the service desk', knobs: [] },
     { type: 'time-in-status', label: 'Time in status', hint: 'Average days per status over N days', knobs: ['days', 'limit'] },
     { type: 'goals', label: 'Goals', hint: 'Progress of every goal', knobs: [] },
+    { type: 'ideas', label: 'Top ideas', hint: 'Highest RICE score, still open', knobs: ['limit'] },
     { type: 'activity', label: 'Recent activity', hint: 'Latest changes', knobs: ['limit'] },
     { type: 'hours', label: 'Hours this week', hint: 'Logged time per person', knobs: [] },
     { type: 'text', label: 'Note', hint: 'Free text for the team', knobs: ['text'] },

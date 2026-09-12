@@ -19,4 +19,8 @@ import { configurePlatform } from './platform'
 
 configurePlatform().then(() => {
   createApp(document.body)
+  // the boot screen from index.ejs fades out once the app shell has mounted
+  setTimeout(() => {
+    ;(window as any).__ceepeeBootDone?.()
+  }, 400)
 })

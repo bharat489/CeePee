@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-import type { TaskFieldConfig, TransitionRule } from '@hcengineering/task'
+import type { StatusProps, TaskFieldConfig, TransitionRule } from '@hcengineering/task'
 import type { Person } from '@hcengineering/contact'
 import contact from '@hcengineering/contact'
 import {
@@ -229,6 +229,12 @@ export class TTaskType extends TDoc implements TaskType {
 
   @Prop(ArrOf(TypeRecord()), getEmbeddedLabel('Transition rules'))
     transitionRules?: TransitionRule[]
+
+  @Prop(TypeRecord(), getEmbeddedLabel('Status properties'))
+    statusProps?: Record<Ref<Status>, StatusProps>
+
+  @Prop(TypeRecord(), getEmbeddedLabel('Workflow layout'))
+    workflowLayout?: Record<Ref<Status>, { x: number, y: number }>
 
   @Prop(ArrOf(TypeRef(core.class.Status)), getEmbeddedLabel('Task statuses'))
     statuses!: Ref<Status>[]

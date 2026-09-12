@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -22,7 +22,7 @@
 import { type PlatformClient } from '@hcengineering/api-client'
 import { type Class, type Doc, type Ref } from '@hcengineering/core'
 import task from '@hcengineering/task'
-import tracker, { IssuePriority, type CustomerOrg, type CustomerReply, type FormField, type Issue, type IssueForm, type Project, type RequestType } from '@hcengineering/tracker'
+import tracker, { IssuePriority, type CustomerOrg, type CustomerReply, type FormField, type Idea, type Issue, type IssueForm, type Project, type RequestType } from '@hcengineering/tracker'
 
 import { addComment, createIssue, findIssue, findProject, personByEmail } from './platform'
 
@@ -349,6 +349,43 @@ async function addTag (c: PlatformClient, issue: Issue, title: string): Promise<
     el = { _id, title, color: 0 }
   }
   await c.addCollection(TAG_REFERENCE, issue.space, issue._id, tracker.class.Issue, 'labels', { tag: el._id, title, color: el.color ?? 0 } as any)
+}
+
+const rice = (i: Idea): number => Math.round((Math.max(1, i.reach) * i.impact * i.confidence) / Math.max(1, i.effort))
+
+/** Public idea board: vote by email, suggest an idea. */
+export async function portalIdeas (c: PlatformClient, cfg: PortalConfig, method: string, sub: string, o: Record<string, unknown>, wantsHtml: boolean): Promise<Result> {
+  const project = cfg.project !== '' ? await findProject(c, cfg.project) : undefined
+  if (project === undefined) return { status: 404, body: { error: 'no project' } }
+  const email = String(o.email ?? '').trim().toLowerCase()
+  const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+  if (method === 'POST' && sub === 'vote') {
+    const idea = (await c.findAll(tracker.class.Idea, { _id: String(o.id ?? '') as Ref<Idea>, space: project._id, public: true }, { limit: 1 }))[0]
+    if (idea === undefined || !validEmail) return wantsHtml ? { status: 400, body: page(cfg, 'Vote', `<div class="card"><h2>Enter your email to vote.</h2><p><a class="btn" href="${cfg.base}/ideas">Back</a></p></div>`), html: true } : { status: 400, body: { error: 'id and email required' } }
+    const voters = idea.voters.includes(email) ? idea.voters.filter((v) => v !== email) : [...idea.voters, email]
+    await c.updateDoc(tracker.class.Idea, idea.space, idea._id, { voters })
+    if (wantsHtml) return { status: 303, body: '', html: true, ...({ location: `${cfg.base}/ideas?email=${encodeURIComponent(email)}` } as any) }
+    return { status: 200, body: { votes: voters.length } }
+  }
+  if (method === 'POST' && sub === 'suggest') {
+    const title = String(o.title ?? '').trim()
+    if (title === '' || !validEmail) return wantsHtml ? { status: 400, body: page(cfg, 'Suggest', `<div class="card"><h2>Give the idea a title and your email.</h2><p><a class="btn" href="${cfg.base}/ideas">Back</a></p></div>`), html: true } : { status: 400, body: { error: 'title and email required' } }
+    await c.createDoc(tracker.class.Idea, project._id, { title: title.slice(0, 200), description: String(o.details ?? '').slice(0, 5000), status: 'new', impact: 3, effort: 3, confidence: 2, reach: 1, voters: [email], tags: ['portal'], owner: null, insights: [{ at: Date.now(), text: `Suggested via the portal by ${email}`, by: email }], linkedIssues: [], goal: null, public: true })
+    if (wantsHtml) return { status: 303, body: '', html: true, ...({ location: `${cfg.base}/ideas?email=${encodeURIComponent(email)}` } as any) }
+    return { status: 200, body: { ok: true } }
+  }
+  const ideas: Idea[] = Array.from(await c.findAll(tracker.class.Idea, { space: project._id, public: true }, { limit: 200 })).filter((i) => i.status !== 'declined').sort((a, b) => b.voters.length - a.voters.length || rice(b) - rice(a))
+  if (!wantsHtml) return { status: 200, body: { ideas: ideas.map((i) => ({ id: i._id, title: i.title, description: i.description, status: i.status, votes: i.voters.length })) } }
+  const STATUS: Record<string, string> = { new: 'New', exploring: 'Exploring', validated: 'Validated', planned: 'Planned', shipped: 'Shipped' }
+  const rows = ideas.map((i) => `<div class="inc"><form method="post" action="${cfg.base}/ideas/vote" style="display:flex;gap:.8rem;align-items:flex-start"><input type="hidden" name="id" value="${esc(i._id)}"><input type="hidden" name="email" value="${esc(email)}"><button type="submit" title="${email === '' ? 'Enter your email above to vote' : (i.voters.includes(email) ? 'Remove your vote' : 'Vote')}" style="min-width:4rem;background:${i.voters.includes(email) ? 'var(--c)' : 'color-mix(in srgb,var(--c) 25%,transparent)'};color:${i.voters.includes(email) ? '#fff' : 'inherit'}">▲ ${i.voters.length}</button><div><b>${esc(i.title)}</b> <span class="pill">${esc(STATUS[i.status] ?? i.status)}</span>${i.description ? `<p class="m" style="margin:.2rem 0 0">${esc(i.description.slice(0, 300))}</p>` : ''}</div></form></div>`).join('')
+  return {
+    status: 200,
+    html: true,
+    body: page(cfg, 'Ideas', `<div class="card"><h2>Ideas</h2><p class="m">Vote for what you want next. Enter your email once; it is only used to count one vote per person.</p><form method="get" action="${cfg.base}/ideas"><input name="email" type="email" value="${esc(email)}" placeholder="you@company.com"><p></p><button type="submit">Use this email</button></form></div>
+<div class="card">${rows !== '' ? rows : '<p class="m">No public ideas yet.</p>'}</div>
+<div class="card"><h2>Suggest an idea</h2><form method="post" action="${cfg.base}/ideas/suggest"><input type="hidden" name="email" value="${esc(email)}">${email === '' ? '<label>Your email</label><input name="email" type="email" required placeholder="you@company.com">' : ''}<label>Idea</label><input name="title" required placeholder="One line"><label>Why</label><textarea name="details" rows="4" placeholder="What problem would it solve for you?"></textarea><p></p><button type="submit">Suggest</button></form></div>
+<p><a class="btn" href="${cfg.base}">${esc(cfg.name)}</a></p>`)
+  }
 }
 
 export async function portalRate (c: PlatformClient, cfg: PortalConfig, o: Record<string, unknown>, wantsHtml: boolean): Promise<Result> {

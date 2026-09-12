@@ -131,7 +131,29 @@ export interface TransitionRule {
   postFunctions?: Array<{ type: string, value?: string, target?: string, url?: string }>
   /** Minimum workspace role, e.g. "MAINTAINER". */
   minRole?: string
+  /** Conditions on sub-tasks, blockers and the parent. */
+  linked?: LinkedCondition[]
 }
+
+/** What holds true while a task sits in a status. @public */
+export interface StatusProps {
+  /** Only the status may change while here. */
+  locked?: boolean
+  /** Entering requires an assignee. */
+  assigneeRequired?: boolean
+  /** Entering clears the assignee. */
+  clearAssignee?: boolean
+  /** Entering assigns the reporter. */
+  assignToReporter?: boolean
+  /** Entering sets this resolution (id) or clears it (null). */
+  setResolution?: string | null
+  /** SLA clock stops while here. */
+  slaPause?: boolean
+  color?: string
+  note?: string
+}
+/** Conditions on related tasks a transition may require. @public */
+export type LinkedCondition = 'subtasks-done' | 'no-open-blockers' | 'parent-open' | 'has-subtasks'
 
 export interface TaskFieldConfig {
   hiddenOnCreate?: string[]
@@ -175,6 +197,12 @@ export interface TaskType extends Doc, IconProps {
 
   /** Per-transition screens, validators, post-functions and roles. */
   transitionRules?: TransitionRule[]
+
+  /** Per-status behaviour. */
+  statusProps?: Record<Ref<Status>, StatusProps>
+
+  /** Node positions in the workflow designer. */
+  workflowLayout?: Record<Ref<Status>, { x: number, y: number }>
 
   // Allowed statuses and ordering
   statuses: Ref<Status>[]

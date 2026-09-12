@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -32,6 +32,7 @@
 // Also hosts the retention sweep (audit events, activity, run log).
 
 import contact from '@hcengineering/contact'
+import { runReminders } from './reminders'
 import core, { type AttachedData, type Class, type Doc, type Ref, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
 import { type TriggerControl } from '@hcengineering/server-core'
 import task, { makeRank, type TaskType } from '@hcengineering/task'
@@ -575,6 +576,13 @@ export async function OnAutomationRules (txes: Tx[], control: TriggerControl): P
     }
   }
 
+  if (sawHeartbeat) {
+    try {
+      out.push(...(await runReminders(control)))
+    } catch {
+      // reminders must never block rules
+    }
+  }
   if (out.length > 0) control.contextCache.set('rules-depth', depth + 1)
   out.push(...(await retentionSweep(control)))
   return out

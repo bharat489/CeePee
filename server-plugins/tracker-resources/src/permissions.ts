@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -110,6 +110,15 @@ export async function OnNotificationScheme (txes: Tx[], control: TriggerControl)
     if (attrs.objectClass !== tracker.class.Issue) continue
     const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: attrs.objectId as Ref<Issue> }, { limit: 1 }))[0]
     if (issue === undefined) continue
+    // a person who muted this project gets nothing from it
+    const mutedFor = attrs.user as AccountUuid | undefined
+    if (mutedFor !== undefined) {
+      const prefs = (await control.findAll(control.ctx, tracker.class.NotifyPrefs, { user: mutedFor }, { limit: 1 }))[0]
+      if (prefs !== undefined && prefs.mutedProjects.includes(issue.space)) {
+        out.push(control.txFactory.createTxRemoveDoc(cud.objectClass, cud.objectSpace, cud.objectId))
+        continue
+      }
+    }
     const project = (await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space }, { limit: 1 }))[0]
     const scheme: NotificationScheme | undefined = project?.notificationScheme
     if (scheme === undefined || Object.keys(scheme).length === 0) continue

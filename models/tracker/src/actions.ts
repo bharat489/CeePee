@@ -785,6 +785,20 @@ export function createActions (builder: Builder, issuesId: string, componentsId:
   createAction(
     builder,
     {
+      action: tracker.actionImpl.RemindMe,
+      label: tracker.string.RemindMe,
+      icon: tracker.icon.DueDate,
+      category: tracker.category.Tracker,
+      input: 'focus',
+      target: tracker.class.Issue,
+      context: { mode: ['context', 'browser'], group: 'edit' }
+    },
+    tracker.action.RemindMe
+  )
+
+  createAction(
+    builder,
+    {
       action: tracker.actionImpl.ArchiveIssue,
       label: tracker.string.ArchiveIssue,
       icon: tracker.icon.Issues,

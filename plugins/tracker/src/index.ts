@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-import type { AccountRole } from '@hcengineering/core'
+import type { AccountRole, AccountUuid } from '@hcengineering/core'
 import { Employee, Person } from '@hcengineering/contact'
 import { Department } from '@hcengineering/hr'
 import {
@@ -413,6 +413,68 @@ export interface OnCallRotation extends Doc {
   /** Incidents with severity at or below this are assigned to whoever is on call. */
   autoAssignSeverity?: number
 }
+/** Per-person notification preferences: quiet hours, muted projects, reminder thresholds. @public */
+export interface NotifyPrefs extends Doc {
+  user: AccountUuid
+  /** Hours in the person's zone; in-app pop-ups and sounds are held between them. */
+  quietFrom?: number
+  quietTo?: number
+  tzOffset: number
+  mutedProjects: Ref<Project>[]
+  /** Remind about my issues due within N days (0 = off). */
+  remindDueDays: number
+  /** Remind about my requests breaching SLA within N hours (0 = off). */
+  remindSlaHours: number
+  remindOverdue: boolean
+}
+/** "Remind me about this issue at …". @public */
+export interface Reminder extends Doc {
+  space: Ref<Project>
+  issue: Ref<Issue>
+  user: AccountUuid
+  at: Timestamp
+  note?: string
+  fired?: boolean
+}
+/** @public */
+export interface IdeaInsight {
+  at: Timestamp
+  text: string
+  url?: string
+  by?: string
+  weight?: number
+}
+/** @public */
+export type IdeaStatus = 'new' | 'exploring' | 'validated' | 'planned' | 'shipped' | 'declined'
+/** An idea to score, argue about and promote to work. Impact, effort and confidence are 1-5; reach is a count. @public */
+export interface Idea extends Doc {
+  space: Ref<Project>
+  title: string
+  description: string
+  status: IdeaStatus
+  impact: number
+  effort: number
+  confidence: number
+  reach: number
+  voters: string[]
+  tags: string[]
+  owner?: Ref<Employee> | null
+  insights: IdeaInsight[]
+  linkedIssues: Ref<Issue>[]
+  goal?: Ref<Goal> | null
+  public: boolean
+}
+/** A named, reusable workflow: statuses by name with transitions, rules, properties and layout. @public */
+export interface WorkflowScheme extends Doc {
+  name: string
+  description?: string
+  statuses: string[]
+  transitions: Record<string, string[]>
+  rules: Array<Record<string, any>>
+  statusProps: Record<string, Record<string, any>>
+  layout?: Record<string, { x: number, y: number }>
+}
+
 /** A field on a form. @public */
 export interface FormField {
   key: string
@@ -720,6 +782,10 @@ export interface Issue extends Task {
   portalEmail?: string
   /** Hidden from lists, boards and queries; restorable. */
   archived?: boolean
+  /** SLA clock paused while in a status with slaPause. */
+  slaPausedAt?: Timestamp | null
+  remindedDue?: Timestamp
+  remindedSla?: Timestamp
   /** Customer-visible messages (CustomerReply). */
   customerReplies?: number
   /** Branches, pull requests, commits, deployments (DevLink). */
@@ -1286,7 +1352,11 @@ const pluginState = plugin(trackerId, {
     TypeCascadingSelect: '' as Ref<Class<TypeCascadingSelect>>,
     IssueForm: '' as Ref<Class<IssueForm>>,
     DevLink: '' as Ref<Class<DevLink>>,
-    Goal: '' as Ref<Class<Goal>>
+    Goal: '' as Ref<Class<Goal>>,
+    NotifyPrefs: '' as Ref<Class<NotifyPrefs>>,
+    Reminder: '' as Ref<Class<Reminder>>,
+    Idea: '' as Ref<Class<Idea>>,
+    WorkflowScheme: '' as Ref<Class<WorkflowScheme>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -1358,6 +1428,9 @@ const pluginState = plugin(trackerId, {
     Subscriptions: '' as AnyComponent,
     Forms: '' as AnyComponent,
     Portfolio: '' as AnyComponent,
+    NotificationPrefs: '' as AnyComponent,
+    Ideas: '' as AnyComponent,
+    RemindPopup: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
     SwimlaneBoard: '' as AnyComponent,
     Releases: '' as AnyComponent,
@@ -1615,6 +1688,32 @@ const pluginState = plugin(trackerId, {
     InvoiceWeek: '' as IntlString,
     InvoiceMonth: '' as IntlString,
     Workflow: '' as IntlString,
+    Ideas: '' as IntlString,
+    Idea: '' as IntlString,
+    NewIdea: '' as IntlString,
+    RemindMe: '' as IntlString,
+    Reminders: '' as IntlString,
+    QuietHours: '' as IntlString,
+    MutedProjects: '' as IntlString,
+    NotificationPrefs: '' as IntlString,
+    DueSoonTitle: '' as IntlString,
+    DueSoonBody: '' as IntlString,
+    SlaRiskTitle: '' as IntlString,
+    SlaRiskBody: '' as IntlString,
+    ReminderTitle: '' as IntlString,
+    ReminderBody: '' as IntlString,
+    OverdueTitle: '' as IntlString,
+    WorkflowSchemes: '' as IntlString,
+    SaveScheme: '' as IntlString,
+    ApplyScheme: '' as IntlString,
+    StatusProperties: '' as IntlString,
+    Impact: '' as IntlString,
+    Effort: '' as IntlString,
+    Confidence: '' as IntlString,
+    Reach: '' as IntlString,
+    PromoteToEpic: '' as IntlString,
+    Insights: '' as IntlString,
+    Vote: '' as IntlString,
     Forms: '' as IntlString,
     NewForm: '' as IntlString,
     OpenForm: '' as IntlString,

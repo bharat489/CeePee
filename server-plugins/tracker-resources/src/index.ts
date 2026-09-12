@@ -17,7 +17,7 @@ import { OnIssueAutomation } from './automation'
 import { OnIssueWebhook } from './webhooks'
 import { OnAutomationRules, holds, perform } from './rules'
 import { AccountRole as WorkspaceRole, hasAccountRole } from '@hcengineering/core'
-import { type TransitionRule } from '@hcengineering/task'
+import { type StatusProps, type TransitionRule } from '@hcengineering/task'
 import { OnIssuePermissions, OnNotificationScheme } from './permissions'
 import chunter, { ChatMessage } from '@hcengineering/chunter'
 import contact, { Employee, Person, PersonSpace } from '@hcengineering/contact'
@@ -885,7 +885,23 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
   for (const tx of txes) {
     const utx = tx as TxUpdateDoc<Issue>
     const next = (utx.operations as any)?.status as Ref<IssueStatus> | undefined
-    if (next === undefined) continue
+    if (next === undefined) {
+      // ---- locked statuses: only the status may change while an issue sits in one
+      if (utx._class !== core.class.TxUpdateDoc || utx.objectClass !== tracker.class.Issue) continue
+      const keys = Object.keys(utx.operations ?? {}).filter((k) => !k.startsWith('$') && !['modifiedOn', 'modifiedBy'].includes(k))
+      if (keys.length === 0) continue
+      const lockedIssue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: utx.objectId }, { limit: 1 }))[0]
+      if (lockedIssue === undefined) continue
+      const lockedType = (await control.findAll(control.ctx, task.class.TaskType, { _id: lockedIssue.kind }, { limit: 1 }))[0]
+      const lockedProps = ((lockedType as any)?.statusProps as Record<string, StatusProps> | undefined)?.[lockedIssue.status]
+      if (lockedProps?.locked === true) {
+        const acc = control.ctx.contextData?.account
+        if (acc === undefined || !hasAccountRole(acc, WorkspaceRole.Owner)) {
+          throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+        }
+      }
+      continue
+    }
 
     const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: utx.objectId }, { limit: 1 }))[0]
     if (issue === undefined || issue.status === next) continue
@@ -917,6 +933,49 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
           throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: `${v.field} ${v.op}${v.value !== undefined ? ' ' + v.value : ''}` }))
         }
       }
+    }
+    // ---- status properties and linked-issue conditions
+    const props = ((type as any).statusProps as Record<string, StatusProps> | undefined)?.[next]
+    if (props?.assigneeRequired === true && (merged.assignee ?? null) === null && props.assignToReporter !== true) {
+      throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: 'assignee' }))
+    }
+    const linked = rule?.linked ?? []
+    if (linked.length > 0) {
+      const doneCat = new Set([task.statusCategory.Won, task.statusCategory.Lost])
+      const isDoneStatus = async (ids: Ref<IssueStatus>[]): Promise<Map<Ref<IssueStatus>, boolean>> => {
+        const list = ids.length > 0 ? await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: { $in: ids } }) : []
+        return new Map(list.map((st) => [st._id, doneCat.has(st.category as any)]))
+      }
+      if (linked.includes('subtasks-done') || linked.includes('has-subtasks')) {
+        const kids = await control.findAll(control.ctx, tracker.class.Issue, { attachedTo: issue._id }, { limit: 500 })
+        if (linked.includes('has-subtasks') && kids.length === 0) throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: 'at least one sub-issue' }))
+        if (linked.includes('subtasks-done') && kids.length > 0) {
+          const doneMap = await isDoneStatus(Array.from(new Set(kids.map((k) => k.status))))
+          if (kids.some((k) => doneMap.get(k.status) !== true)) throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: 'all sub-issues done' }))
+        }
+      }
+      if (linked.includes('no-open-blockers') && (issue.blockedBy ?? []).length > 0) {
+        const blockers = await control.findAll(control.ctx, tracker.class.Issue, { _id: { $in: (issue.blockedBy ?? []).map((b) => b._id as Ref<Issue>) } })
+        const doneMap = await isDoneStatus(Array.from(new Set(blockers.map((b) => b.status))))
+        if (blockers.some((b) => doneMap.get(b.status) !== true)) throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: 'no open blockers' }))
+      }
+      if (linked.includes('parent-open') && issue.attachedTo !== tracker.ids.NoParent) {
+        const parent = (await control.findAll(control.ctx, tracker.class.Issue, { _id: issue.attachedTo as Ref<Issue> }, { limit: 1 }))[0]
+        if (parent !== undefined) {
+          const doneMap = await isDoneStatus([parent.status])
+          if (doneMap.get(parent.status) === true) throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: 'an open parent' }))
+        }
+      }
+    }
+    if (props !== undefined) {
+      const effects: Record<string, unknown> = {}
+      if (props.clearAssignee === true) effects.assignee = null
+      if (props.assignToReporter === true && issue.createdBy !== undefined) {
+        const sid = (await control.findAll(control.ctx, contact.class.SocialIdentity, { _id: issue.createdBy as any }, { limit: 1 }))[0]
+        if (sid !== undefined) effects.assignee = sid.attachedTo
+      }
+      if (props.setResolution !== undefined) effects.resolution = props.setResolution
+      if (Object.keys(effects).length > 0) post.push(control.txFactory.createTxUpdateDoc(tracker.class.Issue, issue.space, issue._id, effects as any))
     }
     const nextStatus = (await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: next }, { limit: 1 }))[0]
     const startsWork = nextStatus?.category === task.statusCategory.Active || nextStatus?.category === task.statusCategory.Won

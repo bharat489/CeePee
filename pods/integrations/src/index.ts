@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -29,7 +29,7 @@ import { scheduleDigest } from './digest'
 import { handleDeploy, handleEmail, handleGeneric, handleGit, handleSentry, type InboundConfig, type Result } from './inbound'
 import { jobStatus, startJiraImport, type JiraImportRequest } from './jira'
 import { getPlatform, heartbeat, resetPlatform, type PlatformConfig } from './platform'
-import { portalArticle, portalHome, portalKb, portalForm, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
+import { portalArticle, portalHome, portalKb, portalForm, portalIdeas, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
 import { scheduleSubscriptions } from './subscriptions'
 import { handleScim, parseRoleMap } from './scim'
 import { handleSlackCommand, handleSlackEvent, handleSlackInteraction, verifySlack, type SlackConfig } from './slack'
@@ -283,7 +283,7 @@ const server = createServer((req, res) => {
         const c = await platform(res)
         if (c === undefined) return
         const parts = path === '/' || path === '/portal' ? [] : path.slice('/portal/'.length).split('/').filter((x) => x !== '')
-        const KNOWN = ['kb', 'article', 'submit', 'status', 'rate', 'reply', 'org', 'form']
+        const KNOWN = ['kb', 'article', 'submit', 'status', 'rate', 'reply', 'org', 'form', 'ideas']
         const slug = parts.length > 0 && !KNOWN.includes(parts[0]) ? parts[0] : ''
         const rest = slug !== '' ? parts.slice(1) : parts
         const cfg = await resolvePortal(c, portalCfg, slug)
@@ -305,6 +305,7 @@ const server = createServer((req, res) => {
           const o = method === 'POST' ? await readBody(req) : {}
           r = await portalOrg(c, cfg, String(o.email ?? url.searchParams.get('email') ?? ''), wantsHtml || method === 'GET')
         } else if (sub === 'rate' && method === 'POST') r = await portalRate(c, cfg, await readBody(req), wantsHtml)
+        else if (sub === 'ideas' || sub.startsWith('ideas/')) r = await portalIdeas(c, cfg, method, sub.slice('ideas/'.length), method === 'POST' ? await readBody(req) : { email: url.searchParams.get('email') ?? '' }, wantsHtml || method === 'GET')
         else if (sub.startsWith('form/')) r = await portalForm(c, cfg, decodeURIComponent(sub.slice('form/'.length)), method, method === 'POST' ? await readBody(req) : {}, wantsHtml || method === 'GET')
         else r = { status: 404, body: { error: 'not found' } }
         sendPortal(res, r)

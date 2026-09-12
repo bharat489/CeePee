@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -175,6 +175,16 @@ export async function OnIssueAutomation (txes: Tx[], control: TriggerControl): P
       }
       if (ops.status !== undefined) {
         out.push(...(await parentRules(issue, project, control)))
+        // SLA pause: the clock stops in statuses flagged slaPause and resumes with the paused time added back
+        const type = (await control.findAll(control.ctx, task.class.TaskType, { _id: issue.kind }, { limit: 1 }))[0] as (TaskType & { statusProps?: Record<string, { slaPause?: boolean }> }) | undefined
+        const entering = type?.statusProps?.[ops.status]?.slaPause === true
+        const wasPaused = issue.slaPausedAt != null
+        if (entering && !wasPaused) {
+          out.push(control.txFactory.createTxUpdateDoc(tracker.class.Issue, issue.space, issue._id, { slaPausedAt: cud.modifiedOn }))
+        } else if (!entering && wasPaused) {
+          const paused = cud.modifiedOn - (issue.slaPausedAt ?? cud.modifiedOn)
+          out.push(control.txFactory.createTxUpdateDoc(tracker.class.Issue, issue.space, issue._id, { slaPausedAt: null, ...(issue.slaDue != null ? { slaDue: issue.slaDue + Math.max(0, paused) } : {}) }))
+        }
       }
     }
   }

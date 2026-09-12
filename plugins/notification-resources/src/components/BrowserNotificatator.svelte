@@ -95,15 +95,30 @@
       await removeNotification(value)
       return
     }
-    addNotification(
-      value.title,
-      value.body,
-      Notification,
-      { value },
-      NotificationSeverity.Info,
-      `notification-${value.objectId}`
-    )
+    // quiet hours (Settings → Notifications & reminders) hold in-app pop-ups; the inbox still gets everything
+    if (!inQuietHours()) {
+      addNotification(
+        value.title,
+        value.body,
+        Notification,
+        { value },
+        NotificationSeverity.Info,
+        `notification-${value.objectId}`
+      )
+    }
     await removeNotification(value)
+  }
+
+  function inQuietHours (): boolean {
+    try {
+      const raw = localStorage.getItem('ceepee.quietHours')
+      if (raw === null) return false
+      const { from, to } = JSON.parse(raw) as { from: number, to: number }
+      const h = new Date().getHours()
+      return from <= to ? h >= from && h < to : h >= from || h < to
+    } catch {
+      return false
+    }
   }
 
   async function removeNotification (value: BrowserNotification): Promise<void> {

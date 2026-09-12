@@ -120,6 +120,10 @@ import CascadingTypeEditor from './components/fields/CascadingTypeEditor.svelte'
 import CascadingSelectEditor from './components/fields/CascadingSelectEditor.svelte'
 import Forms from './components/forms/Forms.svelte'
 import Portfolio from './components/portfolio/Portfolio.svelte'
+import NotificationPrefs from './components/notify/NotificationPrefs.svelte'
+import RemindPopup from './components/notify/RemindPopup.svelte'
+import Ideas from './components/ideas/Ideas.svelte'
+import { remindMe } from './remind'
 import { bulkChange, archiveIssue, unarchiveIssue } from './bulk'
 import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
@@ -491,6 +495,9 @@ export default async (): Promise<Resources> => ({
     CascadingSelectEditor,
     Forms,
     Portfolio,
+    NotificationPrefs,
+    RemindPopup,
+    Ideas,
     Assistant,
     NopeComponent,
     DepartmentSegments,
@@ -625,6 +632,7 @@ export default async (): Promise<Resources> => ({
     ReleaseNotes: releaseNotes,
     CloneWithSubIssues: cloneWithSubIssues,
     BulkChange: bulkChange,
+    RemindMe: remindMe,
     ArchiveIssue: archiveIssue,
     UnarchiveIssue: unarchiveIssue,
     Move: move,

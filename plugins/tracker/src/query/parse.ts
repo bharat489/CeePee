@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -56,9 +56,10 @@ export interface QueryContext {
   statuses: Array<{ _id: Ref<IssueStatus>, name: string, category?: Ref<StatusCategory> }>
   projects: Array<{ _id: Ref<Project>, name: string, identifier: string }>
   sprints: Array<{ _id: Ref<Sprint>, name: string, state: string }>
-  milestones: Array<{ _id: Ref<Milestone>, label: string }>
+  milestones: Array<{ _id: Ref<Milestone>, label: string, status?: number }>
+  departments?: Array<{ name: string, members: Ref<Person>[] }>
   people: Array<{ _id: Ref<Person>, name: string, socialIds: PersonId[] }>
-  components: Array<{ _id: string, label: string }>
+  components: Array<{ _id: string, label: string, lead?: Ref<Person> | null }>
   types: Array<{ _id: string, name: string }>
   resolutions: Array<{ _id: string, name: string }>
   labels: string[]
@@ -649,6 +650,11 @@ function leafFor (n: Node, ctx: QueryContext, errors: string[], needs: { labels:
         needs.labels = true
         const set = new Set(n.values.map((v) => v.toLowerCase()))
         return { test: (i, aux) => [...(aux.labels.get(i._id) ?? [])].some((l) => set.has(l)) !== n.negate }
+      }
+      if (n.field === 'key' || n.field === 'id' || n.field === 'identifier') {
+        const keys = n.values.map((v) => v.toUpperCase()).filter((v) => v !== '__NONE__')
+        const set = new Set(keys)
+        return { push: keys.length === 0 ? undefined : { identifier: n.negate ? { $nin: keys } : { $in: keys } }, test: (i) => set.has(i.identifier.toUpperCase()) !== n.negate }
       }
       const key = REF_KEYS[n.field]
       if (key === undefined) {

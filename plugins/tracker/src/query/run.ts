@@ -1,5 +1,5 @@
 //
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -23,6 +23,7 @@ import { SortingOrder, type Class, type Doc, type DocumentQuery, type FindOption
 
 import type { Issue } from '../index'
 import { compile, type Aux, type Change, type QueryContext } from './parse'
+import { expandFunctions } from './functions'
 
 /** The subset of a client the runner needs. */
 export interface QueryClient {
@@ -32,6 +33,8 @@ export interface QueryClient {
 export interface QueryUser {
   me: Ref<Person> | undefined
   socialIds: PersonId[]
+  /** account uuid, for watchedIssues() */
+  uuid?: string
 }
 
 const C = {
@@ -47,7 +50,8 @@ const C = {
   TaskType: 'task:class:TaskType' as Ref<Class<any>>,
   TagElement: 'tags:class:TagElement' as Ref<Class<any>>,
   TagReference: 'tags:class:TagReference' as Ref<Class<any>>,
-  DocUpdateMessage: 'activity:class:DocUpdateMessage' as Ref<Class<any>>
+  DocUpdateMessage: 'activity:class:DocUpdateMessage' as Ref<Class<any>>,
+  Department: 'hr:class:Department' as Ref<Class<any>>
 }
 
 const arr = <T>(r: T[] | { [n: number]: T, length: number }): T[] => Array.from(r as ArrayLike<T>)
@@ -59,7 +63,7 @@ function personName (name: string): string {
 }
 
 export async function buildQueryContext (client: QueryClient, user: QueryUser): Promise<QueryContext> {
-  const [statuses, projects, sprints, milestones, components, resolutions, persons, socials, taskTypes, tagElements] = await Promise.all([
+  const [statuses, projects, sprints, milestones, components, resolutions, persons, socials, taskTypes, tagElements, departments] = await Promise.all([
     client.findAll(C.IssueStatus, {}),
     client.findAll(C.Project, {}),
     client.findAll(C.Sprint, {}),
@@ -69,7 +73,8 @@ export async function buildQueryContext (client: QueryClient, user: QueryUser): 
     client.findAll(C.Person, {}, { limit: 2000 }),
     client.findAll(C.SocialIdentity, {}, { limit: 5000 }),
     client.findAll(C.TaskType, {}),
-    client.findAll(C.TagElement, { targetClass: C.Issue }, { limit: 1000 })
+    client.findAll(C.TagElement, { targetClass: C.Issue }, { limit: 1000 }),
+    client.findAll(C.Department, {}, { limit: 500 }).catch(() => [] as any[])
   ])
   const byPerson = new Map<Ref<Person>, PersonId[]>()
   for (const s of arr(socials)) byPerson.set(s.attachedTo, [...(byPerson.get(s.attachedTo) ?? []), s._id])
@@ -79,12 +84,13 @@ export async function buildQueryContext (client: QueryClient, user: QueryUser): 
     statuses: arr(statuses).map((s) => ({ _id: s._id, name: s.name, category: s.category })),
     projects: arr(projects).map((p) => ({ _id: p._id, name: p.name, identifier: p.identifier })),
     sprints: arr(sprints).map((s) => ({ _id: s._id, name: s.name, state: s.state })),
-    milestones: arr(milestones).map((m) => ({ _id: m._id, label: m.label })),
+    milestones: arr(milestones).map((m) => ({ _id: m._id, label: m.label, status: m.status })),
     people: arr(persons).map((p) => ({ _id: p._id, name: personName(p.name), socialIds: byPerson.get(p._id) ?? [] })),
-    components: arr(components).map((c) => ({ _id: c._id, label: c.label })),
+    components: arr(components).map((c) => ({ _id: c._id, label: c.label, lead: c.lead })),
     types: Array.from(new Map(arr(taskTypes).map((t) => [t.name, t])).values()).map((t) => ({ _id: t._id, name: t.name })),
     resolutions: arr(resolutions).map((r) => ({ _id: r._id, name: r.name })),
-    labels: Array.from(new Set(arr(tagElements).map((t) => String(t.title)))).sort()
+    labels: Array.from(new Set(arr(tagElements).map((t) => String(t.title)))).sort(),
+    departments: arr(departments as any[]).map((d) => ({ name: String(d.name ?? ''), members: (d.members ?? []) as Ref<Person>[] }))
   }
 }
 
@@ -119,7 +125,10 @@ export interface QueryResult {
 }
 
 /** Compile and run `text`; archived issues are excluded unless the query names them. */
-export async function runQueryWith (client: QueryClient, ctx: QueryContext, text: string, limit = 500): Promise<QueryResult> {
+export async function runQueryWith (client: QueryClient, ctx: QueryContext, text: string, limit = 500, user?: QueryUser): Promise<QueryResult> {
+  const expanded = await expandFunctions(text, ctx, client, user ?? { me: ctx.me, socialIds: ctx.mySocialIds })
+  if (expanded.errors.length > 0) return { issues: [], errors: expanded.errors }
+  text = expanded.text
   const plan = compile(text, ctx)
   if (plan.clauses === 0 || plan.errors.length > 0) return { issues: [], errors: plan.errors }
   const q: DocumentQuery<Issue> = { ...plan.query }

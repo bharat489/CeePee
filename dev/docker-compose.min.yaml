@@ -55,6 +55,9 @@ services:
       - transactor_cockroach
   front:
     links: !override []
+    environment:
+      # VAPID public key; browsers subscribe to push with it (see dev/.env)
+      - PUSH_PUBLIC_KEY=${PUSH_PUBLIC_KEY:-}
   transactor_cockroach:
     links: !override
       - cockroach
@@ -64,6 +67,9 @@ services:
       - MAIL_URL=${MAIL_URL:-}
       - MAIL_API_KEY=${MAIL_API_KEY:-}
       - PUBLIC_FRONT_URL=http://huly.local:8087
+      # web push: the transactor hands push payloads to the notification service below
+      - WEB_PUSH_URL=${WEB_PUSH_URL:-http://notification:8091}
+      - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
   export:
     links: !override
       - minio
@@ -112,6 +118,22 @@ services:
     depends_on:
       - front
       - account
+
+  # Web push (browser notifications while the tab is closed). Keys: npx web-push generate-vapid-keys,
+  # then fill PUSH_PUBLIC_KEY / PUSH_PRIVATE_KEY / PUSH_SUBJECT in dev/.env. The dev keys shipped in .env
+  # work on huly.local only; generate your own before going public.
+  notification:
+    image: hardcoreeng/notification
+    restart: unless-stopped
+    ports:
+      - 8091:8091
+    environment:
+      - PORT=8091
+      - SOURCE=ceepee
+      - AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
+      - PUSH_PUBLIC_KEY=${PUSH_PUBLIC_KEY:-}
+      - PUSH_PRIVATE_KEY=${PUSH_PRIVATE_KEY:-}
+      - PUSH_SUBJECT=${PUSH_SUBJECT:-mailto:admin@ceepee.local}
 
   # Outbound email (invites, notifications, digest). Start with: docker compose --profile mail up -d
   # after filling SMTP_* (or SES_*) in dev/.env and setting MAIL_URL=http://mail:8097 there.

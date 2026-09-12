@@ -98,6 +98,21 @@ GitHub, GitLab and Bitbucket webhooks (`/inbound/github` etc.) now record branch
 - `GET /portal[/<slug>]/org?email=` — every request raised from the same email domain (or the matching customer organisation), so a customer company sees its own queue.
 - New requests are linked to a customer organisation when the email domain matches one configured under Service desk → Organisations.
 
+## Idea board
+
+`GET /portal/<slug>/ideas` lists the project's public ideas (those with **Public** ticked in Ideas), most voted first, as a page
+or as JSON. Visitors enter an email once; `POST /portal/<slug>/ideas/vote` (`id`, `email`) toggles their vote and
+`POST /portal/<slug>/ideas/suggest` (`title`, `details`, `email`) files a new public idea tagged `portal` with the
+suggestion recorded as its first insight. Votes are one per email; the addresses are kept on the idea and never shown publicly.
+
+## Reminders and notifications
+
+The transactor's heartbeat (every `HEARTBEAT_MINUTES`, see scheduled rules) also runs the reminder sweep once an hour:
+explicit "Remind me…" reminders, issues due within each person's *due soon* window and SLAs breaching within their *SLA risk*
+window land in the inbox as notifications. Per-person thresholds, quiet hours and muted projects live in
+Settings → Notifications & reminders. Web push while the tab is closed needs the `notification` service and the `PUSH_*`
+keys in `dev/.env` (both included in the min stack); the transactor reaches it through `WEB_PUSH_URL`.
+
 ## Scheduled emails
 
 Query and dashboard subscriptions (Query page → "Email on a schedule…", Dashboard → same button) are checked every five minutes and sent at the chosen hour through `MAIL_URL`. Query emails carry the matching issues as a table; dashboard emails carry each widget's headline number.

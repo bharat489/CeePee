@@ -1,5 +1,5 @@
 <!--
-// Copyright © 2026 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 -->
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
