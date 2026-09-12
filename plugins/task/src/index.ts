@@ -111,6 +111,28 @@ export interface TaskStatusFactory {
  * @public
  */
 /** @public */
+/**
+ * One edge of a workflow with the rules that guard it: what the transition
+ * screen asks for, what must be filled, what must hold, what runs after, and
+ * who may use it. Kept generic (string keys) so any task class can use it.
+ * @public
+ */
+export interface TransitionRule {
+  from: Ref<Status> | '*'
+  to: Ref<Status>
+  name?: string
+  /** Attribute keys the transition screen asks for. */
+  screen?: string[]
+  /** Attributes that must be non-empty for the transition to go through. */
+  requiredFields?: string[]
+  /** Conditions on the task that must hold. */
+  validators?: Array<{ field: string, op: 'is' | 'is-not' | 'contains' | 'empty' | 'not-empty', value?: string }>
+  /** Actions run after the transition; same shape as automation actions. */
+  postFunctions?: Array<{ type: string, value?: string, target?: string, url?: string }>
+  /** Minimum workspace role, e.g. "MAINTAINER". */
+  minRole?: string
+}
+
 export interface TaskFieldConfig {
   hiddenOnCreate?: string[]
   hiddenOnEdit?: string[]
@@ -150,6 +172,9 @@ export interface TaskType extends Doc, IconProps {
 
   /** Which fields each surface shows, and which must be filled to create. */
   fieldConfig?: TaskFieldConfig
+
+  /** Per-transition screens, validators, post-functions and roles. */
+  transitionRules?: TransitionRule[]
 
   // Allowed statuses and ordering
   statuses: Ref<Status>[]

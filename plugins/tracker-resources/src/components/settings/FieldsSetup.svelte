@@ -65,6 +65,17 @@
     const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]
     await client.update(t, { fieldConfig: { ...c, [list]: next } } as any)
   }
+  // per-project overrides on top of the type-level configuration
+  async function setCtx (key: string, prop: 'hidden' | 'required'): Promise<void> {
+    if (project === undefined) return
+    const ctx = { ...(project.fieldContext ?? {}) }
+    const cur = { ...(ctx[key] ?? {}) }
+    if (cur[prop] === true) delete cur[prop]
+    else cur[prop] = true
+    if (cur.hidden !== true && cur.required !== true && (cur.label === undefined || cur.label === '')) delete ctx[key]
+    else ctx[key] = cur
+    await client.update(project, { fieldContext: ctx })
+  }
 </script>
 
 <div class="fields">
@@ -93,6 +104,26 @@
     </section>
   {/each}
   {#if types.length === 0}<p class="muted">…</p>{/if}
+  {#if project !== undefined}
+    <section class="card motion-rise" style="--i: {types.length}">
+      <span class="card__title"><Label label={tracker.string.ThisProjectOnly} /></span>
+      <p class="muted">Overrides for this project only, on top of the type-level settings above. Hidden fields leave the create form and the issue panel here; required fields must be filled to create.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th class="th th--name">Field</th><th class="th">Hidden in this project</th><th class="th">Required in this project</th></tr></thead>
+          <tbody>
+            {#each FIELDS.filter((x) => x.always !== true) as f (f.key)}
+              <tr>
+                <td class="td td--name">{f.label}</td>
+                <td class="td"><input type="checkbox" checked={project.fieldContext?.[f.key]?.hidden === true} on:change={() => { void setCtx(f.key, 'hidden') }} /></td>
+                <td class="td"><input type="checkbox" disabled={['relations', 'parent', 'externalLinks', 'votes', 'description'].includes(f.key)} checked={project.fieldContext?.[f.key]?.required === true} on:change={() => { void setCtx(f.key, 'required') }} /></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {/if}
 </div>
 
 <style lang="scss">

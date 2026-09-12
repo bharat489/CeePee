@@ -281,6 +281,23 @@
     "ApiTokenExpiry365Days": "365 dní",
     "ApiTokenLoadError": "Nepodařilo se načíst API tokeny",
     "ApiTokenCreateError": "Nepodařilo se vytvořit token. Zkuste to prosím znovu.",
-    "ApiTokenRevokeError": "Odvolání tokenu se nezdařilo. Zkuste to prosím znovu."
+    "ApiTokenRevokeError": "Odvolání tokenu se nezdařilo. Zkuste to prosím znovu.",
+    "JobTitle": "Pracovní pozice",
+    "TeamSetup": "Tým",
+    "TeamSetupHint": "Přidejte lidi a nastavte jejich pozici, roli a oddělení na jednom místě.",
+    "AddPeople": "Přidat lidi",
+    "Email": "E-mail",
+    "FirstName": "Jméno",
+    "LastName": "Příjmení",
+    "Position": "Pozice",
+    "Department": "Oddělení",
+    "InviteAndAdd": "Vytvořit pozvánku",
+    "CopyInviteLink": "Kopírovat odkaz pozvánky",
+    "LinkCopied": "Zkopírováno",
+    "PendingInvites": "Odkazy pozvánek",
+    "NoDepartment": "Bez oddělení",
+    "TeamSetupEmpty": "Zatím tu nikdo není. Přidejte první osobu níže.",
+    "Identity": "Identita a přístup",
+    "IdentityHint": "Poskytovatelé přihlášení, jednotné přihlášení a automatické zřizování z vašeho poskytovatele identity."
   }
 }

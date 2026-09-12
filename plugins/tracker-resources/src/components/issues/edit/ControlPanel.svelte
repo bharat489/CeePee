@@ -37,6 +37,11 @@
   import ExternalLinks from './ExternalLinks.svelte'
   import MentionedIn from './MentionedIn.svelte'
   import CsatPrompt from './CsatPrompt.svelte'
+  import ApprovalPanel from '../../servicedesk/ApprovalPanel.svelte'
+  import CustomerConversation from '../../servicedesk/CustomerConversation.svelte'
+  import IncidentPanel from '../../itsm/IncidentPanel.svelte'
+  import AssetsPanel from '../../itsm/AssetsPanel.svelte'
+  import { activeProjects } from '../../../utils'
   import { taskTypeStore } from '@hcengineering/task-resources'
   import AssigneeEditor from '../AssigneeEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
@@ -120,7 +125,8 @@
   $: updateKeys(issue._class, ignoreKeys)
   // Per-type field configuration (Settings → Fields): hidden fields stay editable elsewhere.
   $: fieldConfig = $taskTypeStore.get(issue.kind)?.fieldConfig
-  $: isHidden = (key: string): boolean => fieldConfig?.hiddenOnEdit?.includes(key) === true
+  $: ctxProject = $activeProjects.get(issue.space)
+  $: isHidden = (key: string): boolean => fieldConfig?.hiddenOnEdit?.includes(key) === true || ctxProject?.fieldContext?.[key]?.hidden === true
   let creatorPersonRef: Ref<Person> | undefined
   $: if (issue.createdBy !== undefined) {
     getPersonRefByPersonIdCb(issue.createdBy, (ref) => {
@@ -262,6 +268,21 @@
   </span>
   <Watchers {issue} {readonly} />
   {/if}
+  <span class="labelTop">
+    <Label label={tracker.string.Approval} />
+  </span>
+  <ApprovalPanel {issue} {readonly} />
+  {#if issue.portalEmail || issue.requestType != null}
+  <span class="labelTop">
+    <Label label={tracker.string.CustomerConversation} />
+  </span>
+  <CustomerConversation {issue} {readonly} />
+  {/if}
+  <span class="labelTop">
+    <Label label={tracker.string.Incident} /> / <Label label={tracker.string.Change} />
+  </span>
+  <IncidentPanel {issue} {readonly} />
+  <AssetsPanel {issue} {readonly} />
   <MentionedIn {issue} />
 
   <div class="divider" />

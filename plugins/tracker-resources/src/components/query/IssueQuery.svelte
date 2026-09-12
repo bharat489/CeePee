@@ -21,17 +21,18 @@
 <script lang="ts">
   import activity from '@hcengineering/activity'
   import contact, { formatName, getCurrentEmployee, type Person } from '@hcengineering/contact'
-  import { getCurrentAccount, SortingOrder, type PersonId, type Ref } from '@hcengineering/core'
+  import core, { getCurrentAccount, SortingOrder, type PersonId, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
-  import { IssuePriority, type Component as TComponent, type Issue, type IssueStatus, type Milestone, type Project, type Resolution, type Sprint } from '@hcengineering/tracker'
-  import { Label, showPanel } from '@hcengineering/ui'
+  import { IssuePriority, type Component as TComponent, type Issue, type IssueStatus, type Milestone, type Project, type Resolution, type SavedQuery, type Sprint } from '@hcengineering/tracker'
+  import { Label, showPanel, showPopup } from '@hcengineering/ui'
   import view from '@hcengineering/view'
   import { onMount, tick } from 'svelte'
 
   import tracker from '../../plugin'
   import { compile, suggest, type Aux, type Change, type QueryContext, type Suggestion } from './parse'
+  import Subscriptions from './Subscriptions.svelte'
 
   const client = getClient()
   const me = getCurrentEmployee()
@@ -234,27 +235,33 @@
     }
   }
 
-  // ---- saved queries (per user, in this browser) ----------------------------
-  const KEY = 'ceepee.savedQueries'
-  let saved: Array<{ name: string, text: string }> = []
-  try {
-    saved = JSON.parse(localStorage.getItem(KEY) ?? '[]')
-  } catch {
-    saved = []
-  }
-  function saveQuery (): void {
+  // ---- saved queries: shared class; anything saved in this browser before is migrated once ----
+  const savedQ = createQuery()
+  let saved: SavedQuery[] = []
+  savedQ.query(tracker.class.SavedQuery, {}, (r) => { saved = r.filter((x) => x.shared || x.owner === me).sort((a, b) => a.name.localeCompare(b.name)) })
+  onMount(() => {
+    try {
+      const old = JSON.parse(localStorage.getItem('ceepee.savedQueries') ?? '[]') as Array<{ name: string, text: string }>
+      if (old.length > 0) {
+        void (async () => {
+          for (const x of old) await client.createDoc(tracker.class.SavedQuery, core.space.Workspace, { name: x.name, text: x.text, owner: me, shared: false })
+          localStorage.removeItem('ceepee.savedQueries')
+        })()
+      }
+    } catch {}
+  })
+  async function saveQuery (): Promise<void> {
     const name = prompt('Name this query', input.slice(0, 40))
     if (name === null || name.trim() === '') return
-    saved = [...saved.filter((s) => s.name !== name), { name: name.trim(), text: input }]
-    try {
-      localStorage.setItem(KEY, JSON.stringify(saved))
-    } catch {}
+    const existing = saved.find((x) => x.name === name.trim() && x.owner === me)
+    if (existing !== undefined) await client.update(existing, { text: input })
+    else await client.createDoc(tracker.class.SavedQuery, core.space.Workspace, { name: name.trim(), text: input, owner: me, shared: false })
   }
-  function removeSaved (name: string): void {
-    saved = saved.filter((s) => s.name !== name)
-    try {
-      localStorage.setItem(KEY, JSON.stringify(saved))
-    } catch {}
+  async function removeSaved (x: SavedQuery): Promise<void> {
+    await client.remove(x)
+  }
+  function subscribe (): void {
+    showPopup(Subscriptions, { kind: 'query', query: input, name: input.slice(0, 50) }, 'top')
   }
 
   $: statusName = new Map(statuses.map((s) => [s._id, s.name]))
@@ -293,10 +300,11 @@
   <aside class="q__side">
     <span class="q__side-title"><Label label={tracker.string.SavedQueries} /></span>
     {#if saved.length === 0}<span class="q__hint">—</span>{/if}
-    {#each saved as s, idx (s.name)}
+    {#each saved as s, idx (s._id)}
       <div class="saved motion-rise" style="--i: {idx}">
         <button
           class="saved__name"
+          title={s.text}
           on:click={() => {
             input = s.text
             void run()
@@ -304,15 +312,12 @@
         >
           {s.name}
         </button>
-        <button
-          class="saved__x"
-          title="Remove"
-          on:click={() => {
-            removeSaved(s.name)
-          }}
-        >
-          ×
-        </button>
+        {#if s.owner === me}
+          <button class="saved__x" title={s.shared ? 'Shared with everyone' : 'Only you see this'} on:click={() => { void client.update(s, { shared: !s.shared }) }}>{s.shared ? '👥' : '🔒'}</button>
+          <button class="saved__x" title="Remove" on:click={() => { void removeSaved(s) }}>×</button>
+        {:else}
+          <span class="saved__x" title="Shared by a teammate">👥</span>
+        {/if}
       </div>
     {/each}
   </aside>
@@ -372,6 +377,7 @@
         ↵
       </button>
       <button class="q__btn" disabled={input.trim() === ''} on:click={saveQuery}><Label label={tracker.string.SaveQuery} /></button>
+      <button class="q__btn" disabled={input.trim() === ''} on:click={subscribe}><Label label={tracker.string.EmailSchedule} /></button>
       <button class="q__btn" disabled={results.length === 0} on:click={exportCsv}>CSV</button>
     </div>
 

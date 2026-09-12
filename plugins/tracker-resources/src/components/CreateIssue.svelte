@@ -259,8 +259,8 @@
 
   // Per-type field configuration (Settings → Fields).
   $: fieldConfig = kind !== undefined ? $taskTypeStore.get(kind)?.fieldConfig : undefined
-  $: hiddenC = (key: string): boolean => fieldConfig?.hiddenOnCreate?.includes(key) === true
-  $: requiredOk = (fieldConfig?.requiredOnCreate ?? []).every((k) => {
+  $: hiddenC = (key: string): boolean => fieldConfig?.hiddenOnCreate?.includes(key) === true || currentProject?.fieldContext?.[key]?.hidden === true
+  $: requiredOk = [...(fieldConfig?.requiredOnCreate ?? []), ...Object.entries(currentProject?.fieldContext ?? {}).filter(([, v]) => v.required === true).map(([k]) => k)].every((k) => {
     switch (k) {
       case 'assignee':
         return object.assignee != null

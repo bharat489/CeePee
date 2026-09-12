@@ -108,6 +108,17 @@ import ServiceDesk from './components/servicedesk/ServiceDesk.svelte'
 import SubmitRequest from './components/servicedesk/SubmitRequest.svelte'
 import ProjectPermissions from './components/settings/ProjectPermissions.svelte'
 import ProjectTemplates from './components/settings/ProjectTemplates.svelte'
+import WorkflowDesigner from './components/workflow/WorkflowDesigner.svelte'
+import QueryBoard from './components/query/QueryBoard.svelte'
+import Subscriptions from './components/query/Subscriptions.svelte'
+import BulkChange from './components/issues/BulkChange.svelte'
+import Assets from './components/itsm/Assets.svelte'
+import OnCall from './components/itsm/OnCall.svelte'
+import ApiAccess from './components/settings/ApiAccess.svelte'
+import ImportHub from './components/import/ImportHub.svelte'
+import CascadingTypeEditor from './components/fields/CascadingTypeEditor.svelte'
+import CascadingSelectEditor from './components/fields/CascadingSelectEditor.svelte'
+import { bulkChange, archiveIssue, unarchiveIssue } from './bulk'
 import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
@@ -466,6 +477,16 @@ export default async (): Promise<Resources> => ({
     SubmitRequest,
     ProjectPermissions,
     ProjectTemplates,
+    WorkflowDesigner,
+    QueryBoard,
+    Subscriptions,
+    BulkChange,
+    Assets,
+    OnCall,
+    ApiAccess,
+    ImportHub,
+    CascadingTypeEditor,
+    CascadingSelectEditor,
     Assistant,
     NopeComponent,
     DepartmentSegments,
@@ -599,6 +620,9 @@ export default async (): Promise<Resources> => ({
     CreateIssueFromMessage: createIssueFromMessage,
     ReleaseNotes: releaseNotes,
     CloneWithSubIssues: cloneWithSubIssues,
+    BulkChange: bulkChange,
+    ArchiveIssue: archiveIssue,
+    UnarchiveIssue: unarchiveIssue,
     Move: move,
     EditWorkflowStatuses: editWorkflowStatuses,
     EditProject: editProject,

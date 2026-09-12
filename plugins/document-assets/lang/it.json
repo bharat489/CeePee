@@ -52,6 +52,7 @@
     "Icon": "Icona",
     "Color": "Colore",
     "ForbidCreateTeamspacePermission": "Vieta creazione teamspace",
-    "ForbidCreateTeamspacePermissionDescription": "Vieta agli utenti di creare nuovi teamspaces"
+    "ForbidCreateTeamspacePermissionDescription": "Vieta agli utenti di creare nuovi teamspaces",
+    "IssuesInDocument": "Segnalazioni in questa pagina"
   }
 }

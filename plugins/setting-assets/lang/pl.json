@@ -281,6 +281,23 @@
     "ApiEndpointAccount": "Pobierz informacje o koncie",
     "ApiBaseUrl": "Bazowy adres URL",
     "ApiWorkspaceId": "Identyfikator przestrzeni roboczej (UUID) jest zawarty w tokenie. Przekaż go jako :workspaceId w adresie URL.",
-    "ApiTokenRevokeError": "Nie udało się unieważnić tokenu. Spróbuj ponownie."
+    "ApiTokenRevokeError": "Nie udało się unieważnić tokenu. Spróbuj ponownie.",
+    "JobTitle": "Stanowisko",
+    "TeamSetup": "Zespół",
+    "TeamSetupHint": "Dodawaj osoby i ustawiaj ich stanowisko, rolę i dział w jednym miejscu.",
+    "AddPeople": "Dodaj osoby",
+    "Email": "E-mail",
+    "FirstName": "Imię",
+    "LastName": "Nazwisko",
+    "Position": "Stanowisko",
+    "Department": "Dział",
+    "InviteAndAdd": "Utwórz zaproszenie",
+    "CopyInviteLink": "Kopiuj link zaproszenia",
+    "LinkCopied": "Skopiowano",
+    "PendingInvites": "Linki zaproszeń",
+    "NoDepartment": "Bez działu",
+    "TeamSetupEmpty": "Nikogo tu jeszcze nie ma. Dodaj pierwszą osobę poniżej.",
+    "Identity": "Tożsamość i dostęp",
+    "IdentityHint": "Dostawcy logowania, jednokrotne logowanie i automatyczne provisionowanie z Twojego dostawcy tożsamości."
   }
 }

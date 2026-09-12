@@ -35,30 +35,24 @@
     "NoBacklinks": "Brak linków zwrotnych",
     "NoHistory": "Brak historii",
     "Untitled": "Bez nazwy",
-
     "Description": "Opis",
-
     "CopyDocumentUrl": "Skopiuj URL dokumentu do schowka",
     "DocumentUrlCopied": "Skopiowano!",
-
     "ViewMode": "Podgląd",
     "EditMode": "Edytuj",
     "SuggestMode": "Zaproponuj",
-
     "CompareTo": "Porównaj z...",
     "Star": "Polub",
     "Unstar": "Usuń z ulubionych",
-
     "Lock": "Zablokuj",
     "Unlock": "Odblokuj",
     "Locked": "Zablokowane",
-
     "ConfigLabel": "Dokumenty",
     "ConfigDescription": "Rozszerzenie do wspólnej edycji dokumentów",
-
     "Icon": "Ikona",
     "Color": "Kolor",
     "ForbidCreateTeamspacePermission": "Zabroń tworzenia przestrzeni zespołowych",
-    "ForbidCreateTeamspacePermissionDescription": "Zabrania użytkownikom tworzenia nowych przestrzeni zespołowych"
+    "ForbidCreateTeamspacePermissionDescription": "Zabrania użytkownikom tworzenia nowych przestrzeni zespołowych",
+    "IssuesInDocument": "Zgłoszenia na tej stronie"
   }
 }

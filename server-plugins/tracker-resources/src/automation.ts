@@ -30,13 +30,53 @@
 import core, { type Ref, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
 import { type TriggerControl } from '@hcengineering/server-core'
 import task, { type TaskType } from '@hcengineering/task'
-import tracker, { type Issue, type IssueStatus, type Project } from '@hcengineering/tracker'
+import tracker, { type Issue, type IssueStatus, type OnCallRotation, type Project, type SlaCalendar } from '@hcengineering/tracker'
+import { type Person } from '@hcengineering/contact'
 
 const HOUR = 3_600_000
+const DAY = 24 * HOUR
+
+/** Advance `from` by `hours` counting only the calendar's working hours, skipping holidays. */
+export function addBusinessHours (from: number, hours: number, cal: SlaCalendar): number {
+  const offset = cal.timezoneOffset * 60_000
+  let t = from
+  let remaining = hours * HOUR
+  for (let guard = 0; guard < 24 * 400 && remaining > 0; guard++) {
+    const local = new Date(t + offset)
+    const dayStart = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - offset
+    const ymd = new Date(dayStart + offset).toISOString().slice(0, 10)
+    const working = cal.workdays.includes(local.getUTCDay()) && !cal.holidays.includes(ymd)
+    const open = dayStart + cal.startHour * HOUR
+    const close = dayStart + cal.endHour * HOUR
+    if (!working || t >= close) {
+      t = dayStart + DAY + cal.startHour * HOUR
+      continue
+    }
+    if (t < open) t = open
+    const available = close - t
+    if (available >= remaining) return t + remaining
+    remaining -= available
+    t = close
+  }
+  return t
+}
 
 function slaDueFor (project: Project, priority: number, from: number): number | null {
   const hours = project.sla?.[String(priority)]
-  return hours !== undefined && hours > 0 ? from + hours * HOUR : null
+  if (hours === undefined || hours <= 0) return null
+  const cal = project.slaCalendar
+  if (cal !== undefined && cal.workdays.length > 0 && cal.endHour > cal.startHour) return addBusinessHours(from, hours, cal)
+  return from + hours * HOUR
+}
+
+/** Who is on call now for a rotation: people take turns of shiftDays from startsOn, handing off at handoffHour. */
+export function currentOnCall (r: OnCallRotation, now = Date.now()): Ref<Person> | undefined {
+  if (r.people.length === 0) return undefined
+  const start = new Date(r.startsOn)
+  start.setHours(r.handoffHour, 0, 0, 0)
+  const shifts = Math.floor((now - start.getTime()) / (Math.max(1, r.shiftDays) * DAY))
+  const idx = ((shifts % r.people.length) + r.people.length) % r.people.length
+  return r.people[idx]
 }
 
 async function parentRules (issue: Issue, project: Project, control: TriggerControl): Promise<Tx[]> {
@@ -97,6 +137,23 @@ export async function OnIssueAutomation (txes: Tx[], control: TriggerControl): P
       if (project.sla !== undefined) {
         const due = slaDueFor(project, attrs.priority, cud.modifiedOn)
         if (due !== null) ops.slaDue = due
+      }
+      // service desk: approvals, incident defaults, on-call assignment
+      if (attrs.requestType != null) {
+        const rt = (await control.findAll(control.ctx, tracker.class.RequestType, { _id: attrs.requestType }, { limit: 1 }))[0]
+        if (rt !== undefined) {
+          if (rt.requiresApproval === true && attrs.approval === undefined) {
+            ops.approval = { state: 'pending', approvers: rt.approvers ?? [], decisions: [], requestedOn: cud.modifiedOn }
+          }
+          if (rt.kind === 'incident' && attrs.severity === undefined) ops.severity = rt.defaultSeverity ?? 3
+        }
+      }
+      const severity = attrs.severity ?? ops.severity
+      if (severity !== undefined && attrs.assignee == null && ops.assignee === undefined) {
+        const rotations = await control.findAll(control.ctx, tracker.class.OnCallRotation, { space: project._id })
+        const r = rotations.find((x) => x.autoAssignSeverity !== undefined && severity <= x.autoAssignSeverity && x.people.length > 0)
+        const who = r !== undefined ? currentOnCall(r, cud.modifiedOn) : undefined
+        if (who !== undefined) ops.assignee = who
       }
       if (Object.keys(ops).length > 0) {
         out.push(control.txFactory.createTxUpdateDoc(tracker.class.Issue, cud.objectSpace, cud.objectId, ops))

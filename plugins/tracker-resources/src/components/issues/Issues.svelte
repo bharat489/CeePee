@@ -44,7 +44,7 @@
 
   $: spaceQuery = currentSpace !== undefined ? { space: currentSpace } : {}
 
-  $: all = { ...baseQuery, ...spaceQuery }
+  $: all = { ...baseQuery, ...spaceQuery, archived: { $ne: true } }
 
   const activeStatusQuery = createQuery()
 
@@ -59,7 +59,7 @@
   )
 
   let active: DocumentQuery<Issue>
-  $: active = { status: { $in: activeStatuses }, ...spaceQuery }
+  $: active = { status: { $in: activeStatuses }, ...spaceQuery, archived: { $ne: true } }
 
   const backlogStatusQuery = createQuery()
 
@@ -68,9 +68,9 @@
   $: backlogStatusQuery.query(tracker.class.IssueStatus, { category: task.statusCategory.UnStarted }, (result) => {
     backlogStatuses = result.map(({ _id }) => _id)
   })
-  $: backlog = { status: { $in: backlogStatuses }, ...spaceQuery }
+  $: backlog = { status: { $in: backlogStatuses }, ...spaceQuery, archived: { $ne: true } }
 
-  $: queries = { all, active, backlog }
+  $: queries = { all, active, backlog, archived: { ...baseQuery, ...spaceQuery, archived: true } }
   $: mode = $resolvedLocationStore.query?.mode ?? undefined
   $: if (mode === undefined || (queries as any)[mode] === undefined) {
     ;[[mode]] = config

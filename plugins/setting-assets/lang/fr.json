@@ -281,6 +281,23 @@
     "ApiTokenExpiry365Days": "365 jours",
     "ApiTokenLoadError": "Échec du chargement des jetons API",
     "ApiTokenCreateError": "Échec de la création du jeton. Veuillez réessayer.",
-    "ApiTokenRevokeError": "Échec de la révocation du jeton. Veuillez réessayer."
+    "ApiTokenRevokeError": "Échec de la révocation du jeton. Veuillez réessayer.",
+    "JobTitle": "Intitulé du poste",
+    "TeamSetup": "Équipe",
+    "TeamSetupHint": "Ajoutez des personnes et définissez leur poste, rôle et service au même endroit.",
+    "AddPeople": "Ajouter des personnes",
+    "Email": "E-mail",
+    "FirstName": "Prénom",
+    "LastName": "Nom",
+    "Position": "Poste",
+    "Department": "Service",
+    "InviteAndAdd": "Créer une invitation",
+    "CopyInviteLink": "Copier le lien d'invitation",
+    "LinkCopied": "Copié",
+    "PendingInvites": "Liens d'invitation",
+    "NoDepartment": "Aucun service",
+    "TeamSetupEmpty": "Personne pour l'instant. Ajoutez la première personne ci-dessous.",
+    "Identity": "Identité et accès",
+    "IdentityHint": "Fournisseurs de connexion, authentification unique et provisionnement automatique depuis votre fournisseur d'identité."
   }
 }

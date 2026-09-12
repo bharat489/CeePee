@@ -15,7 +15,9 @@
 
 import { OnIssueAutomation } from './automation'
 import { OnIssueWebhook } from './webhooks'
-import { OnAutomationRules } from './rules'
+import { OnAutomationRules, holds, perform } from './rules'
+import { AccountRole as WorkspaceRole, hasAccountRole } from '@hcengineering/core'
+import { type TransitionRule } from '@hcengineering/task'
 import { OnIssuePermissions, OnNotificationScheme } from './permissions'
 import chunter, { ChatMessage } from '@hcengineering/chunter'
 import contact, { Employee, Person, PersonSpace } from '@hcengineering/contact'
@@ -879,6 +881,7 @@ export async function OnDependencyShiftRequest (txes: Tx[], control: TriggerCont
  * are unaffected. Side effects never live here -- that is the process engine.
  */
 export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  const post: Tx[] = []
   for (const tx of txes) {
     const utx = tx as TxUpdateDoc<Issue>
     const next = (utx.operations as any)?.status as Ref<IssueStatus> | undefined
@@ -893,6 +896,50 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
     const allowed = (type as any).transitions?.[issue.status] as Ref<IssueStatus>[] | undefined
     if (allowed !== undefined && !allowed.includes(next)) {
       throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+    }
+
+    // ---- transition rules: screens, required fields, validators, roles, post-functions
+    const merged: any = { ...issue, ...utx.operations }
+    const empty = (v: unknown): boolean => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+    const rules = ((type as any).transitionRules as TransitionRule[] | undefined) ?? []
+    const rule = rules.find((r) => r.to === next && (r.from === '*' || r.from === issue.status))
+    const account = control.ctx.contextData?.account
+    if (rule !== undefined) {
+      const missing = (rule.requiredFields ?? []).filter((k) => empty(merged[k]))
+      if (missing.length > 0) {
+        throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: missing.join(', ') }))
+      }
+      if (rule.minRole !== undefined && rule.minRole !== '' && account !== undefined && !hasAccountRole(account, rule.minRole as WorkspaceRole)) {
+        throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+      }
+      for (const v of rule.validators ?? []) {
+        if (!(await holds(v as any, merged as Issue, control, []))) {
+          throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, { missing: `${v.field} ${v.op}${v.value !== undefined ? ' ' + v.value : ''}` }))
+        }
+      }
+    }
+    const nextStatus = (await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: next }, { limit: 1 }))[0]
+    const startsWork = nextStatus?.category === task.statusCategory.Active || nextStatus?.category === task.statusCategory.Won
+    // approvals: nothing moves into progress or done while approval is pending or rejected
+    if (startsWork && issue.approval !== undefined && issue.approval.state !== 'approved') {
+      throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+    }
+    // change freeze: a change whose window overlaps a freeze cannot start, unless an owner does it
+    if (startsWork && (merged.changeStart != null || merged.risk !== undefined)) {
+      const project = (await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space }, { limit: 1 }))[0]
+      const s0 = merged.changeStart ?? Date.now()
+      const e0 = merged.changeEnd ?? s0
+      const frozen = (project?.freezeWindows ?? []).some((w) => w.start <= e0 && w.end >= s0)
+      if (frozen && (account === undefined || !hasAccountRole(account, WorkspaceRole.Owner))) {
+        throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+      }
+    }
+    if (rule !== undefined && (rule.postFunctions ?? []).length > 0) {
+      const project = (await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space }, { limit: 1 }))[0]
+      if (project !== undefined) {
+        const active = (await control.findAll(control.ctx, tracker.class.Sprint, { space: issue.space, state: 'active' })).map((x) => x._id as string)
+        for (const a of rule.postFunctions ?? []) post.push(...(await perform(a as any, merged as Issue, project, control, active)))
+      }
     }
 
     const required = ((type as any).requiredBeforeTerminal as string[] | undefined) ?? []
@@ -913,7 +960,7 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
       }
     }
   }
-  return []
+  return post
 }
 
 export default async () => ({

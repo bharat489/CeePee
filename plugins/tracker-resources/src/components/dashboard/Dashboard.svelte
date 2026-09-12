@@ -24,11 +24,12 @@
   import core, { generateId, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type Dashboard, type DashboardWidget, type Project } from '@hcengineering/tracker'
-  import { Button, IconAdd, Label } from '@hcengineering/ui'
+  import { Button, IconAdd, Label, showPopup } from '@hcengineering/ui'
   import { onDestroy } from 'svelte'
 
   import tracker from '../../plugin'
   import Widget from './Widget.svelte'
+  import Subscriptions from '../query/Subscriptions.svelte'
 
   const client = getClient()
   const me = getCurrentEmployee()
@@ -204,6 +205,7 @@
       <Button kind={'ghost'} label={tracker.string.ExportJson} on:click={exportJson} />
       <label class="import"><input type="file" accept="application/json" on:change={importJson} /><Label label={tracker.string.ImportJson} /></label>
       <Button kind={'ghost'} label={wall ? tracker.string.ExitWallboard : tracker.string.Wallboard} on:click={toggleWall} />
+      <Button kind={'ghost'} label={tracker.string.EmailSchedule} disabled={selected === undefined} on:click={() => { if (selected !== undefined) showPopup(Subscriptions, { kind: 'dashboard', dashboard: selected._id, name: selected.name }, 'top') }} />
     </div>
   </header>
 

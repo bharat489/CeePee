@@ -52,6 +52,7 @@
     "Icon": "Symbol",
     "Color": "Farbe",
     "ForbidCreateTeamspacePermission": "Arbeitsbereichserstellung verbieten",
-    "ForbidCreateTeamspacePermissionDescription": "Verbietet Benutzern das Erstellen neuer Arbeitsbereiche"
+    "ForbidCreateTeamspacePermissionDescription": "Verbietet Benutzern das Erstellen neuer Arbeitsbereiche",
+    "IssuesInDocument": "Vorgänge auf dieser Seite"
   }
 }

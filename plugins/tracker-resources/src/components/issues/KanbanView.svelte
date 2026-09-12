@@ -74,6 +74,8 @@
   import tracker from '../../plugin'
   import SetWipLimitPopup from './SetWipLimitPopup.svelte'
   import { activeProjects } from '../../utils'
+  import QuickFilterBar from './QuickFilterBar.svelte'
+  import { colorMapFor, quickFilterIds } from './boardRules'
   import ComponentEditor from '../components/ComponentEditor.svelte'
   import CreateIssue from '../CreateIssue.svelte'
   import AssigneeEditor from './AssigneeEditor.svelte'
@@ -110,11 +112,18 @@
   $: currentSpace = space ?? tracker.project.DefaultProject
   let currentProject: Project | undefined
   $: currentProject = $activeProjects.get(currentSpace) as Project
+  // board rules stored on the project: quick filters narrow the cards, colour rules tint them
+  let activeQuick: string[] = []
+  let quickIds: Set<Ref<Issue>> | undefined
+  $: void quickFilterIds(currentProject, activeQuick).then((ids) => { quickIds = ids })
+  $: boardQuery = quickIds !== undefined ? { ...query, _id: { $in: Array.from(quickIds) } } : query
+  let cardColors = new Map<Ref<Issue>, string>()
+  $: void colorMapFor(currentProject, (tasks ?? []) as unknown as Issue[]).then((m) => { cardColors = m })
 
   let resultQuery: DocumentQuery<any> = { ...query }
   const client = getClient()
 
-  $: void getTaskKanbanResultQuery(client.getHierarchy(), query, viewOptionsConfig, viewOptions).then((p) => {
+  $: void getTaskKanbanResultQuery(client.getHierarchy(), boardQuery, viewOptionsConfig, viewOptions).then((p) => {
     resultQuery = mergeQueries(p, query)
   })
 
@@ -329,6 +338,7 @@
   />
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <QuickFilterBar project={currentProject} bind:active={activeQuick} />
   <KanbanUI
     bind:this={kanbanUI}
     {categories}
@@ -425,6 +435,7 @@
         <div
           class="tracker-card"
           data-issue={issueId}
+          style="--card-accent: {cardColors.get(issueId) ?? 'transparent'}"
           on:click={() => {
             void openDoc(client.getHierarchy(), issue)
           }}
@@ -578,6 +589,7 @@
   }
   .tracker-card {
     position: relative;
+    border-left: 3px solid var(--card-accent, transparent);
     display: flex;
     flex-direction: column;
     min-height: 6.5rem;

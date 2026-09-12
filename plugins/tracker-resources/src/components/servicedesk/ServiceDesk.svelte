@@ -21,7 +21,8 @@
   import { SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import task from '@hcengineering/task'
-  import { IssuePriority, type Issue, type IssueStatus, type Project, type RequestType } from '@hcengineering/tracker'
+  import { IssuePriority, type CustomerOrg, type Issue, type IssueStatus, type Project, type RequestType, type SlaCalendar } from '@hcengineering/tracker'
+import contact, { formatName, type Employee, type Person } from '@hcengineering/contact'
   import { Button, IconAdd, Label, showPanel } from '@hcengineering/ui'
   import view from '@hcengineering/view'
 
@@ -45,7 +46,70 @@
   const HOUR = 3_600_000
   const DAY = 86_400_000
 
-  let tab: 'queues' | 'types' = 'queues'
+  let tab: 'queues' | 'types' | 'sla' | 'orgs' | 'portal' = 'queues'
+  const pq = createQuery()
+  const oq = createQuery()
+  const eq = createQuery()
+  let project: Project | undefined
+  let orgs: CustomerOrg[] = []
+  let employees: Employee[] = []
+  $: pq.query(tracker.class.Project, { _id: currentSpace }, (r) => { project = r[0] })
+  $: oq.query(tracker.class.CustomerOrg, { space: currentSpace }, (r) => { orgs = r }, { sort: { name: SortingOrder.Ascending } })
+  eq.query(contact.mixin.Employee, { active: true }, (r) => { employees = r })
+  $: nameOf = new Map(employees.map((e) => [e._id as Ref<Person>, formatName(e.name)]))
+  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+
+  // ---- SLA calendar --------------------------------------------------------------
+  const DEFAULT_CAL: SlaCalendar = { timezoneOffset: -new Date().getTimezoneOffset(), workdays: [1, 2, 3, 4, 5], startHour: 9, endHour: 18, holidays: [] }
+  $: cal = project?.slaCalendar ?? DEFAULT_CAL
+  $: calOn = project?.slaCalendar !== undefined
+  let newHoliday = ''
+  async function saveCal (next: SlaCalendar | undefined): Promise<void> {
+    if (project === undefined) return
+    await client.update(project, { slaCalendar: next } as any)
+  }
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // ---- change freeze windows ---------------------------------------------------------
+  let fzStart = ''
+  let fzEnd = ''
+  let fzReason = ''
+  async function addFreeze (): Promise<void> {
+    if (project === undefined || fzStart === '' || fzEnd === '') return
+    await client.update(project, { freezeWindows: [...(project.freezeWindows ?? []), { start: new Date(fzStart).getTime(), end: new Date(fzEnd).getTime(), reason: fzReason.trim() || 'Change freeze' }] })
+    fzStart = fzEnd = fzReason = ''
+  }
+  async function removeFreeze (k: number): Promise<void> {
+    if (project === undefined) return
+    await client.update(project, { freezeWindows: (project.freezeWindows ?? []).filter((_, i) => i !== k) })
+  }
+
+  // ---- customer organisations ---------------------------------------------------------
+  let orgEditing: CustomerOrg | undefined | null = null
+  let oName = ''
+  let oDomains = ''
+  let oNotes = ''
+  function editOrg (o?: CustomerOrg): void {
+    orgEditing = o
+    oName = o?.name ?? ''
+    oDomains = (o?.domains ?? []).join(', ')
+    oNotes = o?.notes ?? ''
+  }
+  async function saveOrg (): Promise<void> {
+    if (oName.trim() === '') return
+    const data = { name: oName.trim(), domains: oDomains.split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter((d) => d !== ''), notes: oNotes.trim() || undefined }
+    if (orgEditing === undefined) await client.createDoc(tracker.class.CustomerOrg, currentSpace, data)
+    else if (orgEditing !== null) await client.update(orgEditing, data)
+    orgEditing = null
+  }
+  $: requestsOf = (o: CustomerOrg): number => issues.filter((i) => i.customerOrg === o._id || o.domains.includes((i.portalEmail ?? '').split('@')[1] ?? '')).length
+
+  // ---- portal --------------------------------------------------------------------------
+  $: portal = project?.portal ?? { enabled: false, slug: (project?.identifier ?? '').toLowerCase(), name: project?.name ?? 'Help centre', color: '#2b6bea', logoUrl: '', welcome: '' }
+  async function savePortal (patch: Partial<typeof portal>): Promise<void> {
+    if (project === undefined) return
+    await client.update(project, { portal: { ...portal, ...patch, slug: (patch.slug ?? portal.slug).toLowerCase().replace(/[^a-z0-9-]/g, '') } })
+  }
 
   interface Queue {
     id: string
@@ -74,16 +138,24 @@
   let fDesc = ''
   let fPriority: IssuePriority = IssuePriority.Medium
   let fSla = 0
+  let fKind: NonNullable<RequestType['kind']> = 'request'
+  let fApproval = false
+  let fApprovers: Ref<Person>[] = []
+  let fSeverity = 3
   function edit (t?: RequestType): void {
     editing = t
     fName = t?.name ?? ''
     fDesc = t?.description ?? ''
     fPriority = t?.priority ?? IssuePriority.Medium
     fSla = t?.slaHours ?? 0
+    fKind = t?.kind ?? 'request'
+    fApproval = t?.requiresApproval === true
+    fApprovers = [...(t?.approvers ?? [])]
+    fSeverity = t?.defaultSeverity ?? 3
   }
   async function save (): Promise<void> {
     if (fName.trim() === '') return
-    const data = { name: fName.trim(), description: fDesc.trim(), priority: fPriority, slaHours: fSla > 0 ? fSla : undefined }
+    const data = { name: fName.trim(), description: fDesc.trim(), priority: fPriority, slaHours: fSla > 0 ? fSla : undefined, kind: fKind, requiresApproval: fApproval, approvers: fApproval ? fApprovers : [], defaultSeverity: fKind === 'incident' ? fSeverity : undefined }
     if (editing === undefined) await client.createDoc(tracker.class.RequestType, currentSpace, data)
     else if (editing !== null) await client.update(editing, data)
     editing = null
@@ -109,6 +181,9 @@
     <nav class="tabs">
       <button class="tab" class:tab--active={tab === 'queues'} on:click={() => { tab = 'queues' }}>Queues</button>
       <button class="tab" class:tab--active={tab === 'types'} on:click={() => { tab = 'types' }}>Request types</button>
+      <button class="tab" class:tab--active={tab === 'sla'} on:click={() => { tab = 'sla' }}>SLA calendar</button>
+      <button class="tab" class:tab--active={tab === 'orgs'} on:click={() => { tab = 'orgs' }}>Organisations</button>
+      <button class="tab" class:tab--active={tab === 'portal'} on:click={() => { tab = 'portal' }}>Portal</button>
     </nav>
   </header>
 
@@ -137,7 +212,7 @@
         {#if types.length === 0}<p class="muted">No request types yet — add one under "Request types" so people can submit requests.</p>{/if}
       </section>
     </div>
-  {:else}
+  {:else if tab === 'types'}
     <section class="card">
       <div class="card__head">
         <span class="card__title">Request types</span>
@@ -150,6 +225,12 @@
           <div class="form__row">
             <label>Priority <select class="input" bind:value={fPriority}><option value={IssuePriority.Urgent}>Urgent</option><option value={IssuePriority.High}>High</option><option value={IssuePriority.Medium}>Medium</option><option value={IssuePriority.Low}>Low</option></select></label>
             <label>SLA hours <input class="input input--n" type="number" min="0" bind:value={fSla} /></label>
+            <label>Kind <select class="input" bind:value={fKind}><option value="request">Service request</option><option value="incident">Incident</option><option value="change">Change</option><option value="problem">Problem</option></select></label>
+            {#if fKind === 'incident'}<label>Default severity <select class="input" bind:value={fSeverity}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>{/if}
+          </div>
+          <div class="form__row">
+            <label class="check"><input type="checkbox" bind:checked={fApproval} /> needs approval before work starts</label>
+            {#if fApproval}<span class="chips">{#each employees as e (e._id)}<label class="chip" class:chip--on={fApprovers.includes(e._id)}><input type="checkbox" checked={fApprovers.includes(e._id)} on:change={() => { fApprovers = fApprovers.includes(e._id) ? fApprovers.filter((p) => p !== e._id) : [...fApprovers, e._id] }} />{formatName(e.name)}</label>{/each}</span>{/if}
             <Button kind={'primary'} label={tracker.string.Save} on:click={save} />
             <Button kind={'ghost'} label={tracker.string.Cancel} on:click={() => { editing = null }} />
           </div>
@@ -158,11 +239,73 @@
       {#each types as t, idx (t._id)}
         <div class="type motion-rise" style="--i: {idx}">
           <div class="type__main"><span class="type__name">{t.name}</span><span class="type__desc">{t.description}</span></div>
-          <span class="type__meta">{prio[t.priority]}{#if t.slaHours} · SLA {t.slaHours}h{/if} · {issues.filter((i) => i.requestType === t._id).length} requests</span>
+          <span class="type__meta">{t.kind ?? 'request'}{t.requiresApproval ? ' · approval' : ''} · {prio[t.priority]}{#if t.slaHours} · SLA {t.slaHours}h{/if} · {issues.filter((i) => i.requestType === t._id).length} requests</span>
           <div class="type__tools"><button class="lnk" on:click={() => { edit(t) }}>edit</button><button class="lnk lnk--bad" on:click={() => { void remove(t) }}>delete</button></div>
         </div>
       {/each}
       {#if types.length === 0 && editing === null}<p class="muted">No request types yet.</p>{/if}
+    </section>
+  {:else if tab === 'sla'}
+    <section class="card">
+      <div class="card__head"><span class="card__title">Business hours for SLAs</span><label class="check"><input type="checkbox" checked={calOn} on:change={(e) => { void saveCal(e.currentTarget.checked ? { ...DEFAULT_CAL } : undefined) }} /> use a calendar (off = 24×7)</label></div>
+      {#if calOn}
+        <div class="form__row">
+          {#each DOW as d, k}<label class="check"><input type="checkbox" checked={cal.workdays.includes(k)} on:change={() => { void saveCal({ ...cal, workdays: cal.workdays.includes(k) ? cal.workdays.filter((x) => x !== k) : [...cal.workdays, k].sort() }) }} /> {d}</label>{/each}
+        </div>
+        <div class="form__row">
+          <label>from <input class="input input--n" type="number" min="0" max="23" value={cal.startHour} on:change={(e) => { void saveCal({ ...cal, startHour: Number(e.currentTarget.value) }) }} />:00</label>
+          <label>to <input class="input input--n" type="number" min="1" max="24" value={cal.endHour} on:change={(e) => { void saveCal({ ...cal, endHour: Number(e.currentTarget.value) }) }} />:00</label>
+          <label>UTC offset (minutes) <input class="input input--n" type="number" step="15" value={cal.timezoneOffset} on:change={(e) => { void saveCal({ ...cal, timezoneOffset: Number(e.currentTarget.value) }) }} /></label>
+        </div>
+        <div class="form__row">
+          <span>Holidays:</span>
+          {#each cal.holidays as h}<span class="chip chip--on">{h}<button class="lnk lnk--bad" on:click={() => { void saveCal({ ...cal, holidays: cal.holidays.filter((x) => x !== h) }) }}>×</button></span>{/each}
+          <input class="input" type="date" bind:value={newHoliday} /><button class="lnk" on:click={() => { if (newHoliday !== '') { void saveCal({ ...cal, holidays: Array.from(new Set([...cal.holidays, newHoliday])).sort() }); newHoliday = '' } }}>add</button>
+        </div>
+        <p class="muted">SLA clocks only run inside these hours; a request raised Friday evening with a 4-hour SLA is due Monday morning.</p>
+      {:else}
+        <p class="muted">SLA hours count around the clock. Switch the calendar on to count business hours only.</p>
+      {/if}
+    </section>
+    <section class="card">
+      <div class="card__head"><span class="card__title">Change freeze windows</span></div>
+      <p class="muted">Changes whose window overlaps a freeze cannot start (owners excepted). Shown as a warning on the change itself.</p>
+      {#each project?.freezeWindows ?? [] as w, k}
+        <div class="type"><div class="type__main"><span class="type__name">{w.reason}</span><span class="type__desc">{new Date(w.start).toLocaleString()} → {new Date(w.end).toLocaleString()}</span></div><div class="type__tools"><button class="lnk lnk--bad" on:click={() => { void removeFreeze(k) }}>remove</button></div></div>
+      {/each}
+      <div class="form__row"><input class="input" type="datetime-local" bind:value={fzStart} /> → <input class="input" type="datetime-local" bind:value={fzEnd} /><input class="input" placeholder="Reason, e.g. Black Friday" bind:value={fzReason} /><Button kind={'ghost'} label={tracker.string.Add} disabled={fzStart === '' || fzEnd === ''} on:click={() => { void addFreeze() }} /></div>
+    </section>
+  {:else if tab === 'orgs'}
+    <section class="card">
+      <div class="card__head"><span class="card__title">Customer organisations</span><Button kind={'primary'} icon={IconAdd} label={tracker.string.Add} on:click={() => { editOrg(undefined) }} /></div>
+      <p class="muted">Requests from an organisation's email domains are grouped, and people from the same organisation can see each other's requests in the portal.</p>
+      {#if orgEditing !== null}
+        <div class="form motion-pop">
+          <input class="input" placeholder="Organisation name" bind:value={oName} />
+          <input class="input" placeholder="Email domains, comma-separated: acme.com, acme.co.uk" bind:value={oDomains} />
+          <textarea class="input input--area" placeholder="Notes: contract, contacts, SLA tier" bind:value={oNotes} />
+          <div class="form__row"><Button kind={'primary'} label={tracker.string.Save} on:click={() => { void saveOrg() }} /><Button kind={'ghost'} label={tracker.string.Cancel} on:click={() => { orgEditing = null }} /></div>
+        </div>
+      {/if}
+      {#each orgs as o (o._id)}
+        <div class="type"><div class="type__main"><span class="type__name">{o.name}</span><span class="type__desc">{o.domains.join(', ')}{o.notes ? ' · ' + o.notes : ''}</span></div><span class="type__meta">{requestsOf(o)} requests</span><div class="type__tools"><button class="lnk" on:click={() => { editOrg(o) }}>edit</button><button class="lnk lnk--bad" on:click={() => { if (confirm(`Delete "${o.name}"?`)) void client.remove(o) }}>delete</button></div></div>
+      {/each}
+      {#if orgs.length === 0 && orgEditing === null}<p class="muted">No organisations yet.</p>{/if}
+    </section>
+  {:else if tab === 'portal'}
+    <section class="card">
+      <div class="card__head"><span class="card__title">Public help centre for this project</span><label class="check"><input type="checkbox" checked={portal.enabled} on:change={(e) => { void savePortal({ enabled: e.currentTarget.checked }) }} /> enabled</label></div>
+      <p class="muted">Served by the integrations service without login. Customers search the knowledge base, submit requests of the types above, follow progress by key and email, reply, and rate the outcome.</p>
+      <div class="form__row">
+        <label>URL slug <input class="input" value={portal.slug} on:change={(e) => { void savePortal({ slug: e.currentTarget.value }) }} /></label>
+        <label>Name <input class="input" value={portal.name} on:change={(e) => { void savePortal({ name: e.currentTarget.value }) }} /></label>
+        <label>Colour <input class="input input--n" type="color" value={portal.color} on:change={(e) => { void savePortal({ color: e.currentTarget.value }) }} /></label>
+      </div>
+      <div class="form__row">
+        <label>Logo URL <input class="input input--w" value={portal.logoUrl ?? ''} on:change={(e) => { void savePortal({ logoUrl: e.currentTarget.value }) }} /></label>
+      </div>
+      <textarea class="input input--area" placeholder="Welcome text shown at the top of the portal" value={portal.welcome ?? ''} on:change={(e) => { void savePortal({ welcome: e.currentTarget.value }) }} />
+      {#if portal.enabled && portal.slug}<p class="muted">Address: <code>{integrationsUrl}/portal/{portal.slug}</code></p>{/if}
     </section>
   {/if}
 </div>
@@ -196,5 +339,9 @@
   .type__desc { font-size: 0.8125rem; color: var(--theme-dark-color); }
   .type__meta { font-size: 0.75rem; color: var(--theme-trans-color); white-space: nowrap; }
   .type__tools { display: flex; gap: 0.5rem; }
+  .chips { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; }
+  .chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 999px; font-size: 0.75rem; cursor: pointer; input { display: none; } &--on { border-color: var(--accent-brand); background: var(--accent-brand-soft); color: var(--theme-caption-color); } }
+  .check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8125rem; color: var(--theme-content-color); }
+  .input--w { min-width: 20rem; }
   .lnk { border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.75rem; cursor: pointer; &:hover { text-decoration: underline; } &--bad { color: var(--negative-button-default); } }
 </style>

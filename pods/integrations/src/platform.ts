@@ -23,7 +23,7 @@ import { connect, connectStorage, type PlatformClient, type StorageClient } from
 import contact, { type Person } from '@hcengineering/contact'
 import core, { generateId, SocialIdType, SortingOrder, type Ref } from '@hcengineering/core'
 import task from '@hcengineering/task'
-import tracker, { IssuePriority, type Issue, type IssueStatus, type Project, type RequestType } from '@hcengineering/tracker'
+import tracker, { IssuePriority, type Issue, type IssueStatus, type Project, type RequestType, type CustomerOrg } from '@hcengineering/tracker'
 
 export interface PlatformConfig {
   url: string
@@ -99,6 +99,7 @@ export interface NewIssueInput {
   requestType?: boolean
   requestTypeId?: Ref<RequestType>
   portalEmail?: string
+  customerOrg?: Ref<CustomerOrg>
   status?: Ref<IssueStatus>
   kind?: Issue['kind']
   storyPoints?: number
@@ -160,6 +161,7 @@ export async function createIssue (c: PlatformClient, project: Project, input: N
       externalLinks: input.externalLinks,
       requestType,
       portalEmail: input.portalEmail,
+      customerOrg: input.customerOrg ?? null,
       storyPoints: input.storyPoints
     } as any,
     _id

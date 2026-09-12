@@ -65,6 +65,17 @@ Rate-limited per address. Requests are ordinary issues with `portalEmail` set an
 - `POST /inbound/jira-import` (bearer `INBOUND_TOKEN`; JSON `baseUrl, email, token, jql, project, attachments, history, comments, worklogs`) → job id.
 - `GET /inbound/jira-import/<id>` → progress. Attachments are downloaded with the Jira credentials and stored; change history becomes a dated comment per issue.
 
+## Per-project portals, replies, organisations
+
+- Every project can switch on its own help centre under Service desk → Portal: it is served at `/portal/<slug>` with the project's name, colour, logo and welcome text; `/portal` stays the environment default (`PORTAL_PROJECT`).
+- `POST /portal[/<slug>]/reply` (`key, email, text`) — the customer writes into the request. The message becomes a CustomerReply (the issue's "Customer conversation" panel) and a comment for the team. Only replies written in that panel are shown back to the customer; ordinary comments stay internal.
+- `GET /portal[/<slug>]/org?email=` — every request raised from the same email domain (or the matching customer organisation), so a customer company sees its own queue.
+- New requests are linked to a customer organisation when the email domain matches one configured under Service desk → Organisations.
+
+## Scheduled emails
+
+Query and dashboard subscriptions (Query page → "Email on a schedule…", Dashboard → same button) are checked every five minutes and sent at the chosen hour through `MAIL_URL`. Query emails carry the matching issues as a table; dashboard emails carry each widget's headline number.
+
 ## SCIM
 
 Base URL `https://<host>/scim/v2`, bearer `SCIM_TOKEN`. Supported: `ServiceProviderConfig`, `ResourceTypes`, `Schemas`, `Users` (GET with `filter=userName eq "..."`, POST, GET/PATCH/PUT/DELETE by id). Creating a user issues an auto-join invite with the mapped role; the invite link is returned under `urn:ceepee:params:scim:schemas:extension:Invite`. Deactivation demotes to read-only guest (history is kept); re-activation restores the previous role. Groups are read for the role mapping only.

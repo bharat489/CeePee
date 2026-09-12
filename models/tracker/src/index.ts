@@ -52,6 +52,14 @@ import {
   TRequestType,
   TAutomationRule,
   TAutomationHeartbeat,
+  TAutomationRun,
+  TSavedQuery,
+  TQuerySubscription,
+  TCustomerReply,
+  TCustomerOrg,
+  TAsset,
+  TOnCallRotation,
+  TTypeCascadingSelect,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -408,7 +416,8 @@ function defineApplication (
               config: [
                 ['all', tracker.string.All, {}],
                 ['active', tracker.string.Active, {}],
-                ['backlog', tracker.string.Backlog, {}]
+                ['backlog', tracker.string.Backlog, {}],
+                ['archived', tracker.string.Archived, {}]
               ],
               allProjectsTypes: true
             }
@@ -419,6 +428,13 @@ function defineApplication (
             label: tracker.string.Roadmap,
             icon: tracker.icon.Milestone,
             component: tracker.component.Roadmap
+          },
+          {
+            id: 'boards',
+            position: 'top',
+            label: tracker.string.Boards,
+            icon: tracker.icon.Issues,
+            component: tracker.component.QueryBoard
           },
           {
             id: 'new-project',
@@ -493,7 +509,8 @@ function defineApplication (
                   config: [
                     ['all', tracker.string.All, {}],
                     ['active', tracker.string.Active, {}],
-                    ['backlog', tracker.string.Backlog, {}]
+                    ['backlog', tracker.string.Backlog, {}],
+                    ['archived', tracker.string.Archived, {}]
                   ]
                 }
               },
@@ -580,6 +597,24 @@ function defineApplication (
                 component: tracker.component.ServiceDesk
               },
               {
+                id: 'workflow',
+                label: tracker.string.Workflow,
+                icon: tracker.icon.Issues,
+                component: tracker.component.WorkflowDesigner
+              },
+              {
+                id: 'assets',
+                label: tracker.string.Assets,
+                icon: tracker.icon.Component,
+                component: tracker.component.Assets
+              },
+              {
+                id: 'on-call',
+                label: tracker.string.OnCall,
+                icon: tracker.icon.Milestone,
+                component: tracker.component.OnCall
+              },
+              {
                 id: 'fields',
                 label: tracker.string.Fields,
                 icon: tracker.icon.Issues,
@@ -639,7 +674,15 @@ export function createModel (builder: Builder): void {
     TAuditPolicy,
     TRequestType,
     TAutomationRule,
-    TAutomationHeartbeat
+    TAutomationHeartbeat,
+    TAutomationRun,
+    TSavedQuery,
+    TQuerySubscription,
+    TCustomerReply,
+    TCustomerOrg,
+    TAsset,
+    TOnCallRotation,
+    TTypeCascadingSelect
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the
@@ -665,11 +708,32 @@ export function createModel (builder: Builder): void {
 
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
     name: 'jira-import',
-    label: tracker.string.JiraImport,
+    label: tracker.string.Import,
     icon: setting.icon.Integrations,
-    component: tracker.component.JiraImport,
+    component: tracker.component.ImportHub,
     order: 1170,
     role: AccountRole.Maintainer
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'api-access',
+    label: tracker.string.ApiAccess,
+    icon: setting.icon.Integrations,
+    component: tracker.component.ApiAccess,
+    order: 1190,
+    role: AccountRole.User
+  })
+
+  // Cascading select: a custom attribute type with its own type editor (Settings → Classes)
+  // and value editor on issues.
+  builder.mixin(tracker.class.TypeCascadingSelect, core.class.Class, view.mixin.ObjectEditor, {
+    editor: tracker.component.CascadingTypeEditor
+  })
+  builder.mixin(tracker.class.TypeCascadingSelect, core.class.Class, view.mixin.AttributeEditor, {
+    inlineEditor: tracker.component.CascadingSelectEditor
+  })
+  builder.mixin(tracker.class.TypeCascadingSelect, core.class.Class, view.mixin.AttributePresenter, {
+    presenter: view.component.StringPresenter
   })
 
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {

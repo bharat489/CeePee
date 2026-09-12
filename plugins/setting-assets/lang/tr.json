@@ -281,6 +281,23 @@
     "ApiTokenExpiry365Days": "365 gün",
     "ApiTokenLoadError": "API belirteçleri yüklenemedi",
     "ApiTokenCreateError": "Belirteç oluşturulamadı. Lütfen tekrar deneyin.",
-    "ApiTokenRevokeError": "Belirteç iptal edilemedi. Lütfen tekrar deneyin."
+    "ApiTokenRevokeError": "Belirteç iptal edilemedi. Lütfen tekrar deneyin.",
+    "JobTitle": "Unvan",
+    "TeamSetup": "Ekip",
+    "TeamSetupHint": "Kişileri ekleyin; pozisyon, rol ve departmanı tek yerden ayarlayın.",
+    "AddPeople": "Kişi ekle",
+    "Email": "E-posta",
+    "FirstName": "Ad",
+    "LastName": "Soyad",
+    "Position": "Pozisyon",
+    "Department": "Departman",
+    "InviteAndAdd": "Davet oluştur",
+    "CopyInviteLink": "Davet bağlantısını kopyala",
+    "LinkCopied": "Kopyalandı",
+    "PendingInvites": "Davet bağlantıları",
+    "NoDepartment": "Departman yok",
+    "TeamSetupEmpty": "Henüz kimse yok. İlk kişiyi aşağıdan ekleyin.",
+    "Identity": "Kimlik ve erişim",
+    "IdentityHint": "Oturum açma sağlayıcıları, tek oturum açma ve kimlik sağlayıcınızdan otomatik hesap oluşturma."
   }
 }

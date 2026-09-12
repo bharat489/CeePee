@@ -771,6 +771,50 @@ export function createActions (builder: Builder, issuesId: string, componentsId:
   createAction(
     builder,
     {
+      action: tracker.actionImpl.BulkChange,
+      label: tracker.string.BulkChange,
+      icon: tracker.icon.Issues,
+      category: tracker.category.Tracker,
+      input: 'selection',
+      target: tracker.class.Issue,
+      context: { mode: ['context', 'browser'], group: 'edit' }
+    },
+    tracker.action.BulkChange
+  )
+
+  createAction(
+    builder,
+    {
+      action: tracker.actionImpl.ArchiveIssue,
+      label: tracker.string.ArchiveIssue,
+      icon: tracker.icon.Issues,
+      category: tracker.category.Tracker,
+      input: 'any',
+      target: tracker.class.Issue,
+      query: { archived: { $ne: true } },
+      context: { mode: ['context', 'browser'], group: 'remove' }
+    },
+    tracker.action.ArchiveIssue
+  )
+
+  createAction(
+    builder,
+    {
+      action: tracker.actionImpl.UnarchiveIssue,
+      label: tracker.string.UnarchiveIssue,
+      icon: tracker.icon.Issues,
+      category: tracker.category.Tracker,
+      input: 'any',
+      target: tracker.class.Issue,
+      query: { archived: true },
+      context: { mode: ['context', 'browser'], group: 'remove' }
+    },
+    tracker.action.UnarchiveIssue
+  )
+
+  createAction(
+    builder,
+    {
       action: view.actionImpl.CopyAsMarkdownTable,
       actionProps: {
         cardClass: tracker.class.Issue

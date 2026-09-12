@@ -59,6 +59,22 @@ import type {
   AutomationCondition,
   AutomationRule,
   AutomationHeartbeat,
+  AutomationRun,
+  SavedQuery,
+  QuerySubscription,
+  CustomerReply,
+  CustomerOrg,
+  SupportAsset,
+  OnCallRotation,
+  TypeCascadingSelect,
+  ApprovalState,
+  SlaCalendar,
+  PortalSettings,
+  FieldContext,
+  QuickFilter,
+  CardColorRule,
+  FreezeWindow,
+  TimelineEntry,
   AutomationTrigger,
   BillingRate,
   Dashboard,
@@ -199,6 +215,30 @@ export class TProject extends TTaskProject implements Project {
   @Prop(TypeString(), tracker.string.ProjectTemplates)
   @Hidden()
     projectTemplate?: string
+
+  @Prop(TypeRecord(), tracker.string.QuickFilters)
+  @Hidden()
+    quickFilters?: QuickFilter[]
+
+  @Prop(TypeRecord(), tracker.string.CardColors)
+  @Hidden()
+    cardColors?: CardColorRule[]
+
+  @Prop(TypeRecord(), tracker.string.SlaCalendar)
+  @Hidden()
+    slaCalendar?: SlaCalendar
+
+  @Prop(TypeRecord(), tracker.string.Portal)
+  @Hidden()
+    portal?: PortalSettings
+
+  @Prop(TypeRecord(), tracker.string.Change)
+  @Hidden()
+    freezeWindows?: FreezeWindow[]
+
+  @Prop(TypeRecord(), tracker.string.ThisProjectOnly)
+  @Hidden()
+    fieldContext?: Record<string, FieldContext>
 }
 /**
  * @public
@@ -381,6 +421,51 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeString(), getEmbeddedLabel('Portal email'))
   @Hidden()
     portalEmail?: string
+
+  @Prop(TypeBoolean(), tracker.string.Archived)
+  @Hidden()
+  @Index(IndexKind.Indexed)
+    archived?: boolean
+
+  @Prop(TypeRecord(), tracker.string.Approval)
+  @Hidden()
+    approval?: ApprovalState
+
+  @Prop(Collection(tracker.class.CustomerReply), tracker.string.CustomerConversation)
+  @Hidden()
+    customerReplies?: number
+
+  @Prop(TypeRef(tracker.class.CustomerOrg), tracker.string.Organisations)
+  @Hidden()
+    customerOrg?: Ref<CustomerOrg> | null
+
+  @Prop(ArrOf(TypeRef(tracker.class.Asset)), tracker.string.Assets)
+  @Hidden()
+    assets?: Ref<SupportAsset>[]
+
+  @Prop(TypeNumber(), tracker.string.Severity)
+  @Hidden()
+    severity?: number
+
+  @Prop(TypeString(), tracker.string.Risk)
+  @Hidden()
+    risk?: 'low' | 'medium' | 'high'
+
+  @Prop(TypeDate(), tracker.string.Change)
+  @Hidden()
+    changeStart?: Timestamp | null
+
+  @Prop(TypeDate(), tracker.string.Change)
+  @Hidden()
+    changeEnd?: Timestamp | null
+
+  @Prop(TypeString(), tracker.string.Incident)
+  @Hidden()
+    postmortem?: string
+
+  @Prop(TypeRecord(), tracker.string.Incident)
+  @Hidden()
+    timeline?: TimelineEntry[]
 
   @Prop(TypeReportedTime(), tracker.string.ReportedTime)
     reportedTime!: number
@@ -970,6 +1055,10 @@ export class TRequestType extends TDoc implements RequestType {
 
   priority!: IssuePriority
   slaHours?: number
+  kind?: 'request' | 'incident' | 'change' | 'problem'
+  requiresApproval?: boolean
+  approvers?: Ref<Person>[]
+  defaultSeverity?: number
 }
 
 @Model(tracker.class.AutomationRule, core.class.Doc, DOMAIN_TRACKER)
@@ -999,10 +1088,139 @@ export class TAutomationRule extends TDoc implements AutomationRule {
   lastWebhook?: Timestamp
   lastPayload?: Record<string, any>
   lastMatched?: number
+  global?: boolean
+  projects?: Ref<Project>[]
 }
 
 @Model(tracker.class.AutomationHeartbeat, core.class.Doc, DOMAIN_TRACKER)
 @UX(tracker.string.Automation)
 export class TAutomationHeartbeat extends TDoc implements AutomationHeartbeat {
   at!: Timestamp
+}
+
+@Model(tracker.class.AutomationRun, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.RunLog)
+export class TAutomationRun extends TDoc implements AutomationRun {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeRef(tracker.class.AutomationRule), tracker.string.Automation)
+  @Index(IndexKind.Indexed)
+    rule!: Ref<AutomationRule>
+
+  ruleName!: string
+  trigger!: string
+  issue?: Ref<Issue>
+  identifier?: string
+  at!: Timestamp
+  ok!: boolean
+  matched!: number
+  actions!: string[]
+  error?: string
+}
+
+@Model(tracker.class.SavedQuery, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Query)
+export class TSavedQuery extends TDoc implements SavedQuery {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Query)
+    text!: string
+
+  owner!: Ref<Employee>
+  shared!: boolean
+}
+
+@Model(tracker.class.QuerySubscription, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Subscriptions)
+export class TQuerySubscription extends TDoc implements QuerySubscription {
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  kind!: 'query' | 'dashboard'
+  query?: string
+  savedQuery?: Ref<SavedQuery>
+  dashboard?: Ref<Dashboard>
+  schedule!: 'daily' | 'weekly'
+  hour!: number
+  weekday?: number
+  recipients!: string[]
+  owner!: Ref<Employee>
+  enabled!: boolean
+  lastSent?: Timestamp
+  lastError?: string
+}
+
+@Model(tracker.class.CustomerReply, core.class.AttachedDoc, DOMAIN_TRACKER)
+@UX(tracker.string.CustomerConversation)
+export class TCustomerReply extends TAttachedDoc implements CustomerReply {
+  @Prop(TypeRef(tracker.class.Issue), tracker.string.Issue)
+  @Index(IndexKind.Indexed)
+  declare attachedTo: Ref<Issue>
+
+  @Prop(TypeString(), tracker.string.Description)
+    text!: string
+
+  fromCustomer!: boolean
+  author!: string
+  at!: Timestamp
+}
+
+@Model(tracker.class.CustomerOrg, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Organisations)
+export class TCustomerOrg extends TDoc implements CustomerOrg {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  domains!: string[]
+  notes?: string
+}
+
+@Model(tracker.class.Asset, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Assets)
+export class TAsset extends TDoc implements SupportAsset {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.Assets)
+    kind!: string
+
+  serial?: string
+  owner?: Ref<Person> | null
+  status!: 'in-use' | 'spare' | 'repair' | 'retired'
+  location?: string
+  notes?: string
+}
+
+@Model(tracker.class.OnCallRotation, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.OnCall)
+export class TOnCallRotation extends TDoc implements OnCallRotation {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeString(), tracker.string.Name)
+    name!: string
+
+  people!: Ref<Person>[]
+  startsOn!: Timestamp
+  shiftDays!: number
+  handoffHour!: number
+  autoAssignSeverity?: number
+}
+
+@UX(tracker.string.CascadingSelect)
+@Model(tracker.class.TypeCascadingSelect, core.class.Type)
+export class TTypeCascadingSelect extends TType implements TypeCascadingSelect {
+  options!: Array<{ parent: string, children: string[] }>
 }

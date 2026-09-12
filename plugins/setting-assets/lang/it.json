@@ -281,6 +281,23 @@
     "ApiTokenExpiry365Days": "365 giorni",
     "ApiTokenLoadError": "Impossibile caricare i token API",
     "ApiTokenCreateError": "Impossibile creare il token. Riprova.",
-    "ApiTokenRevokeError": "Impossibile revocare il token. Riprova."
+    "ApiTokenRevokeError": "Impossibile revocare il token. Riprova.",
+    "JobTitle": "Qualifica",
+    "TeamSetup": "Team",
+    "TeamSetupHint": "Aggiungi persone e imposta posizione, ruolo e reparto in un unico posto.",
+    "AddPeople": "Aggiungi persone",
+    "Email": "E-mail",
+    "FirstName": "Nome",
+    "LastName": "Cognome",
+    "Position": "Posizione",
+    "Department": "Reparto",
+    "InviteAndAdd": "Crea invito",
+    "CopyInviteLink": "Copia link di invito",
+    "LinkCopied": "Copiato",
+    "PendingInvites": "Link di invito",
+    "NoDepartment": "Nessun reparto",
+    "TeamSetupEmpty": "Ancora nessuno qui. Aggiungi la prima persona qui sotto.",
+    "Identity": "Identità e accesso",
+    "IdentityHint": "Provider di accesso, single sign-on e provisioning automatico dal tuo identity provider."
   }
 }

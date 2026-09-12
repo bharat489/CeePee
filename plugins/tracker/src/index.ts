@@ -139,6 +139,13 @@ export interface Project extends TaskProject, IconProps {
   notificationScheme?: NotificationScheme
   /** Template the project was created from, e.g. "scrum:team". */
   projectTemplate?: string
+  quickFilters?: QuickFilter[]
+  cardColors?: CardColorRule[]
+  slaCalendar?: SlaCalendar
+  portal?: PortalSettings
+  freezeWindows?: FreezeWindow[]
+  /** Per-project field overrides keyed by attribute name. */
+  fieldContext?: Record<string, FieldContext>
 }
 
 /**
@@ -253,6 +260,155 @@ export interface RequestType extends Doc {
   description: string
   priority: IssuePriority
   slaHours?: number
+  /** Service request, incident, change or problem; drives the panels an issue shows. */
+  kind?: 'request' | 'incident' | 'change' | 'problem'
+  /** New requests of this type wait for approval before work starts. */
+  requiresApproval?: boolean
+  approvers?: Ref<Person>[]
+  /** Default severity for incidents (1 = highest). */
+  defaultSeverity?: number
+}
+
+/** Business hours an SLA clock runs in. Hours are in the calendar's own offset. @public */
+export interface SlaCalendar {
+  /** Minutes east of UTC, e.g. 330 for India. */
+  timezoneOffset: number
+  /** 0 = Sunday … 6 = Saturday. */
+  workdays: number[]
+  startHour: number
+  endHour: number
+  /** YYYY-MM-DD dates that do not count. */
+  holidays: string[]
+}
+/** Public help centre settings for one project; served by the integrations service at /portal/<slug>. @public */
+export interface PortalSettings {
+  enabled: boolean
+  slug: string
+  name: string
+  color: string
+  logoUrl?: string
+  welcome?: string
+}
+/** Per-project override of how a field behaves. @public */
+export interface FieldContext {
+  hidden?: boolean
+  required?: boolean
+  label?: string
+}
+/** @public */
+export interface ApprovalDecision {
+  person: Ref<Person>
+  ok: boolean
+  at: Timestamp
+  note?: string
+}
+/** @public */
+export interface ApprovalState {
+  state: 'pending' | 'approved' | 'rejected'
+  approvers: Ref<Person>[]
+  decisions: ApprovalDecision[]
+  requestedOn: Timestamp
+}
+/** A board chip that narrows cards to a query. @public */
+export interface QuickFilter {
+  name: string
+  query: string
+}
+/** Cards matching the query get the colour. @public */
+export interface CardColorRule {
+  query: string
+  color: string
+}
+/** Changes may not start inside a freeze window. @public */
+export interface FreezeWindow {
+  start: Timestamp
+  end: Timestamp
+  reason: string
+}
+/** @public */
+export interface TimelineEntry {
+  at: Timestamp
+  text: string
+  by?: string
+}
+
+/** One evaluation of an automation rule. @public */
+export interface AutomationRun extends Doc {
+  space: Ref<Project>
+  rule: Ref<AutomationRule>
+  ruleName: string
+  trigger: string
+  issue?: Ref<Issue>
+  identifier?: string
+  at: Timestamp
+  ok: boolean
+  matched: number
+  actions: string[]
+  error?: string
+}
+/** A named query; shared ones show for everyone. @public */
+export interface SavedQuery extends Doc {
+  name: string
+  text: string
+  owner: Ref<Employee>
+  shared: boolean
+}
+/** A scheduled email of a saved query's results or a dashboard's headline numbers. @public */
+export interface QuerySubscription extends Doc {
+  name: string
+  kind: 'query' | 'dashboard'
+  query?: string
+  savedQuery?: Ref<SavedQuery>
+  dashboard?: Ref<Dashboard>
+  schedule: 'daily' | 'weekly'
+  hour: number
+  weekday?: number
+  recipients: string[]
+  owner: Ref<Employee>
+  enabled: boolean
+  lastSent?: Timestamp
+  lastError?: string
+}
+/** A message on a request that the customer sees in the portal. Everything else stays internal. @public */
+export interface CustomerReply extends AttachedDoc {
+  attachedTo: Ref<Issue>
+  text: string
+  fromCustomer: boolean
+  author: string
+  at: Timestamp
+}
+/** A customer company; requests from its email domains are grouped and visible to each other in the portal. @public */
+export interface CustomerOrg extends Doc {
+  space: Ref<Project>
+  name: string
+  domains: string[]
+  notes?: string
+}
+/** Something the team supports; issues link to it. @public */
+export interface SupportAsset extends Doc {
+  space: Ref<Project>
+  name: string
+  kind: string
+  serial?: string
+  owner?: Ref<Person> | null
+  status: 'in-use' | 'spare' | 'repair' | 'retired'
+  location?: string
+  notes?: string
+}
+/** People take turns of shiftDays starting at startsOn; handoff at handoffHour. @public */
+export interface OnCallRotation extends Doc {
+  space: Ref<Project>
+  name: string
+  people: Ref<Person>[]
+  startsOn: Timestamp
+  shiftDays: number
+  handoffHour: number
+  /** Incidents with severity at or below this are assigned to whoever is on call. */
+  autoAssignSeverity?: number
+}
+/** Attribute type: a parent value with dependent child values, stored as "Parent / Child". @public */
+export interface TypeCascadingSelect extends Type<string> {
+  options: Array<{ parent: string, children: string[] }>
 }
 
 /** @public */
@@ -265,7 +421,7 @@ export interface AutomationCondition {
 }
 /** @public */
 export interface AutomationAction {
-  type: 'set-status' | 'set-priority' | 'set-assignee' | 'add-label' | 'add-comment' | 'set-sprint' | 'set-milestone' | 'set-due' | 'webhook' | 'slack' | 'teams'
+  type: 'set-status' | 'set-priority' | 'set-assignee' | 'add-label' | 'add-comment' | 'set-sprint' | 'set-milestone' | 'set-due' | 'webhook' | 'slack' | 'teams' | 'create-issue' | 'create-subtasks' | 'send-email'
   value?: string
   /** Which issues the action touches: the triggering one (default) or related ones. */
   target?: 'self' | 'parent' | 'children' | 'blocked-by' | 'blocking'
@@ -296,6 +452,9 @@ export interface AutomationRule extends Doc {
   lastPayload?: Record<string, any>
   /** issues matched on the last run. */
   lastMatched?: number
+  /** Applies to every project (space is the workspace); projects narrows it. */
+  global?: boolean
+  projects?: Ref<Project>[]
 }
 
 /**
@@ -488,6 +647,22 @@ export interface Issue extends Task {
   csatComment?: string
   /** Email of the person who raised this through the public portal (no account). */
   portalEmail?: string
+  /** Hidden from lists, boards and queries; restorable. */
+  archived?: boolean
+  /** Customer-visible messages (CustomerReply). */
+  customerReplies?: number
+  /** Approval before work may start (service requests, changes). */
+  approval?: ApprovalState
+  customerOrg?: Ref<CustomerOrg> | null
+  assets?: Ref<SupportAsset>[]
+  /** Incidents: 1 = highest. */
+  severity?: number
+  /** Changes. */
+  risk?: 'low' | 'medium' | 'high'
+  changeStart?: Timestamp | null
+  changeEnd?: Timestamp | null
+  postmortem?: string
+  timeline?: TimelineEntry[]
 
   // Remaining time in man hours
   remainingTime: number
@@ -1027,7 +1202,15 @@ const pluginState = plugin(trackerId, {
     AuditPolicy: '' as Ref<Class<AuditPolicy>>,
     RequestType: '' as Ref<Class<RequestType>>,
     AutomationRule: '' as Ref<Class<AutomationRule>>,
-    AutomationHeartbeat: '' as Ref<Class<AutomationHeartbeat>>
+    AutomationHeartbeat: '' as Ref<Class<AutomationHeartbeat>>,
+    AutomationRun: '' as Ref<Class<AutomationRun>>,
+    SavedQuery: '' as Ref<Class<SavedQuery>>,
+    QuerySubscription: '' as Ref<Class<QuerySubscription>>,
+    CustomerReply: '' as Ref<Class<CustomerReply>>,
+    CustomerOrg: '' as Ref<Class<CustomerOrg>>,
+    Asset: '' as Ref<Class<SupportAsset>>,
+    OnCallRotation: '' as Ref<Class<OnCallRotation>>,
+    TypeCascadingSelect: '' as Ref<Class<TypeCascadingSelect>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -1087,6 +1270,16 @@ const pluginState = plugin(trackerId, {
     Quickstart: '' as AnyComponent,
     JiraImport: '' as AnyComponent,
     ProjectTemplates: '' as AnyComponent,
+    WorkflowDesigner: '' as AnyComponent,
+    QueryBoard: '' as AnyComponent,
+    BulkChange: '' as AnyComponent,
+    Assets: '' as AnyComponent,
+    OnCall: '' as AnyComponent,
+    ApiAccess: '' as AnyComponent,
+    ImportHub: '' as AnyComponent,
+    CascadingTypeEditor: '' as AnyComponent,
+    CascadingSelectEditor: '' as AnyComponent,
+    Subscriptions: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
     SwimlaneBoard: '' as AnyComponent,
     Releases: '' as AnyComponent,
@@ -1343,6 +1536,38 @@ const pluginState = plugin(trackerId, {
     SubmitTimesheet: '' as IntlString,
     InvoiceWeek: '' as IntlString,
     InvoiceMonth: '' as IntlString,
+    Workflow: '' as IntlString,
+    Continue: '' as IntlString,
+    Send: '' as IntlString,
+    Run: '' as IntlString,
+    Boards: '' as IntlString,
+    BulkChange: '' as IntlString,
+    ArchiveIssue: '' as IntlString,
+    UnarchiveIssue: '' as IntlString,
+    Archived: '' as IntlString,
+    Assets: '' as IntlString,
+    OnCall: '' as IntlString,
+    ApiAccess: '' as IntlString,
+    Import: '' as IntlString,
+    Subscriptions: '' as IntlString,
+    EmailSchedule: '' as IntlString,
+    CustomerConversation: '' as IntlString,
+    Approval: '' as IntlString,
+    Approve: '' as IntlString,
+    Reject: '' as IntlString,
+    Incident: '' as IntlString,
+    Change: '' as IntlString,
+    Severity: '' as IntlString,
+    Risk: '' as IntlString,
+    SlaCalendar: '' as IntlString,
+    Organisations: '' as IntlString,
+    Portal: '' as IntlString,
+    CascadingSelect: '' as IntlString,
+    QuickFilters: '' as IntlString,
+    CardColors: '' as IntlString,
+    GlobalRule: '' as IntlString,
+    RunLog: '' as IntlString,
+    ThisProjectOnly: '' as IntlString,
     Resolution: '' as IntlString,
     Resolutions: '' as IntlString,
     NoResolution: '' as IntlString,
@@ -1530,3 +1755,6 @@ export function createStatesData (data: TaskStatusFactory[]): Omit<Data<Status>,
   }
   return states
 }
+
+export * from './query/parse'
+export * from './query/run'

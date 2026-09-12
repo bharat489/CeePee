@@ -281,6 +281,23 @@
     "ApiTokenExpiry365Days": "365 天",
     "ApiTokenLoadError": "加载 API 令牌失败",
     "ApiTokenCreateError": "创建令牌失败，请重试。",
-    "ApiTokenRevokeError": "撤销令牌失败，请重试。"
+    "ApiTokenRevokeError": "撤销令牌失败，请重试。",
+    "JobTitle": "职位名称",
+    "TeamSetup": "团队",
+    "TeamSetupHint": "在一处添加成员并设置其职位、角色和部门。",
+    "AddPeople": "添加成员",
+    "Email": "邮箱",
+    "FirstName": "名",
+    "LastName": "姓",
+    "Position": "职位",
+    "Department": "部门",
+    "InviteAndAdd": "创建邀请",
+    "CopyInviteLink": "复制邀请链接",
+    "LinkCopied": "已复制",
+    "PendingInvites": "邀请链接",
+    "NoDepartment": "无部门",
+    "TeamSetupEmpty": "这里还没有人。在下方添加第一位成员。",
+    "Identity": "身份与访问",
+    "IdentityHint": "登录提供方、单点登录，以及从身份提供方自动开通账号。"
   }
 }

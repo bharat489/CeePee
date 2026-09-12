@@ -29,7 +29,8 @@ import { scheduleDigest } from './digest'
 import { handleDeploy, handleEmail, handleGeneric, handleGit, handleSentry, type InboundConfig, type Result } from './inbound'
 import { jobStatus, startJiraImport, type JiraImportRequest } from './jira'
 import { getPlatform, heartbeat, resetPlatform, type PlatformConfig } from './platform'
-import { portalArticle, portalHome, portalKb, portalRate, portalStatus, portalSubmit, type PortalConfig, type Result as PortalResult } from './portal'
+import { portalArticle, portalHome, portalKb, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
+import { scheduleSubscriptions } from './subscriptions'
 import { handleScim, parseRoleMap } from './scim'
 
 const env = process.env
@@ -50,9 +51,11 @@ const portalCfg: PortalConfig = {
   color: env.PORTAL_COLOR ?? '#2b6bea',
   logoUrl: env.PORTAL_LOGO_URL ?? '',
   project: env.PORTAL_PROJECT ?? env.INBOUND_PROJECT ?? '',
-  publicUrl: PUBLIC_URL
+  publicUrl: PUBLIC_URL,
+  base: '/portal',
+  welcome: env.PORTAL_WELCOME ?? ''
 }
-const PORTAL_ENABLED = (env.PORTAL_ENABLED ?? 'true') !== 'false' && portalCfg.project !== ''
+const PORTAL_ENABLED = (env.PORTAL_ENABLED ?? 'true') !== 'false'
 const HEARTBEAT_MINUTES = Math.max(1, Number(env.HEARTBEAT_MINUTES ?? 5))
 
 const log = (m: string): void => {
@@ -113,6 +116,11 @@ function send (res: ServerResponse, status: number, body: unknown): void {
 }
 
 function sendPortal (res: ServerResponse, r: PortalResult): void {
+  if (r.status === 303 && (r as any).location !== undefined) {
+    res.writeHead(303, { location: String((r as any).location) })
+    res.end()
+    return
+  }
   if (r.html === true && typeof r.body === 'string') {
     res.writeHead(r.status, { 'content-type': 'text/html; charset=utf-8', 'content-length': Buffer.byteLength(r.body), 'cache-control': 'no-store' })
     res.end(r.body)
@@ -196,16 +204,29 @@ const server = createServer((req, res) => {
         cors(res)
         const c = await platform(res)
         if (c === undefined) return
-        const sub = path === '/' || path === '/portal' ? '' : path.slice('/portal/'.length)
+        const parts = path === '/' || path === '/portal' ? [] : path.slice('/portal/'.length).split('/').filter((x) => x !== '')
+        const KNOWN = ['kb', 'article', 'submit', 'status', 'rate', 'reply', 'org']
+        const slug = parts.length > 0 && !KNOWN.includes(parts[0]) ? parts[0] : ''
+        const rest = slug !== '' ? parts.slice(1) : parts
+        const cfg = await resolvePortal(c, portalCfg, slug)
+        if (cfg === undefined) {
+          send(res, 404, { error: 'no such portal' })
+          return
+        }
+        const sub = rest.join('/')
         let r: PortalResult
-        if (sub === '') r = await portalHome(c, portalCfg, url.searchParams.get('q') ?? '')
+        if (sub === '') r = await portalHome(c, cfg, url.searchParams.get('q') ?? '')
         else if (sub === 'kb') r = await portalKb(c, url.searchParams.get('q') ?? '')
-        else if (sub.startsWith('article/')) r = await portalArticle(c, portalCfg, decodeURIComponent(sub.slice('article/'.length)))
-        else if (sub === 'submit' && method === 'POST') r = await portalSubmit(c, portalCfg, await readBody(req), wantsHtml)
+        else if (sub.startsWith('article/')) r = await portalArticle(c, cfg, decodeURIComponent(sub.slice('article/'.length)))
+        else if (sub === 'submit' && method === 'POST') r = await portalSubmit(c, cfg, await readBody(req), wantsHtml)
         else if (sub === 'status') {
           const o = method === 'POST' ? await readBody(req) : {}
-          r = await portalStatus(c, portalCfg, String(o.key ?? url.searchParams.get('key') ?? ''), String(o.email ?? url.searchParams.get('email') ?? ''), wantsHtml || method === 'GET')
-        } else if (sub === 'rate' && method === 'POST') r = await portalRate(c, portalCfg, await readBody(req), wantsHtml)
+          r = await portalStatus(c, cfg, String(o.key ?? url.searchParams.get('key') ?? ''), String(o.email ?? url.searchParams.get('email') ?? ''), wantsHtml || method === 'GET')
+        } else if (sub === 'reply' && method === 'POST') r = await portalReply(c, cfg, await readBody(req), wantsHtml)
+        else if (sub === 'org') {
+          const o = method === 'POST' ? await readBody(req) : {}
+          r = await portalOrg(c, cfg, String(o.email ?? url.searchParams.get('email') ?? ''), wantsHtml || method === 'GET')
+        } else if (sub === 'rate' && method === 'POST') r = await portalRate(c, cfg, await readBody(req), wantsHtml)
         else r = { status: 404, body: { error: 'not found' } }
         sendPortal(res, r)
         return
@@ -363,6 +384,12 @@ export function start (): void {
     mailUrl: env.MAIL_URL,
     mailApiKey: env.MAIL_API_KEY,
     hour: Number(env.DIGEST_HOUR ?? 8),
+    frontUrl: env.PUBLIC_FRONT_URL ?? platformCfg.url,
+    workspace: platformCfg.workspace
+  }, log)
+  scheduleSubscriptions(async () => await getPlatform(platformCfg), {
+    mailUrl: env.MAIL_URL,
+    mailApiKey: env.MAIL_API_KEY,
     frontUrl: env.PUBLIC_FRONT_URL ?? platformCfg.url,
     workspace: platformCfg.workspace
   }, log)

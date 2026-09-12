@@ -52,6 +52,7 @@
     "Icon": "アイコン",
     "Color": "色",
     "ForbidCreateTeamspacePermission": "チームスペースの作成禁止",
-    "ForbidCreateTeamspacePermissionDescription": "ユーザーが新しいチームスペースを作成することを禁止します"
+    "ForbidCreateTeamspacePermissionDescription": "ユーザーが新しいチームスペースを作成することを禁止します",
+    "IssuesInDocument": "このページの課題"
   }
 }
