@@ -138,7 +138,7 @@
   let search: string = ''
 </script>
 
-<form class="container" style:padding={$deviceInfo.docWidth <= 480 ? '1.25rem' : '5rem'}>
+<form class="container" style:padding={$deviceInfo.docWidth <= 480 ? '0.75rem' : 'clamp(1rem, 3vw, 2.5rem)'}>
   <div class="grow-separator" />
   <div class="fs-title">
     {#if account != null}

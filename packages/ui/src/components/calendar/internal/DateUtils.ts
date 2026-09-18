@@ -159,10 +159,86 @@ export function getFormattedDate (value: number | null, options?: Intl.DateTimeF
   return value === null ? '' : new Date(value).toLocaleString('default', options ?? { month: 'short', day: 'numeric' })
 }
 
-export const getTimeZoneName = (
-  val: string = Intl.DateTimeFormat().resolvedOptions().timeZoneName ?? Intl.DateTimeFormat().resolvedOptions().timeZone
-): string => {
-  return val.replace('_', ' ').split('/')[1] ?? ''
+// Legacy IANA ids browsers still report (Windows maps India to Asia/Calcutta) → the name people use.
+const LEGACY_ZONE_NAMES: Record<string, string> = {
+  'Asia/Calcutta': 'Kolkata',
+  'Asia/Katmandu': 'Kathmandu',
+  'Asia/Saigon': 'Ho Chi Minh City',
+  'Asia/Rangoon': 'Yangon',
+  'Asia/Dacca': 'Dhaka',
+  'Asia/Macao': 'Macau',
+  'Asia/Ulan_Bator': 'Ulaanbaatar',
+  'Europe/Kiev': 'Kyiv',
+  'America/Buenos_Aires': 'Buenos Aires',
+  'Asia/Thimbu': 'Thimphu'
+}
+
+/** Cities people look for that share a zone with the IANA city; searchable in the clock's timezone list. */
+export const CITY_ALIASES: Array<{ city: string, zone: string }> = [
+  { city: 'Mumbai', zone: 'Asia/Kolkata' }, { city: 'New Delhi', zone: 'Asia/Kolkata' }, { city: 'Bengaluru', zone: 'Asia/Kolkata' }, { city: 'Chennai', zone: 'Asia/Kolkata' }, { city: 'Hyderabad', zone: 'Asia/Kolkata' }, { city: 'Pune', zone: 'Asia/Kolkata' }, { city: 'Ahmedabad', zone: 'Asia/Kolkata' }, { city: 'Jaipur', zone: 'Asia/Kolkata' }, { city: 'Lucknow', zone: 'Asia/Kolkata' }, { city: 'Chandigarh', zone: 'Asia/Kolkata' }, { city: 'Kochi', zone: 'Asia/Kolkata' }, { city: 'Goa', zone: 'Asia/Kolkata' },
+  { city: 'Islamabad', zone: 'Asia/Karachi' }, { city: 'Lahore', zone: 'Asia/Karachi' }, { city: 'Abu Dhabi', zone: 'Asia/Dubai' }, { city: 'Doha', zone: 'Asia/Qatar' }, { city: 'Tel Aviv', zone: 'Asia/Jerusalem' }, { city: 'Beijing', zone: 'Asia/Shanghai' }, { city: 'Shenzhen', zone: 'Asia/Shanghai' }, { city: 'Hanoi', zone: 'Asia/Bangkok' }, { city: 'Osaka', zone: 'Asia/Tokyo' },
+  { city: 'San Francisco', zone: 'America/Los_Angeles' }, { city: 'Seattle', zone: 'America/Los_Angeles' }, { city: 'San Diego', zone: 'America/Los_Angeles' }, { city: 'Austin', zone: 'America/Chicago' }, { city: 'Dallas', zone: 'America/Chicago' }, { city: 'Houston', zone: 'America/Chicago' }, { city: 'Boston', zone: 'America/New_York' }, { city: 'Washington', zone: 'America/New_York' }, { city: 'Miami', zone: 'America/New_York' }, { city: 'Atlanta', zone: 'America/New_York' }, { city: 'Montreal', zone: 'America/Toronto' },
+  { city: 'Manchester', zone: 'Europe/London' }, { city: 'Edinburgh', zone: 'Europe/London' }, { city: 'Munich', zone: 'Europe/Berlin' }, { city: 'Frankfurt', zone: 'Europe/Berlin' }, { city: 'Hamburg', zone: 'Europe/Berlin' }, { city: 'Milan', zone: 'Europe/Rome' }, { city: 'Barcelona', zone: 'Europe/Madrid' }, { city: 'Lyon', zone: 'Europe/Paris' }, { city: 'Geneva', zone: 'Europe/Zurich' }, { city: 'Rotterdam', zone: 'Europe/Amsterdam' }, { city: 'Krakow', zone: 'Europe/Warsaw' }, { city: 'St Petersburg', zone: 'Europe/Moscow' },
+  { city: 'Cape Town', zone: 'Africa/Johannesburg' }, { city: 'Rio de Janeiro', zone: 'America/Sao_Paulo' }, { city: 'Guadalajara', zone: 'America/Mexico_City' }, { city: 'Wellington', zone: 'Pacific/Auckland' }, { city: 'Brisbane', zone: 'Australia/Brisbane' }
+]
+
+const CLOCK_LABEL_KEY = 'ceepee.clockLabel'
+const CLOCK_ZONES_KEY = 'TimeZones'
+
+/** The zone the status bar clock follows: the first one picked in the clock popup, else the browser's. */
+export function getPrimaryTimeZone (): string {
+  try {
+    const saved = localStorage.getItem(CLOCK_ZONES_KEY)
+    if (saved !== null) {
+      const list = JSON.parse(saved) as string[]
+      if (Array.isArray(list) && typeof list[0] === 'string' && list[0] !== '') return list[0]
+    }
+  } catch {}
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+export function getClockLabel (): string | undefined {
+  try {
+    const v = localStorage.getItem(CLOCK_LABEL_KEY)
+    return v === null || v.trim() === '' ? undefined : v.trim()
+  } catch {
+    return undefined
+  }
+}
+
+export function setClockLabel (label: string | undefined): void {
+  try {
+    if (label === undefined || label.trim() === '') localStorage.removeItem(CLOCK_LABEL_KEY)
+    else localStorage.setItem(CLOCK_LABEL_KEY, label.trim())
+  } catch {}
+}
+
+/** Short zone abbreviation when the locale has a real one (IST, CET, EST); empty for GMT+5:30 style. */
+export function getTimeZoneAbbreviation (zone: string): string {
+  try {
+    const part = new Intl.DateTimeFormat(navigator.language, { timeZone: zone, timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value ?? ''
+    return /^[A-Z]{2,5}$/.test(part) ? part : ''
+  } catch {
+    return ''
+  }
+}
+
+/** City name for a zone id, with legacy ids translated (Asia/Calcutta → Kolkata). */
+export function getTimeZoneCity (zone: string): string {
+  const legacy = LEGACY_ZONE_NAMES[zone]
+  if (legacy !== undefined) return legacy
+  return zone.replace(/_/g, ' ').split('/').slice(-1)[0] ?? ''
+}
+
+/** What the status bar shows next to the time: the person's own label, else the primary zone's city plus its abbreviation. */
+export const getTimeZoneName = (val?: string): string => {
+  if (val !== undefined) return getTimeZoneCity(val)
+  const own = getClockLabel()
+  if (own !== undefined) return own
+  const zone = getPrimaryTimeZone()
+  const city = getTimeZoneCity(zone)
+  const abbr = getTimeZoneAbbreviation(zone)
+  return abbr !== '' && abbr !== city ? `${city} · ${abbr}` : city
 }
 
 export const convertTimeZone = (tz: string): TimeZone => {

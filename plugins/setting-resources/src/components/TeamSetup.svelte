@@ -150,6 +150,7 @@
     link?: string
     copied?: boolean
     busy?: boolean
+    error?: string
   }
   let adding: NewPerson[] = [blank()]
   function blank (): NewPerson {
@@ -159,18 +160,22 @@
     adding = [...adding, blank()]
   }
   function canInvite (p: NewPerson): boolean {
-    return /.+@.+\..+/.test(p.email.trim()) && p.first.trim() !== '' && p.busy !== true && p.link === undefined
+    return /.+@.+\..+/.test(p.email.trim()) && p.busy !== true && p.link === undefined
   }
 
   async function invite (p: NewPerson): Promise<void> {
     if (!canInvite(p)) return
     p.busy = true
+    p.error = undefined
     adding = adding
     try {
-      // autoJoin: the invitee lands in the workspace on first sign-in with the
-      // role already set -- no second trip to Members to promote them.
-      p.link = await accountClient.createInviteLink(p.email.trim(), p.role, true, p.first.trim(), p.last.trim())
+      // A plain invite link bound to this email: the person signs up (or signs in) through it and
+      // joins with the chosen role. Auto-join links are reserved for the account service's own
+      // scheduler token, so asking for one from a signed-in user is refused as Forbidden.
+      p.link = await accountClient.createInviteLink(p.email.trim(), p.role, false, p.first.trim(), p.last.trim())
       void recordAudit('invite.created', p.email.trim(), String(p.role))
+    } catch (err: any) {
+      p.error = String(err?.message ?? err?.status?.code ?? err ?? 'failed').replace('platform:status:', '')
     } finally {
       p.busy = false
       adding = adding
@@ -281,6 +286,7 @@
               }}
             />
             {#if p.link === undefined}
+              {#if p.error !== undefined}<span class="invite-error" title={p.error}>{p.error}</span>{/if}
               <Button
                 kind={'primary'}
                 size={'medium'}
@@ -309,6 +315,7 @@
 </div>
 
 <style lang="scss">
+  .invite-error { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--negative-button-default); }
   .team { display: flex; flex-direction: column; gap: 0.5rem; }
   .team__hint { margin: 0 0 0.75rem; color: var(--theme-dark-color); font-size: 0.875rem; max-width: 60ch; }
   .team__empty { margin: 0; color: var(--theme-trans-color); font-size: 0.875rem; }

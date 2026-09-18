@@ -21,13 +21,15 @@ export interface LoginFormLayout {
 }
 
 export function getLoginFormLayout (docWidth: number, docHeight: number): LoginFormLayout {
+  // Fluid: the form sits inside a card that already has its own padding, so this only adds
+  // breathing room that scales with the viewport instead of jumping between fixed sizes.
   if (docWidth <= 480) {
-    return { padding: '.25rem 1.25rem', paddingInline: '1.25rem' }
+    return { padding: '0.25rem 0.5rem', paddingInline: '0.5rem' }
   }
-  if (docHeight <= 820) {
-    return { padding: '1rem 2rem', paddingInline: '2rem' }
+  if (docHeight <= 700) {
+    return { padding: '0.25rem clamp(0.5rem, 2vw, 1.25rem)', paddingInline: 'clamp(0.5rem, 2vw, 1.25rem)' }
   }
-  return { padding: '4rem 5rem', paddingInline: '5rem' }
+  return { padding: 'clamp(0.5rem, 2vh, 1.5rem) clamp(0.5rem, 2vw, 1.5rem)', paddingInline: 'clamp(0.5rem, 2vw, 1.5rem)' }
 }
 
 export function loginFormPadding (docWidth: number, docHeight: number): string {
@@ -39,8 +41,6 @@ export function loginFormPaddingInline (docWidth: number, docHeight: number): st
 }
 
 export function loginFormMinHeight (docHeight: number): string {
-  if (docHeight <= 880) {
-    return '0'
-  }
-  return 'min(42rem, calc(100dvh - 12rem))'
+  // the card centres its content; a forced minimum only pushes forms off short screens
+  return docHeight > 1000 ? 'min(30rem, calc(100dvh - 20rem))' : '0'
 }
