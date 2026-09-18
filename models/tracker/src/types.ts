@@ -75,6 +75,9 @@ import type {
   Reminder,
   Idea,
   WorkflowScheme,
+  TypePersonList,
+  EmailTemplate,
+  EmailTemplateKind,
   ApprovalState,
   SlaCalendar,
   PortalSettings,
@@ -442,6 +445,10 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeDate(), tracker.string.SlaDue)
   @Hidden()
     slaPausedAt?: Timestamp | null
+
+  @Prop(TypeString(), tracker.string.PublicLink)
+  @Hidden()
+    shareToken?: string | null
 
   @Prop(TypeDate(), tracker.string.Reminders)
   @Hidden()
@@ -1066,6 +1073,8 @@ export class TAuditEvent extends TDoc implements AuditEvent {
 @UX(tracker.string.AuditLog)
 export class TAuditPolicy extends TDoc implements AuditPolicy {
   retentionDays!: number
+  siemUrl?: string
+  siemSecret?: string
 }
 
 @Model(tracker.class.RequestType, core.class.Doc, DOMAIN_TRACKER)
@@ -1383,6 +1392,21 @@ export class TWorkflowScheme extends TDoc implements WorkflowScheme {
   rules!: Array<Record<string, any>>
   statusProps!: Record<string, Record<string, any>>
   layout?: Record<string, { x: number, y: number }>
+}
+
+@UX(tracker.string.PersonList)
+@Model(tracker.class.TypePersonList, core.class.Type)
+export class TTypePersonList extends TType implements TypePersonList {
+  multiple?: boolean
+}
+
+@Model(tracker.class.EmailTemplate, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.EmailTemplates)
+export class TEmailTemplate extends TDoc implements EmailTemplate {
+  kind!: EmailTemplateKind
+  subject!: string
+  body!: string
+  enabled!: boolean
 }
 
 @UX(tracker.string.CascadingSelect)

@@ -806,7 +806,18 @@
     "Development": "Entwicklung",
     "TimeInStatus": "Zeit im Status",
     "StatusPage": "Statusseite",
-    "Submit": "Absenden"
+    "Submit": "Absenden",
+    "Appearance": "Erscheinungsbild",
+    "Vibe": "Stimmung",
+    "EmailTemplates": "E-Mail-Vorlagen",
+    "OrgConsole": "Organisation",
+    "ShareIssue": "Öffentlichen Link teilen…",
+    "StopSharing": "Freigabe beenden",
+    "PersonList": "Personen (mehrere)",
+    "AutoSchedule": "Automatisch planen",
+    "FieldPermissions": "Feldberechtigungen",
+    "EmbedOnSite": "Auf Ihrer Website einbetten",
+    "PublicLink": "Öffentlichen Link erstellen"
   },
   "status": {}
 }

@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="utf8">
+  <script>try{var d=document.documentElement,v=localStorage.getItem('ceepee.vibe')||'aurora';d.setAttribute('data-vibe',v);var c=localStorage.getItem('ceepee.corners');if(c)d.setAttribute('data-corners',c);var m=localStorage.getItem('ceepee.motion');if(m)d.setAttribute('data-motion',m)}catch(e){}</script>
   <title>CeePee</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0E0F10">
@@ -33,6 +34,12 @@
     #ceepee-boot .word { position: relative; font-size: 28px; font-weight: 800; letter-spacing: .34em; text-indent: .34em; background: linear-gradient(90deg, #e9ecf1 0%, #c0f010 45%, #4f8bff 60%, #e9ecf1 100%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: boot-shimmer 3.2s linear infinite; }
     @keyframes boot-shimmer { from { background-position: 220% 0; } to { background-position: -220% 0; } }
     #ceepee-boot .line { position: relative; width: 240px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+    html[data-vibe="aurora"] #ceepee-boot .word { background-image: linear-gradient(90deg, #e9ecf1 0%, #a855f7 40%, #ec4899 55%, #f97316 65%, #e9ecf1 100%); }
+    html[data-vibe="ocean"] #ceepee-boot .word { background-image: linear-gradient(90deg, #e9ecf1 0%, #22d3ee 45%, #6366f1 60%, #e9ecf1 100%); }
+    html[data-vibe="sunset"] #ceepee-boot .word { background-image: linear-gradient(90deg, #e9ecf1 0%, #f97316 45%, #ec4899 60%, #e9ecf1 100%); }
+    html[data-vibe="aurora"] #ceepee-boot .line::after { background: linear-gradient(90deg, transparent, #a855f7, #ec4899, #f97316, transparent); }
+    html[data-vibe="ocean"] #ceepee-boot .line::after { background: linear-gradient(90deg, transparent, #22d3ee, #6366f1, transparent); }
+    html[data-vibe="sunset"] #ceepee-boot .line::after { background: linear-gradient(90deg, transparent, #f97316, #ec4899, transparent); }
     #ceepee-boot .line::after { content: ""; position: absolute; top: 0; left: -40%; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #c0f010, #4f8bff, transparent); animation: boot-scan 1.6s ease-in-out infinite; }
     @keyframes boot-scan { to { left: 100%; } }
     #ceepee-boot .phase { position: relative; min-height: 1.4em; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: rgba(233,236,241,.6); }

@@ -560,7 +560,18 @@
     "Development": "Vývoj",
     "TimeInStatus": "Čas ve stavu",
     "StatusPage": "Stránka stavu",
-    "Submit": "Odeslat"
+    "Submit": "Odeslat",
+    "Appearance": "Vzhled",
+    "Vibe": "Nálada",
+    "EmailTemplates": "Šablony e-mailů",
+    "OrgConsole": "Organizace",
+    "ShareIssue": "Sdílet veřejný odkaz…",
+    "StopSharing": "Přestat sdílet",
+    "PersonList": "Lidé (více)",
+    "AutoSchedule": "Automaticky naplánovat",
+    "FieldPermissions": "Oprávnění k polím",
+    "EmbedOnSite": "Vložit na váš web",
+    "PublicLink": "Vytvořit veřejný odkaz"
   },
   "status": {}
 }

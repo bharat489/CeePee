@@ -67,6 +67,8 @@ import {
   TReminder,
   TIdea,
   TWorkflowScheme,
+  TTypePersonList,
+  TEmailTemplate,
   TDepartmentRole,
   TDepartmentSegment,
   TIssue,
@@ -715,7 +717,9 @@ export function createModel (builder: Builder): void {
     TNotifyPrefs,
     TReminder,
     TIdea,
-    TWorkflowScheme
+    TWorkflowScheme,
+    TTypePersonList,
+    TEmailTemplate
   )
 
   // Settings → Department roles. Sits just after Spaces (1100), where the
@@ -780,6 +784,18 @@ export function createModel (builder: Builder): void {
     presenter: view.component.StringPresenter
   })
 
+  // People (multiple): a custom attribute holding several employees, edited with the people picker
+  // and shown as stacked avatars.
+  builder.mixin(tracker.class.TypePersonList, core.class.Class, view.mixin.ObjectEditor, {
+    editor: tracker.component.PersonListTypeEditor
+  })
+  builder.mixin(tracker.class.TypePersonList, core.class.Class, view.mixin.AttributeEditor, {
+    inlineEditor: tracker.component.PersonListEditor
+  })
+  builder.mixin(tracker.class.TypePersonList, core.class.Class, view.mixin.AttributePresenter, {
+    presenter: tracker.component.PersonListPresenter
+  })
+
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
     name: 'audit',
     label: tracker.string.AuditLog,
@@ -787,6 +803,35 @@ export function createModel (builder: Builder): void {
     component: tracker.component.AuditLog,
     order: 1180,
     role: AccountRole.Maintainer
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'org-console',
+    label: tracker.string.OrgConsole,
+    icon: setting.icon.Setting,
+    component: tracker.component.OrgConsole,
+    order: 1170,
+    role: AccountRole.Owner
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'email-templates',
+    label: tracker.string.EmailTemplates,
+    icon: setting.icon.Mailbox,
+    component: tracker.component.EmailTemplates,
+    order: 1185,
+    role: AccountRole.Maintainer
+  })
+
+  // Personal: vibe, corners, motion, theme and density.
+  builder.createDoc(setting.class.SettingsCategory, core.space.Model, {
+    name: 'appearance',
+    label: tracker.string.Appearance,
+    icon: setting.icon.Views,
+    component: tracker.component.Appearance,
+    group: 'settings-account',
+    role: AccountRole.Guest,
+    order: 1640
   })
 
   // Seed the two roles the model depends on. Teams add their own alongside

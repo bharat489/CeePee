@@ -114,6 +114,7 @@
       return
     }
     await client.update(dragCard, updateValue)
+    dispatch('dropped', { item: dragCard, update: updateValue })
   }
 
   function panelDragOver (event: Event | undefined, state: CategoryType): void {

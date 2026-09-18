@@ -568,7 +568,18 @@
     "Development": "개발",
     "TimeInStatus": "상태별 소요 시간",
     "StatusPage": "상태 페이지",
-    "Submit": "제출"
+    "Submit": "제출",
+    "Appearance": "모양",
+    "Vibe": "분위기",
+    "EmailTemplates": "이메일 템플릿",
+    "OrgConsole": "조직",
+    "ShareIssue": "공개 링크 공유…",
+    "StopSharing": "공유 중지",
+    "PersonList": "사람 (여러 명)",
+    "AutoSchedule": "자동 일정",
+    "FieldPermissions": "필드 권한",
+    "EmbedOnSite": "사이트에 삽입",
+    "PublicLink": "공개 링크 만들기"
   },
   "status": {}
 }

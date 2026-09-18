@@ -123,6 +123,17 @@ import Portfolio from './components/portfolio/Portfolio.svelte'
 import NotificationPrefs from './components/notify/NotificationPrefs.svelte'
 import RemindPopup from './components/notify/RemindPopup.svelte'
 import Ideas from './components/ideas/Ideas.svelte'
+import Appearance from './components/appearance/Appearance.svelte'
+import EmailTemplates from './components/settings/EmailTemplates.svelte'
+import OrgConsole from './components/org/OrgConsole.svelte'
+import SharePopup from './components/share/SharePopup.svelte'
+import PersonListTypeEditor from './components/fields/PersonListTypeEditor.svelte'
+import PersonListEditor from './components/fields/PersonListEditor.svelte'
+import PersonListPresenter from './components/fields/PersonListPresenter.svelte'
+import { shareIssue } from './share'
+import { applyStoredVibe } from './vibe'
+
+applyStoredVibe()
 import { remindMe } from './remind'
 import { bulkChange, archiveIssue, unarchiveIssue } from './bulk'
 import { cloneWithSubIssues } from './cloneIssue'
@@ -498,6 +509,13 @@ export default async (): Promise<Resources> => ({
     NotificationPrefs,
     RemindPopup,
     Ideas,
+    Appearance,
+    EmailTemplates,
+    OrgConsole,
+    SharePopup,
+    PersonListTypeEditor,
+    PersonListEditor,
+    PersonListPresenter,
     Assistant,
     NopeComponent,
     DepartmentSegments,
@@ -633,6 +651,7 @@ export default async (): Promise<Resources> => ({
     CloneWithSubIssues: cloneWithSubIssues,
     BulkChange: bulkChange,
     RemindMe: remindMe,
+    ShareIssue: shareIssue,
     ArchiveIssue: archiveIssue,
     UnarchiveIssue: unarchiveIssue,
     Move: move,

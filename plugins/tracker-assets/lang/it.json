@@ -568,7 +568,18 @@
     "Development": "Sviluppo",
     "TimeInStatus": "Tempo nello stato",
     "StatusPage": "Pagina di stato",
-    "Submit": "Invia"
+    "Submit": "Invia",
+    "Appearance": "Aspetto",
+    "Vibe": "Atmosfera",
+    "EmailTemplates": "Modelli e-mail",
+    "OrgConsole": "Organizzazione",
+    "ShareIssue": "Condividi link pubblico…",
+    "StopSharing": "Interrompi condivisione",
+    "PersonList": "Persone (più di una)",
+    "AutoSchedule": "Pianificazione automatica",
+    "FieldPermissions": "Permessi per campo",
+    "EmbedOnSite": "Incorpora nel tuo sito",
+    "PublicLink": "Crea link pubblico"
   },
   "status": {}
 }

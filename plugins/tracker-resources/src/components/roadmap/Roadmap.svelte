@@ -322,6 +322,90 @@
     return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
   const daysBetween = (a: number, b: number): number => Math.round((b - a) / DAY)
+
+  // ---- auto-schedule ----------------------------------------------------------------
+  // Blockers first, then priority, then existing due date. One lane per assignee (or per
+  // project team when unassigned) at hoursPerWeek/5 a day. Proposes start and due dates;
+  // nothing is written until applied.
+  interface Plan {
+    issue: Issue
+    start: number
+    end: number
+    lane: string
+    after: string[]
+  }
+  const empQ = createQuery()
+  let empNames = new Map<string, string>()
+  empQ.query(contact.mixin.Employee, { active: true }, (r) => { empNames = new Map(r.map((e) => [e._id as string, formatName(e.name)])) })
+  let planning = false
+  let planBusy = false
+  let plan: Plan[] = []
+  let planProject: Ref<Project> | '' = ''
+  let planLeftOut = 0
+  const prio = (i: Issue): number => (i.priority === 0 ? 99 : i.priority)
+  const cmpPlan = (a: Issue, b: Issue): number => prio(a) - prio(b) || (a.dueDate ?? 9e15) - (b.dueDate ?? 9e15) || (a.createdOn ?? 0) - (b.createdOn ?? 0)
+  function buildPlan (): void {
+    planBusy = true
+    try {
+      const list = openIssues.filter((i) => (planProject === '' || i.space === planProject) && i.kind !== tracker.taskTypes.Epic)
+      const byId = new Map(list.map((i) => [i._id, i]))
+      const hoursOf = (i: Issue): number => {
+        const left = (i.estimation ?? 0) - (i.reportedTime ?? 0)
+        return left > 0 ? left : 8
+      }
+      const perDay = (scenario ? hoursPerWeek : 40) / 5
+      const indeg = new Map<Ref<Issue>, number>()
+      const out = new Map<Ref<Issue>, Ref<Issue>[]>()
+      for (const i of list) indeg.set(i._id, 0)
+      for (const i of list) {
+        for (const b of i.blockedBy ?? []) {
+          const bid = b._id as Ref<Issue>
+          if (!byId.has(bid)) continue
+          indeg.set(i._id, (indeg.get(i._id) ?? 0) + 1)
+          out.set(bid, [...(out.get(bid) ?? []), i._id])
+        }
+      }
+      const ready = list.filter((i) => (indeg.get(i._id) ?? 0) === 0).sort(cmpPlan)
+      const laneFree = new Map<string, number>()
+      const endOf = new Map<Ref<Issue>, number>()
+      const result: Plan[] = []
+      const today = startOfToday()
+      while (ready.length > 0) {
+        const i = ready.shift()
+        if (i === undefined) break
+        const lane = i.assignee != null ? String(i.assignee) : `team:${i.space}`
+        const blockerEnd = Math.max(today, ...(i.blockedBy ?? []).map((b) => endOf.get(b._id as Ref<Issue>) ?? today))
+        const start = Math.max(laneFree.get(lane) ?? today, blockerEnd)
+        const end = addWorkdays(start, Math.max(1, Math.ceil(hoursOf(i) / perDay)))
+        laneFree.set(lane, end)
+        endOf.set(i._id, end)
+        result.push({ issue: i, start, end, lane, after: (i.blockedBy ?? []).map((b) => byId.get(b._id as Ref<Issue>)?.identifier ?? '').filter((x) => x !== '') })
+        for (const next of out.get(i._id) ?? []) {
+          indeg.set(next, (indeg.get(next) ?? 1) - 1)
+          if (indeg.get(next) === 0) {
+            const n = byId.get(next)
+            if (n !== undefined) {
+              ready.push(n)
+              ready.sort(cmpPlan)
+            }
+          }
+        }
+      }
+      plan = result
+      planLeftOut = list.length - result.length
+      planning = true
+    } finally {
+      planBusy = false
+    }
+  }
+  $: planChanges = plan.filter((p) => p.issue.dueDate !== p.end || p.issue.startDate !== p.start)
+  async function applyPlan (): Promise<void> {
+    if (planChanges.length === 0 || !confirm(`Write start and due dates on ${planChanges.length} issue${planChanges.length === 1 ? '' : 's'}?`)) return
+    for (const p of planChanges) await client.update(p.issue, { startDate: p.start, dueDate: p.end })
+    planning = false
+    plan = []
+  }
+  const laneName = (lane: string): string => (lane.startsWith('team:') ? `${projectName.get(lane.slice(5) as Ref<Project>) ?? ''} team` : empNames.get(lane) ?? 'someone')
 </script>
 
 <div class="rm">
@@ -371,6 +455,25 @@
       </div>
     </section>
   {/if}
+
+  <section class="card motion-rise" style="--i: 0">
+    <div class="card__head"><span class="card__title"><Label label={tracker.string.AutoSchedule} /></span>
+      <span class="rm__tools"><select class="select" bind:value={planProject}><option value="">all projects</option>{#each projects as p (p._id)}<option value={p._id}>{p.name}</option>{/each}</select><Button kind={planning ? 'ghost' : 'primary'} label={tracker.string.AutoSchedule} disabled={planBusy} on:click={() => { buildPlan() }} />{#if planning}<Button kind={'primary'} label={tracker.string.Save} disabled={planChanges.length === 0} on:click={() => { void applyPlan() }} /><Button kind={'ghost'} label={tracker.string.Cancel} on:click={() => { planning = false; plan = [] }} />{/if}</span>
+    </div>
+    <p class="muted">Orders open issues by blockers, then priority, then due date; gives each person (or the project team, when unassigned) one lane at {scenario ? hoursPerWeek / 5 : 8}h a day; and proposes start and due dates. Unestimated issues count as a day. Nothing is written until you save.</p>
+    {#if planning}
+      <p class="muted">{plan.length} scheduled · {planChanges.length} would change{planLeftOut > 0 ? ` · ${planLeftOut} left out (circular blockers)` : ''}</p>
+      <div class="pl-wrap"><table class="pl">
+        <thead><tr><th>Issue</th><th>Lane</th><th>After</th><th>Start</th><th>Due</th><th>Now due</th></tr></thead>
+        <tbody>
+          {#each plan.slice(0, 80) as p (p.issue._id)}
+            <tr class:pl--change={p.issue.dueDate !== p.end}><td><button class="lnk" on:click={() => { open(p.issue) }}>{p.issue.identifier}</button> {p.issue.title}</td><td>{laneName(p.lane)}</td><td>{p.after.join(', ')}</td><td>{fmtDate(p.start)}</td><td><b>{fmtDate(p.end)}</b></td><td class="muted">{p.issue.dueDate != null ? fmtDate(p.issue.dueDate) : '—'}</td></tr>
+          {/each}
+        </tbody>
+      </table></div>
+      {#if plan.length > 80}<p class="muted">Showing the first 80 of {plan.length}.</p>{/if}
+    {/if}
+  </section>
 
   <section class="card motion-rise" style="--i: 0">
     {#if rowsByProject.length === 0}
@@ -481,4 +584,8 @@
   .dep__id { margin-right: 0.3rem; font-size: 0.7rem; color: var(--theme-trans-color); }
   .dep__arrow { font-size: 0.7rem; color: var(--theme-trans-color); }
   .dep__blocker { border: 1px solid var(--theme-divider-color); }
+  .pl-wrap { overflow-x: auto; }
+  .pl { width: 100%; border-collapse: collapse; font-size: 0.8125rem; th, td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--theme-divider-color); text-align: left; white-space: nowrap; } th { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--theme-dark-color); } td { color: var(--theme-content-color); } td:first-child { white-space: normal; } b { color: var(--theme-caption-color); } }
+  .pl--change td { background: var(--accent-brand-soft); }
+  .lnk { border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.8125rem; cursor: pointer; &:hover { text-decoration: underline; } }
 </style>

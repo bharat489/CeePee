@@ -566,7 +566,18 @@
     "Development": "Geliştirme",
     "TimeInStatus": "Durumda geçen süre",
     "StatusPage": "Durum sayfası",
-    "Submit": "Gönder"
+    "Submit": "Gönder",
+    "Appearance": "Görünüm",
+    "Vibe": "Hava",
+    "EmailTemplates": "E-posta şablonları",
+    "OrgConsole": "Organizasyon",
+    "ShareIssue": "Herkese açık bağlantı paylaş…",
+    "StopSharing": "Paylaşımı durdur",
+    "PersonList": "Kişiler (birden çok)",
+    "AutoSchedule": "Otomatik planla",
+    "FieldPermissions": "Alan izinleri",
+    "EmbedOnSite": "Sitenize gömün",
+    "PublicLink": "Herkese açık bağlantı oluştur"
   },
   "status": {}
 }

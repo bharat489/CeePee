@@ -22,30 +22,147 @@
 // neutral tokens themselves, so it can be tuned -- or removed -- in one
 // place. It is imported last so equal-specificity rules here win.
 //
-// Two colours carry the brand: the lime (#C0F010) that appears in the logo,
-// used for "you are here" and "this is live" signals, and a blue-to-violet
-// gradient for the primary action. Lime is never used as text on light
-// backgrounds; it fails contrast there. Bars, rings and washes only.
+// Colour comes from a "vibe" the person picks in Settings → Appearance and
+// that lands on <html data-vibe="…">. Every vibe defines the same handful
+// of tokens: a brand colour, its ink (readable on light surfaces), a soft
+// wash, a focus ring, a three-stop gradient for primary actions, and glows.
+// Corners (data-corners) and motion (data-motion) are separate knobs.
 // ---------------------------------------------------------------------------
 
-* {
+html {
+  // Aurora (default): violet → pink → orange. Loud, warm, unmistakable.
+  --vibe-a: #7c3aed;
+  --vibe-b: #ec4899;
+  --vibe-c: #f97316;
+  --accent-brand: #a855f7;
+  --accent-brand-ink: #6d28d9;
+  --accent-brand-soft: rgba(168, 85, 247, 0.16);
+  --accent-brand-ring: rgba(168, 85, 247, 0.55);
+  --accent-gradient: linear-gradient(135deg, var(--vibe-a) 0%, var(--vibe-b) 55%, var(--vibe-c) 100%);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(236, 72, 153, 0.14) 55%, rgba(249, 115, 22, 0.12));
+  --accent-glow: 0 10px 28px -10px rgba(168, 85, 247, 0.65);
+  --accent-glow-strong: 0 14px 36px -10px rgba(236, 72, 153, 0.75);
+  --card-lift-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.5);
+  --vibe-tint-dark: #0f0c16;
+  --vibe-tint-dark-2: #17121f;
+  --vibe-tint-light: #f7f4fb;
+}
+html[data-vibe='ocean'] {
+  --vibe-a: #0ea5e9;
+  --vibe-b: #6366f1;
+  --vibe-c: #22d3ee;
+  --accent-brand: #22d3ee;
+  --accent-brand-ink: #0e7490;
+  --accent-brand-soft: rgba(34, 211, 238, 0.16);
+  --accent-brand-ring: rgba(34, 211, 238, 0.55);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(99, 102, 241, 0.14) 55%, rgba(34, 211, 238, 0.12));
+  --accent-glow: 0 10px 28px -10px rgba(14, 165, 233, 0.65);
+  --accent-glow-strong: 0 14px 36px -10px rgba(99, 102, 241, 0.75);
+  --vibe-tint-dark: #0a1017;
+  --vibe-tint-dark-2: #101821;
+  --vibe-tint-light: #f2f8fb;
+}
+html[data-vibe='sunset'] {
+  --vibe-a: #f97316;
+  --vibe-b: #ec4899;
+  --vibe-c: #a21caf;
+  --accent-brand: #fb7185;
+  --accent-brand-ink: #be123c;
+  --accent-brand-soft: rgba(251, 113, 133, 0.16);
+  --accent-brand-ring: rgba(251, 113, 133, 0.55);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(236, 72, 153, 0.14) 55%, rgba(162, 28, 175, 0.12));
+  --accent-glow: 0 10px 28px -10px rgba(249, 115, 22, 0.65);
+  --accent-glow-strong: 0 14px 36px -10px rgba(236, 72, 153, 0.75);
+  --vibe-tint-dark: #150e0f;
+  --vibe-tint-dark-2: #1e1416;
+  --vibe-tint-light: #fbf5f3;
+}
+html[data-vibe='lime'] {
+  --vibe-a: #2b6bea;
+  --vibe-b: #6a45f5;
+  --vibe-c: #c0f010;
   --accent-brand: #c0f010;
   --accent-brand-ink: #4e6600;
   --accent-brand-soft: rgba(192, 240, 16, 0.14);
   --accent-brand-ring: rgba(192, 240, 16, 0.55);
   --accent-gradient: linear-gradient(135deg, #2b6bea 0%, #6a45f5 100%);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(43, 107, 234, 0.18), rgba(106, 69, 245, 0.14));
   --accent-glow: 0 10px 28px -10px rgba(84, 96, 245, 0.65);
   --accent-glow-strong: 0 14px 36px -10px rgba(84, 96, 245, 0.85);
-  --card-lift-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.5);
+  --vibe-tint-dark: #0e0f10;
+  --vibe-tint-dark-2: #161719;
+  --vibe-tint-light: #f6f7f9;
 }
-.theme-light {
+html[data-vibe='mono'] {
+  --vibe-a: #2b6bea;
+  --vibe-b: #2b6bea;
+  --vibe-c: #2b6bea;
+  --accent-brand: #2b6bea;
+  --accent-brand-ink: #1e4fb0;
+  --accent-brand-soft: rgba(43, 107, 234, 0.14);
+  --accent-brand-ring: rgba(43, 107, 234, 0.5);
+  --accent-gradient: linear-gradient(135deg, #2b6bea 0%, #2b6bea 100%);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(43, 107, 234, 0.14), rgba(43, 107, 234, 0.1));
+  --accent-glow: none;
+  --accent-glow-strong: none;
+  --vibe-tint-dark: #0e0f10;
+  --vibe-tint-dark-2: #161719;
+  --vibe-tint-light: #f6f7f9;
+}
+// On dark surfaces the "ink" would be too dark; the brand colour itself reads fine there.
+html.theme-dark {
+  --accent-brand-ink: var(--accent-brand);
+}
+html.theme-light {
   --card-lift-shadow: 0 8px 22px -10px rgba(20, 30, 60, 0.3);
+}
+
+// The chrome takes a whisper of the vibe: navigator, status bar and page
+// backdrop lean toward the brand hue instead of pure grey.
+html.theme-dark:not([data-vibe='mono']):not([data-vibe='lime']) {
+  --theme-navpanel-color: var(--vibe-tint-dark);
+  --theme-statusbar-color: var(--vibe-tint-dark);
+  --theme-back-color: var(--vibe-tint-dark);
+  --theme-bg-color: var(--vibe-tint-dark-2);
+}
+html.theme-light:not([data-vibe='mono']):not([data-vibe='lime']) {
+  --theme-navpanel-color: var(--vibe-tint-light);
+  --theme-back-color: var(--vibe-tint-light);
+}
+
+// Corners: rounded (default), pill, sharp.
+html[data-corners='pill'] {
+  .hulyButton,
+  .antiButton,
+  .hulyButton.primary,
+  .antiButton.primary {
+    border-radius: 999px;
+  }
+}
+html[data-corners='sharp'] {
+  .hulyButton,
+  .antiButton,
+  .hulyPopup-container,
+  .antiPopup,
+  .kanban-container .card-container,
+  .tracker-card {
+    border-radius: 0.25rem !important;
+  }
+}
+
+// Motion: reduced turns every animation into a cut.
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 // Selection colour is one of the few places a product's colour touches every
 // screen. Make it the brand's.
 ::selection {
-  background: rgba(192, 240, 16, 0.35);
+  background: var(--accent-brand-soft);
 }
 
 // Keyboard focus is shown with the brand ring, only for keyboard users.
@@ -78,6 +195,7 @@ a:focus-visible,
 .antiButton.primary:not(:disabled, .disabled) {
   background-image: var(--accent-gradient);
   border-color: transparent;
+  color: #fff;
 
   &:hover {
     box-shadow: var(--accent-glow);
@@ -91,9 +209,9 @@ a:focus-visible,
 }
 
 // ---------------------------------------------------------------------------
-// Navigation: the selected item carries a lime bar that grows in, and a
+// Navigation: the selected item carries a brand bar that grows in, and a
 // faint wash that fades out to the right. Hover nudges the row toward the
-// content it opens.
+// content it opens. The selected application icon wears the gradient.
 // ---------------------------------------------------------------------------
 .hulyNavItem-container,
 .antiNav-element {
@@ -117,7 +235,7 @@ a:focus-visible,
       bottom: 22%;
       width: 3px;
       border-radius: 3px;
-      background: var(--accent-brand);
+      background: var(--accent-gradient);
       transform-origin: center;
       animation: barIn var(--motion-base) var(--ease-emphasis) both;
       pointer-events: none;
@@ -125,9 +243,46 @@ a:focus-visible,
   }
 }
 
+.app.selected {
+  background-image: var(--accent-gradient) !important;
+  box-shadow: var(--accent-glow);
+  .icon-container {
+    color: #fff !important;
+  }
+}
+.app:not(.selected):hover {
+  background-image: var(--accent-gradient-soft);
+}
+
+// Page headers get a hairline of gradient underneath, so every screen has
+// one line of colour at the top.
+.hulyHeader-container {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--accent-gradient);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+}
+
+// Avatars: a brand ring on hover, so people light up.
+.hulyAvatar-container {
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+  &:hover {
+    box-shadow: 0 0 0 2px var(--accent-brand-ring);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Lists and boards. Rows rise in with a stagger (index supplied by the row
-// as --i); cards lift on hover and settle on press.
+// as --i); cards lift on hover and settle on press. Column headers carry a
+// soft gradient wash.
 // ---------------------------------------------------------------------------
 .listGrid.row {
   animation: riseIn var(--motion-base) var(--ease-enter) both;
@@ -150,12 +305,20 @@ a:focus-visible,
     box-shadow: none;
   }
 }
+.kanban-container .header {
+  background-image: var(--accent-gradient-soft) !important;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
 
 // ---------------------------------------------------------------------------
-// Popups arrive through PopupInstance (tokens, no spring); nothing here
-// animates their contents a second time. Panels get a hairline of brand at
-// the top so an open issue reads as "live".
+// Popups and panels: frosted glass, and a hairline of brand at the top of an
+// open panel so it reads as "live".
 // ---------------------------------------------------------------------------
+.hulyPopup-container,
+.antiPopup {
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
 .panel-instance .popupPanel::before {
   content: '';
   position: absolute;
@@ -170,6 +333,14 @@ a:focus-visible,
 }
 .panel-instance .popupPanel {
   position: relative;
+}
+
+// Gradient text for anything that opts in (page titles in CeePee pages).
+.ceepee-gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 // Skeleton / placeholder sheen for anything that opts in.

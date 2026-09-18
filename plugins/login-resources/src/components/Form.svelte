@@ -234,8 +234,9 @@
     flex-direction: column;
 
     .title {
-      font-weight: 500;
-      font-size: 1.25rem;
+      font-weight: 800;
+      font-size: 1.6rem;
+      letter-spacing: -0.02em;
       color: var(--theme-caption-color);
     }
     .status {

@@ -568,7 +568,18 @@
     "Development": "开发",
     "TimeInStatus": "状态停留时间",
     "StatusPage": "状态页",
-    "Submit": "提交"
+    "Submit": "提交",
+    "Appearance": "外观",
+    "Vibe": "氛围",
+    "EmailTemplates": "邮件模板",
+    "OrgConsole": "组织",
+    "ShareIssue": "分享公开链接…",
+    "StopSharing": "停止分享",
+    "PersonList": "人员（多个）",
+    "AutoSchedule": "自动排期",
+    "FieldPermissions": "字段权限",
+    "EmbedOnSite": "嵌入到您的网站",
+    "PublicLink": "创建公开链接"
   },
   "status": {}
 }

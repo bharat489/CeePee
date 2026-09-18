@@ -568,7 +568,18 @@
     "Development": "開発",
     "TimeInStatus": "ステータス滞在時間",
     "StatusPage": "ステータスページ",
-    "Submit": "送信"
+    "Submit": "送信",
+    "Appearance": "外観",
+    "Vibe": "バイブ",
+    "EmailTemplates": "メールテンプレート",
+    "OrgConsole": "組織",
+    "ShareIssue": "公開リンクを共有…",
+    "StopSharing": "共有を停止",
+    "PersonList": "担当者（複数）",
+    "AutoSchedule": "自動スケジュール",
+    "FieldPermissions": "フィールド権限",
+    "EmbedOnSite": "サイトに埋め込む",
+    "PublicLink": "公開リンクを作成"
   },
   "status": {}
 }

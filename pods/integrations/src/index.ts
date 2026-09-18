@@ -29,7 +29,7 @@ import { scheduleDigest } from './digest'
 import { handleDeploy, handleEmail, handleGeneric, handleGit, handleSentry, type InboundConfig, type Result } from './inbound'
 import { jobStatus, startJiraImport, type JiraImportRequest } from './jira'
 import { getPlatform, heartbeat, resetPlatform, type PlatformConfig } from './platform'
-import { portalArticle, portalHome, portalKb, portalForm, portalIdeas, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
+import { portalArticle, portalHome, portalKb, collectorJs, pickLang, portalShare, portalForm, portalIdeas, portalOrg, portalRate, portalReply, portalStatus, portalSubmit, resolvePortal, type PortalConfig, type Result as PortalResult } from './portal'
 import { scheduleSubscriptions } from './subscriptions'
 import { handleScim, parseRoleMap } from './scim'
 import { handleSlackCommand, handleSlackEvent, handleSlackInteraction, verifySlack, type SlackConfig } from './slack'
@@ -59,6 +59,7 @@ const portalCfg: PortalConfig = {
   welcome: env.PORTAL_WELCOME ?? ''
 }
 const PORTAL_ENABLED = (env.PORTAL_ENABLED ?? 'true') !== 'false'
+const PORTAL_LANG = env.PORTAL_LANG ?? 'en'
 const HEARTBEAT_MINUTES = Math.max(1, Number(env.HEARTBEAT_MINUTES ?? 5))
 const slackCfg: SlackConfig = { signingSecret: env.SLACK_SIGNING_SECRET ?? '', botToken: env.SLACK_BOT_TOKEN ?? '', frontUrl: env.PUBLIC_FRONT_URL ?? platformCfg.url, workspace: platformCfg.workspace }
 const TEAMS_SECRET = env.TEAMS_WEBHOOK_SECRET ?? ''
@@ -270,6 +271,29 @@ const server = createServer((req, res) => {
       }
 
       // ---- public customer portal (no login) -------------------------------
+      // ---- public read-only issue page (token from "Share public link…") ----------------
+      if (path.startsWith('/share/')) {
+        if (limited(req, 60)) {
+          send(res, 429, { error: 'too many requests' })
+          return
+        }
+        const c = await platform(res)
+        if (c === undefined) return
+        const cookieLang = /(?:^|;\s*)lang=([a-zA-Z-]+)/.exec(String(req.headers.cookie ?? ''))?.[1]
+        const lang = pickLang(url.searchParams.get('lang'), cookieLang, String(req.headers['accept-language'] ?? ''), PORTAL_LANG)
+        sendPortal(res, await portalShare(c, portalCfg, path.slice('/share/'.length).split('/')[0], lang, wantsHtml || method === 'GET'))
+        return
+      }
+
+      // ---- embeddable issue collector -------------------------------------------------------
+      if (path === '/collector.js') {
+        const js = collectorJs(PUBLIC_URL, url.searchParams.get('portal') ?? '', url.searchParams.get('form') ?? '', (url.searchParams.get('label') ?? 'Feedback').slice(0, 40), /^#[0-9a-fA-F]{3,8}$/.test(url.searchParams.get('color') ?? '') ? String(url.searchParams.get('color')) : portalCfg.color)
+        cors(res)
+        res.writeHead(200, { 'content-type': 'application/javascript; charset=utf-8', 'cache-control': 'public, max-age=300', 'content-length': Buffer.byteLength(js) })
+        res.end(js)
+        return
+      }
+
       if (path === '/' || path === '/portal' || path.startsWith('/portal/')) {
         if (!PORTAL_ENABLED) {
           send(res, 404, { error: 'portal disabled: set PORTAL_PROJECT' })
@@ -291,6 +315,12 @@ const server = createServer((req, res) => {
           send(res, 404, { error: 'no such portal' })
           return
         }
+        // language: ?lang= wins and is remembered in a cookie; then the cookie; then the browser; then PORTAL_LANG
+        const langParam = url.searchParams.get('lang')
+        const cookieLang = /(?:^|;\s*)lang=([a-zA-Z-]+)/.exec(String(req.headers.cookie ?? ''))?.[1]
+        cfg.lang = pickLang(langParam, cookieLang, String(req.headers['accept-language'] ?? ''), PORTAL_LANG)
+        if (langParam !== null) res.setHeader('set-cookie', `lang=${cfg.lang}; path=/; max-age=31536000; samesite=lax`)
+        cfg.embed = url.searchParams.get('embed') === '1'
         const sub = rest.join('/')
         let r: PortalResult
         if (sub === '') r = await portalHome(c, cfg, url.searchParams.get('q') ?? '')

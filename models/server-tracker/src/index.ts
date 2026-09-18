@@ -73,6 +73,18 @@ export function createModel (builder: Builder): void {
     txMatch: { objectClass: { $in: [tracker.class.Issue, 'chunter:class:ChatMessage' as any, tracker.class.AutomationHeartbeat, tracker.class.AutomationRule] } }
   })
 
+  // Customer emails: request received (issue created with portalEmail) and team replied (customer-visible reply).
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnCustomerMail,
+    txMatch: { _class: core.class.TxCreateDoc, objectClass: { $in: [tracker.class.Issue, tracker.class.CustomerReply] } }
+  })
+
+  // Audit streaming to a SIEM when the audit policy names one.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnSiem,
+    txMatch: { objectClass: { $in: [tracker.class.Issue, tracker.class.Project, tracker.class.AutomationRule, tracker.class.IssueForm, tracker.class.WorkflowScheme, tracker.class.AuditPolicy, tracker.class.AuditEvent, tracker.class.Idea, tracker.class.EmailTemplate, 'task:class:TaskType' as any] } }
+  })
+
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnIssueAutomation,
     txMatch: { objectClass: tracker.class.Issue }

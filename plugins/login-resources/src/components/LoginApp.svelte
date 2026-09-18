@@ -46,12 +46,6 @@
   import { Pages, getAccount, pages } from '..'
   import login from '../plugin'
 
-  import loginBack from '../../img/login_back.png'
-  import loginBack2x from '../../img/login_back_2x.png'
-  import loginBackAvif from '../../img/login_back.avif'
-  import loginBack2xAvif from '../../img/login_back_2x.avif'
-  import loginBackWebp from '../../img/login_back.webp'
-  import loginBack2xWebp from '../../img/login_back_2x.webp'
   import AdminWorkspaces from './AdminWorkspaces.svelte'
   import ChangePassword from './ChangePassword.svelte'
 
@@ -120,40 +114,36 @@
   }
 
   onMount(chooseToken)
+  const PILLS = ['Kanban & Scrum', 'Roadmaps', 'Service desk', 'SLAs', 'Automations', 'Workflows', 'Ideas', 'Docs', 'Chat', 'Time tracking', 'Forms', 'Public portal', 'Dashboards', 'Portfolio']
 </script>
 
 {#if page === 'admin'}
   <AdminWorkspaces />
 {:else}
-  <div
-    class="theme-dark w-full h-full backd"
-    class:paneld={$deviceInfo.docWidth <= 768}
-    class:white={!$themeStore.dark}
-  >
-    <div class="bg-image clear-mins" class:back={$deviceInfo.docWidth > 768} class:p-4={$deviceInfo.docWidth > 768}>
-      <picture>
-        <source srcset={`${loginBackAvif}, ${loginBack2xAvif} 2x`} type="image/avif" />
-        <source srcset={`${loginBackWebp}, ${loginBack2xWebp} 2x`} type="image/webp" />
-
-        <img
-          class="back-image"
-          src={loginBack}
-          style:display={$deviceInfo.docWidth <= 768 ? 'none' : 'block'}
-          srcset={`${loginBack} 1x, ${loginBack2x} 2x`}
-          alt=""
-        />
-      </picture>
-
-      <div
-        style:position="fixed"
-        style:left={$deviceInfo.docWidth <= 480 ? '.75rem' : '1.75rem'}
-        style:top={'calc(3rem + var(--huly-top-indent, 0rem))'}
-        class="flex-row-center"
-      >
-        <LoginIcon /><span class="fs-title ml-2">{getMetadata(workbench.metadata.PlatformTitle)}</span>
-      </div>
-
-      <div class="panel-base" class:panel={$deviceInfo.docWidth > 768} class:white={!$themeStore.dark}>
+  <div class="theme-dark w-full h-full lg" class:lg--narrow={$deviceInfo.docWidth <= 900}>
+    <div class="lg__sky" aria-hidden="true">
+      <span class="lg__blob lg__blob--a" /><span class="lg__blob lg__blob--b" /><span class="lg__blob lg__blob--c" />
+      <span class="lg__grid" />
+      <span class="lg__stars" />
+    </div>
+    <div class="lg__brand" style:top={'calc(1.5rem + var(--huly-top-indent, 0rem))'}>
+      <LoginIcon /><span class="lg__brandname">{getMetadata(workbench.metadata.PlatformTitle)}</span>
+    </div>
+    <div class="lg__layout">
+      {#if $deviceInfo.docWidth > 900}
+        <section class="lg__hero">
+          <span class="lg__eyebrow">Work management, reimagined</span>
+          <h1 class="lg__h1">Ship faster.<br /><span class="lg__grad">Feel it.</span></h1>
+          <p class="lg__lead">Issues, sprints, roadmaps, service desk, docs and chat in one place. Self-hosted, no per-seat tax. For teams who would rather build than click.</p>
+          <ul class="lg__points">
+            <li style="--i: 0"><i class="lg__dot" style="background: var(--vibe-a); color: var(--vibe-a)" />Boards and workflows that bend to you, not the other way round</li>
+            <li style="--i: 1"><i class="lg__dot" style="background: var(--vibe-b); color: var(--vibe-b)" />Customer portal, SLAs and automations out of the box</li>
+            <li style="--i: 2"><i class="lg__dot" style="background: var(--vibe-c); color: var(--vibe-c)" />Ideas, docs and chat next to the work, no tab switching</li>
+          </ul>
+          <div class="lg__ticker"><div class="lg__track">{#each [...PILLS, ...PILLS] as p, k}<span class="lg__pill" class:lg__pill--alt={k % 3 === 1}>{p}</span>{/each}</div></div>
+        </section>
+      {/if}
+      <section class="lg__card" class:lg__card--wide={$deviceInfo.docWidth <= 900}>
         <Scroller padding={'1rem 0'}>
           <div class="form-content">
             {#if page === 'login'}
@@ -189,130 +179,42 @@
             {/if}
           </div>
         </Scroller>
-      </div>
-
-      <Popup />
+      </section>
     </div>
+    <Popup />
   </div>
 {/if}
 
 <style lang="scss">
-  .back-image {
-    position: fixed;
-    top: 32px;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: left top;
-  }
-  .backd {
-    position: relative;
-    background-color: var(--theme-bg-color);
-
-    .bg-image {
-      display: flex;
-      flex-direction: row-reverse;
-      width: 100%;
-      height: 100%;
-    }
-    &.paneld {
-      background: rgba(45, 50, 160, 0.5);
-
-      .panel-base {
-        padding-top: 5rem;
-        padding-bottom: 1rem;
-        width: 100%;
-      }
-    }
-  }
-
-  .panel {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    width: 50%;
-    height: 100%;
-    min-width: 35rem;
-    max-width: 41rem;
-    background: rgba(45, 50, 160, 0.5);
-    mix-blend-mode: normal;
-    box-shadow: -30px 1.52px 173.87px #121437;
-    backdrop-filter: blur(157.855px);
-    border-radius: 1rem;
-
-    &::after {
-      overflow: hidden;
-      position: absolute;
-      content: '';
-      inset: 0;
-      background: radial-gradient(161.92% 96.11% at 11.33% 3.89%, #313d9a 0%, #202669 100%);
-      border-radius: 1rem;
-      z-index: -1;
-    }
-    &::before {
-      position: absolute;
-      content: '';
-      inset: 0;
-      padding: 1px;
-      background: conic-gradient(
-          rgba(255, 255, 255, 0.18) 10%,
-          rgba(126, 120, 165, 0.5),
-          rgba(191, 216, 253, 0.5),
-          rgba(246, 247, 249, 0.32),
-          rgba(219, 229, 242, 0.34) 60%,
-          rgba(163, 203, 255, 0.24) 90%
-        )
-        border-box;
-      -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      border-radius: 1rem;
-      transform: rotate(180deg);
-      transition: opacity 0.15s var(--timing-main);
-      opacity: 0.7;
-    }
-  }
-  .backd.paneld::after,
-  .panel::after {
-    overflow: hidden;
-    position: absolute;
-    content: '';
-    inset: 0;
-    background: radial-gradient(161.92% 96.11% at 11.33% 3.89%, #313d9a 0%, #202669 100%);
-    z-index: -1;
-  }
-  .panel::after {
-    border-radius: 1rem;
-  }
-  .form-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    flex-grow: 1;
-    height: max-content;
-  }
-  .backd::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    clip-path: inset(0);
-    mix-blend-mode: screen;
-    background:
-      radial-gradient(42% 55% at 14% 18%, rgba(43, 107, 234, 0.55), transparent 70%),
-      radial-gradient(36% 46% at 86% 82%, rgba(192, 240, 16, 0.3), transparent 70%),
-      radial-gradient(30% 40% at 62% 8%, rgba(106, 69, 245, 0.45), transparent 70%);
-    filter: blur(48px);
-    animation: auroraDrift 24s var(--ease-standard) infinite alternate;
-  }
-  .backd .panel-base {
-    position: relative;
-    z-index: 2;
-    animation: riseIn var(--motion-slow) var(--ease-enter) both;
-  }
+  .lg { position: relative; overflow: hidden; background: #0a0912; color: #e9ecf1; }
+  .lg__sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .lg__blob { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(70px); opacity: 0.5; mix-blend-mode: screen; animation: lgFloat 26s ease-in-out infinite alternate; }
+  .lg__blob--a { left: -20vmax; top: -25vmax; background: radial-gradient(circle at 30% 30%, var(--vibe-a), transparent 60%); }
+  .lg__blob--b { right: -25vmax; top: -10vmax; background: radial-gradient(circle at 60% 40%, var(--vibe-b), transparent 60%); animation-delay: -9s; }
+  .lg__blob--c { left: 20vw; bottom: -35vmax; background: radial-gradient(circle at 50% 50%, var(--vibe-c), transparent 60%); animation-delay: -17s; }
+  .lg__grid { position: absolute; inset: -40%; background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 72px 72px; transform: perspective(700px) rotateX(60deg) translateY(160px); mask-image: radial-gradient(ellipse at 50% 70%, #000 15%, transparent 65%); -webkit-mask-image: radial-gradient(ellipse at 50% 70%, #000 15%, transparent 65%); animation: lgGrid 18s linear infinite; }
+  .lg__stars { position: absolute; inset: 0; opacity: 0.6; background-image: radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.7), transparent), radial-gradient(1px 1px at 70% 20%, rgba(255, 255, 255, 0.5), transparent), radial-gradient(1.5px 1.5px at 40% 80%, rgba(255, 255, 255, 0.6), transparent), radial-gradient(1px 1px at 85% 65%, rgba(255, 255, 255, 0.5), transparent), radial-gradient(1px 1px at 10% 75%, rgba(255, 255, 255, 0.4), transparent), radial-gradient(1px 1px at 55% 50%, rgba(255, 255, 255, 0.35), transparent); }
+  .lg__brand { position: fixed; left: 1.75rem; z-index: 3; display: flex; align-items: center; gap: 0.5rem; }
+  .lg__brandname { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+  .lg__layout { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(24rem, 34rem); gap: 3rem; align-items: center; width: 100%; height: 100%; padding: 5rem 4rem 3rem; box-sizing: border-box; }
+  .lg--narrow .lg__layout { grid-template-columns: 1fr; gap: 0; padding: 5rem 0.75rem 1rem; }
+  .lg__hero { display: flex; flex-direction: column; gap: 1.1rem; max-width: 38rem; animation: riseIn 0.7s var(--ease-enter, ease-out) both; }
+  .lg__eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(233, 236, 241, 0.6); }
+  .lg__h1 { margin: 0; font-size: clamp(2.6rem, 5vw, 4.4rem); line-height: 1.02; font-weight: 900; letter-spacing: -0.03em; }
+  .lg__grad { background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lg__lead { margin: 0; max-width: 32rem; font-size: 1.05rem; line-height: 1.6; color: rgba(233, 236, 241, 0.75); }
+  .lg__points { display: flex; flex-direction: column; gap: 0.55rem; margin: 0.4rem 0 0; padding: 0; list-style: none; li { display: flex; align-items: center; gap: 0.6rem; font-size: 0.95rem; color: rgba(233, 236, 241, 0.85); animation: riseIn 0.6s var(--ease-enter, ease-out) both; animation-delay: calc(0.25s + var(--i) * 0.12s); } }
+  .lg__dot { flex-shrink: 0; width: 0.6rem; height: 0.6rem; border-radius: 50%; box-shadow: 0 0 12px currentColor; }
+  .lg__ticker { margin-top: 0.6rem; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .lg__track { display: flex; gap: 0.5rem; width: max-content; animation: lgTicker 30s linear infinite; }
+  .lg__pill { padding: 0.3rem 0.75rem; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(255, 255, 255, 0.05); font-size: 0.78rem; white-space: nowrap; &--alt { border-color: var(--accent-brand-ring); background: var(--accent-brand-soft); } }
+  .lg__card { position: relative; display: flex; flex-direction: column; justify-content: center; max-height: 100%; padding: 2rem 2.25rem; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 1.4rem; background: rgba(16, 14, 26, 0.55); backdrop-filter: blur(28px) saturate(1.4); -webkit-backdrop-filter: blur(28px) saturate(1.4); box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08); animation: riseIn 0.8s var(--ease-enter, ease-out) both; animation-delay: 0.15s; &::before { content: ''; position: absolute; left: 2rem; right: 2rem; top: 0; height: 2px; border-radius: 2px; background: var(--accent-gradient); opacity: 0.9; } &--wide { padding: 1.5rem 1.1rem; } }
+  .form-content { display: flex; flex-direction: column; justify-content: center; flex-grow: 1; height: max-content; }
+  .lg :global(.antiButton.contrast:not(:disabled)) { background-image: var(--accent-gradient) !important; background-color: transparent !important; border-color: transparent !important; color: #fff !important; box-shadow: var(--accent-glow); }
+  .lg :global(.antiButton.contrast:not(:disabled):hover) { filter: brightness(1.08); box-shadow: var(--accent-glow-strong); }
+  .lg :global(.editbox) { border-radius: 0.75rem; }
+  @keyframes lgFloat { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(6vw, 4vh, 0) scale(1.15); } }
+  @keyframes lgGrid { from { background-position: 0 0; } to { background-position: 0 72px; } }
+  @keyframes lgTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .lg__blob, .lg__grid, .lg__track { animation: none; } }
 </style>

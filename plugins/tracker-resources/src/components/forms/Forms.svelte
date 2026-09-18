@@ -105,6 +105,17 @@
     const slug = project?.portal?.enabled === true && project.portal.slug !== '' ? `/${project.portal.slug}` : ''
     return `${integrationsUrl}/portal${slug}/form/${f.slug}`
   }
+  function embedSnippet (f: IssueForm): string {
+    const slug = project?.portal?.enabled === true && project.portal.slug !== '' ? project.portal.slug : ''
+    return `<script src="${integrationsUrl}/collector.js?portal=${encodeURIComponent(slug)}&form=${encodeURIComponent(f.slug)}&label=${encodeURIComponent('Feedback')}" async><` + '/script>'
+  }
+  async function copyEmbed (f: IssueForm): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(embedSnippet(f))
+      copied = f._id + 'e'
+      setTimeout(() => { copied = '' }, 1500)
+    } catch {}
+  }
   let copied = ''
   async function copy (f: IssueForm, pub: boolean): Promise<void> {
     try {
@@ -176,13 +187,14 @@
       <div class="card__tools">
         <Button kind={'primary'} label={tracker.string.OpenForm} on:click={() => { open(f) }} />
         <button class="lnk" on:click={() => { void copy(f, false) }}>{copied === f._id ? 'copied' : 'copy in-app link'}</button>
-        {#if f.public}<button class="lnk" title={publicLink(f)} on:click={() => { void copy(f, true) }}>{copied === f._id + 'p' ? 'copied' : 'copy public link'}</button>{/if}
+        {#if f.public}<button class="lnk" title={publicLink(f)} on:click={() => { void copy(f, true) }}>{copied === f._id + 'p' ? 'copied' : 'copy public link'}</button><button class="lnk" title={embedSnippet(f)} on:click={() => { void copyEmbed(f) }}>{copied === f._id + 'e' ? 'copied' : 'copy embed snippet'}</button>{/if}
         <button class="lnk" on:click={() => { edit(f) }}>edit</button>
         <button class="lnk lnk--bad" on:click={() => { void remove(f) }}>delete</button>
       </div>
     </section>
   {/each}
   {#if forms.length === 0 && editing === null}<p class="muted">No forms yet.</p>{/if}
+  {#if forms.some((f) => f.public)}<p class="muted">Embed: paste the snippet into any website for a floating Feedback button that opens the form in place (an issue collector). Works on plain HTML, WordPress, Webflow and app shells.</p>{/if}
   {#if forms.some((f) => f.public) && project?.portal?.enabled !== true}<p class="muted">Public forms are served on this project's portal; switch it on under Service desk → Portal, or they use the default portal.</p>{/if}
 </div>
 

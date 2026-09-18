@@ -806,7 +806,18 @@
     "Development": "Разработка",
     "TimeInStatus": "Время в статусе",
     "StatusPage": "Страница статуса",
-    "Submit": "Отправить"
+    "Submit": "Отправить",
+    "Appearance": "Оформление",
+    "Vibe": "Настроение",
+    "EmailTemplates": "Шаблоны писем",
+    "OrgConsole": "Организация",
+    "ShareIssue": "Поделиться публичной ссылкой…",
+    "StopSharing": "Закрыть доступ",
+    "PersonList": "Люди (несколько)",
+    "AutoSchedule": "Автопланирование",
+    "FieldPermissions": "Права на поля",
+    "EmbedOnSite": "Встроить на сайт",
+    "PublicLink": "Создать публичную ссылку"
   },
   "status": {}
 }

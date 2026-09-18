@@ -56,13 +56,14 @@
 
 <style>
   .title {
-    font-weight: 500;
-    font-size: 1.25rem;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
     color: var(--theme-caption-color);
   }
   .caption a {
     padding-bottom: 0.375rem;
-    border-bottom: 2px solid var(--theme-caption-color);
+    border-bottom: 3px solid var(--accent-brand);
 
     &:not(.selected) {
       color: var(--theme-dark-color);

@@ -67,6 +67,8 @@ services:
       - MAIL_URL=${MAIL_URL:-}
       - MAIL_API_KEY=${MAIL_API_KEY:-}
       - PUBLIC_FRONT_URL=http://huly.local:8087
+      # customer emails link back to the portal
+      - PUBLIC_INTEGRATIONS_URL=${PUBLIC_INTEGRATIONS_URL:-http://huly.local:8095}
       # web push: the transactor hands push payloads to the notification service below
       - WEB_PUSH_URL=${WEB_PUSH_URL:-http://notification:8091}
       - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
@@ -111,6 +113,7 @@ services:
       - PORTAL_COLOR=${PORTAL_COLOR:-#2b6bea}
       - PORTAL_LOGO_URL=${PORTAL_LOGO_URL:-}
       - PORTAL_PROJECT=${PORTAL_PROJECT:-}
+      - PORTAL_LANG=${PORTAL_LANG:-en}
       - HEARTBEAT_MINUTES=${HEARTBEAT_MINUTES:-5}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}

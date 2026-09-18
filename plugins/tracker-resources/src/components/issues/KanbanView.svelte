@@ -70,6 +70,19 @@
   } from '@hcengineering/view-resources'
   import { ChatMessagesPresenter } from '@hcengineering/chunter-resources'
   import { onDestroy, onMount } from 'svelte'
+  import ceepeeTask from '@hcengineering/task'
+  import { statusStore as ceepeeStatusStore } from '@hcengineering/view-resources'
+  import { confetti } from '../../confetti'
+
+  // where the last drag ended, so the celebration starts under the pointer
+  let lastDrop = { x: 0, y: 0 }
+  const trackDrop = (e: DragEvent): void => { lastDrop = { x: e.clientX, y: e.clientY } }
+  onMount(() => { document.addEventListener('dragend', trackDrop) })
+  onDestroy(() => { document.removeEventListener('dragend', trackDrop) })
+  function onDropped (d: { item: any, update: any }): void {
+    const st = d?.update?.status !== undefined ? $ceepeeStatusStore.byId.get(d.update.status) : undefined
+    if (st !== undefined && st.category === ceepeeTask.statusCategory.Won) confetti(lastDrop.x || window.innerWidth / 2, lastDrop.y || window.innerHeight / 2)
+  }
 
   import tracker from '../../plugin'
   import SetWipLimitPopup from './SetWipLimitPopup.svelte'
@@ -353,6 +366,7 @@
     {getUpdateProps}
     {groupByDocs}
     {groupByKey}
+    on:dropped={(e) => { onDropped(e.detail) }}
     on:obj-focus={(evt) => {
       listProvider.updateFocus(evt.detail)
     }}

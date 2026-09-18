@@ -44,6 +44,8 @@ export default plugin(serverTrackerId, {
     OnNotificationScheme: '' as Resource<TriggerFunc>,
     OnComponentRemove: '' as Resource<TriggerFunc>,
     OnProjectRemove: '' as Resource<TriggerFunc>,
-    OnDependencyShiftRequest: '' as Resource<TriggerFunc>
+    OnDependencyShiftRequest: '' as Resource<TriggerFunc>,
+    OnCustomerMail: '' as Resource<TriggerFunc>,
+    OnSiem: '' as Resource<TriggerFunc>
   }
 })

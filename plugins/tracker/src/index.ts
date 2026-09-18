@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-import type { AccountRole, AccountUuid } from '@hcengineering/core'
+import type { AccountRole } from '@hcengineering/core'
 import { Employee, Person } from '@hcengineering/contact'
 import { Department } from '@hcengineering/hr'
 import {
@@ -174,6 +174,8 @@ export interface PermissionScheme {
   editEstimates?: AccountRole
   editDates?: AccountRole
   moveSprint?: AccountRole
+  /** Field name → minimum role that may edit it. */
+  fields?: Record<string, AccountRole>
 }
 
 /** Who receives an event kind. Absent = everyone the platform would notify. @public */
@@ -256,6 +258,9 @@ export interface AuditEvent extends Doc {
 export interface AuditPolicy extends Doc {
   /** 0 = keep forever */
   retentionDays: number
+  /** Stream every watched change to this HTTPS endpoint as JSON. */
+  siemUrl?: string
+  siemSecret?: string
 }
 
 /** What a customer can ask for. @public */
@@ -473,6 +478,20 @@ export interface WorkflowScheme extends Doc {
   rules: Array<Record<string, any>>
   statusProps: Record<string, Record<string, any>>
   layout?: Record<string, { x: number, y: number }>
+}
+
+/** Attribute type: several people from the workspace. @public */
+export interface TypePersonList extends Type<Array<Ref<Employee>>> {
+  multiple?: boolean
+}
+/** @public */
+export type EmailTemplateKind = 'portal-created' | 'portal-reply' | 'digest' | 'rule'
+/** Subject and body for one kind of outgoing email; {placeholders} in braces. @public */
+export interface EmailTemplate extends Doc {
+  kind: EmailTemplateKind
+  subject: string
+  body: string
+  enabled: boolean
 }
 
 /** A field on a form. @public */
@@ -784,6 +803,8 @@ export interface Issue extends Task {
   archived?: boolean
   /** SLA clock paused while in a status with slaPause. */
   slaPausedAt?: Timestamp | null
+  /** Token of the public read-only link; null or absent = not shared. */
+  shareToken?: string | null
   remindedDue?: Timestamp
   remindedSla?: Timestamp
   /** Customer-visible messages (CustomerReply). */
@@ -1356,7 +1377,9 @@ const pluginState = plugin(trackerId, {
     NotifyPrefs: '' as Ref<Class<NotifyPrefs>>,
     Reminder: '' as Ref<Class<Reminder>>,
     Idea: '' as Ref<Class<Idea>>,
-    WorkflowScheme: '' as Ref<Class<WorkflowScheme>>
+    WorkflowScheme: '' as Ref<Class<WorkflowScheme>>,
+    TypePersonList: '' as Ref<Class<TypePersonList>>,
+    EmailTemplate: '' as Ref<Class<EmailTemplate>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
@@ -1431,6 +1454,13 @@ const pluginState = plugin(trackerId, {
     NotificationPrefs: '' as AnyComponent,
     Ideas: '' as AnyComponent,
     RemindPopup: '' as AnyComponent,
+    Appearance: '' as AnyComponent,
+    EmailTemplates: '' as AnyComponent,
+    OrgConsole: '' as AnyComponent,
+    SharePopup: '' as AnyComponent,
+    PersonListTypeEditor: '' as AnyComponent,
+    PersonListEditor: '' as AnyComponent,
+    PersonListPresenter: '' as AnyComponent,
     AuditLog: '' as AnyComponent,
     SwimlaneBoard: '' as AnyComponent,
     Releases: '' as AnyComponent,
@@ -1704,6 +1734,17 @@ const pluginState = plugin(trackerId, {
     ReminderBody: '' as IntlString,
     OverdueTitle: '' as IntlString,
     WorkflowSchemes: '' as IntlString,
+    Appearance: '' as IntlString,
+    Vibe: '' as IntlString,
+    EmailTemplates: '' as IntlString,
+    OrgConsole: '' as IntlString,
+    ShareIssue: '' as IntlString,
+    StopSharing: '' as IntlString,
+    PersonList: '' as IntlString,
+    AutoSchedule: '' as IntlString,
+    FieldPermissions: '' as IntlString,
+    EmbedOnSite: '' as IntlString,
+    PublicLink: '' as IntlString,
     SaveScheme: '' as IntlString,
     ApplyScheme: '' as IntlString,
     StatusProperties: '' as IntlString,

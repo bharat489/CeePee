@@ -122,3 +122,21 @@ Query and dashboard subscriptions (Query page → "Email on a schedule…", Dash
 Base URL `https://<host>/scim/v2`, bearer `SCIM_TOKEN`. Supported: `ServiceProviderConfig`, `ResourceTypes`, `Schemas`, `Users` (GET with `filter=userName eq "..."`, POST, GET/PATCH/PUT/DELETE by id). Creating a user issues an auto-join invite with the mapped role; the invite link is returned under `urn:ceepee:params:scim:schemas:extension:Invite`. Deactivation demotes to read-only guest (history is kept); re-activation restores the previous role. Groups are read for the role mapping only.
 
 SAML: the account service speaks OpenID Connect (`OPENID_*` variables). Put a SAML identity provider behind an OIDC broker (Keycloak, Dex, Authentik) and point `OPENID_ISSUER` at the broker.
+
+## Public issue links, collector, languages
+
+`GET /share/<token>` renders one issue read-only (title, status, priority, assignee, labels, description) for anyone with the
+link; the token comes from the issue's **Share public link…** action and dies when sharing is stopped. Pages carry
+`noindex`. `GET /collector.js?portal=<slug>&form=<formSlug>&label=Feedback&color=%232b6bea` is a script tag for any website:
+a floating button that opens the public form in an overlay (the form is served with `?embed=1`, no chrome). The portal
+speaks English, Hindi, Spanish, French, German and Portuguese: `?lang=xx` is remembered in a cookie, otherwise the browser's
+language, otherwise `PORTAL_LANG`. While a visitor types a request title, matching help articles are suggested inline.
+
+## Email templates, customer emails, SIEM
+
+Settings → Email templates sets subject and body for: request received (to the requester when an issue with a portal email
+is created, from the portal, a form or email-to-ticket), team replied (customer-visible reply), the daily digest, and the
+default automation email. The first two are sent by the transactor (needs `MAIL_URL` and `PUBLIC_INTEGRATIONS_URL` there).
+Settings → Organisation shows counts, public surfaces, service health, audit retention and a SIEM endpoint: when set,
+every change to issues, projects, rules, forms, schemes, ideas, templates and audit records is posted there as one JSON
+event with the shared secret as a bearer token.

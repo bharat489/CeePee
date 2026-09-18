@@ -33,6 +33,7 @@
 
 import contact from '@hcengineering/contact'
 import { runReminders } from './reminders'
+import { templateFor } from './mailTemplates'
 import core, { type AttachedData, type Class, type Doc, type Ref, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
 import { type TriggerControl } from '@hcengineering/server-core'
 import task, { makeRank, type TaskType } from '@hcengineering/task'
@@ -190,7 +191,7 @@ function markup (text: string): string {
   return JSON.stringify({ type: 'doc', content: text.split(/\n+/).filter((l) => l.trim() !== '').map((l) => ({ type: 'paragraph', content: [{ type: 'text', text: l }] })) })
 }
 
-const env = (k: string): string => String((globalThis as any).process?.env?.[k] ?? '')
+export const env = (k: string): string => String((globalThis as any).process?.env?.[k] ?? '')
 
 export async function render (tpl: string, issue: Issue, project: Project, control: TriggerControl, payload?: Record<string, unknown>): Promise<string> {
   const status = (await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: issue.status }, { limit: 1 }))[0]
@@ -246,7 +247,7 @@ async function resolveRecipients (spec: string, issue: Issue, control: TriggerCo
   return Array.from(out)
 }
 
-function sendMail (to: string[], subject: string, text: string): void {
+export function sendMail (to: string[], subject: string, text: string): void {
   const mail = env('MAIL_URL').replace(/\/$/, '')
   if (mail === '' || to.length === 0) return
   const headers: Record<string, string> = { 'content-type': 'application/json' }
@@ -371,7 +372,8 @@ export async function perform (a: AutomationAction, issue: Issue, project: Proje
     }
     case 'send-email': {
       const to = await resolveRecipients(a.url !== undefined && a.url.trim() !== '' ? a.url : 'assignee', issue, control)
-      const body = await render(v !== '' ? v : '{identifier} {title}\n{status} · {priority}\n{url}', issue, project, control, payload)
+      const tplText = v !== '' ? v : (await templateFor(control, 'rule'))?.body ?? '{identifier} {title}\n{status} · {priority}\n{url}'
+      const body = await render(tplText, issue, project, control, payload)
       const [subject, ...rest] = body.split('\n')
       sendMail(to, subject, rest.length > 0 ? rest.join('\n') : subject)
       return []

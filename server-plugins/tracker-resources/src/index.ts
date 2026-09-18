@@ -19,6 +19,8 @@ import { OnAutomationRules, holds, perform } from './rules'
 import { AccountRole as WorkspaceRole, hasAccountRole } from '@hcengineering/core'
 import { type StatusProps, type TransitionRule } from '@hcengineering/task'
 import { OnIssuePermissions, OnNotificationScheme } from './permissions'
+import { OnCustomerMail } from './customerMail'
+import { OnSiem } from './siem'
 import chunter, { ChatMessage } from '@hcengineering/chunter'
 import contact, { Employee, Person, PersonSpace } from '@hcengineering/contact'
 import core, {
@@ -1039,6 +1041,8 @@ export default async () => ({
     OnIssueUpdate,
     OnComponentRemove,
     OnProjectRemove,
-    OnDependencyShiftRequest
+    OnDependencyShiftRequest,
+    OnCustomerMail,
+    OnSiem
   }
 })

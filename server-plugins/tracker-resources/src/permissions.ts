@@ -50,7 +50,7 @@ export async function OnIssuePermissions (txes: Tx[], control: TriggerControl): 
     const project = (await control.findAll(control.ctx, tracker.class.Project, { _id: cud.objectSpace as Ref<Project> }, { limit: 1 }))[0]
     const scheme: PermissionScheme | undefined = project?.permissions
     if (scheme === undefined || Object.keys(scheme).length === 0) continue
-    const need = (key: keyof PermissionScheme): void => {
+    const need = (key: Exclude<keyof PermissionScheme, 'fields'>): void => {
       const min = scheme[key]
       if (min !== undefined && !hasAccountRole(account, min)) forbidden()
     }
@@ -73,6 +73,14 @@ export async function OnIssuePermissions (txes: Tx[], control: TriggerControl): 
     if (ops.estimation !== undefined || ops.storyPoints !== undefined) need('editEstimates')
     if (ops.dueDate !== undefined || ops.startDate !== undefined || ops.slaDue !== undefined) need('editDates')
     if (ops.sprint !== undefined || ops.milestone !== undefined) need('moveSprint')
+    // field-level: any field the scheme names needs at least that role to change
+    if (scheme.fields !== undefined) {
+      for (const key of Object.keys(ops)) {
+        if (key.startsWith('$') || key === 'modifiedOn' || key === 'modifiedBy') continue
+        const min = scheme.fields[key]
+        if (min !== undefined && !hasAccountRole(account, min)) forbidden()
+      }
+    }
   }
   return []
 }

@@ -799,6 +799,20 @@ export function createActions (builder: Builder, issuesId: string, componentsId:
   createAction(
     builder,
     {
+      action: tracker.actionImpl.ShareIssue,
+      label: tracker.string.ShareIssue,
+      icon: view.icon.CopyLink,
+      category: tracker.category.Tracker,
+      input: 'focus',
+      target: tracker.class.Issue,
+      context: { mode: ['context', 'browser'], group: 'copy' }
+    },
+    tracker.action.ShareIssue
+  )
+
+  createAction(
+    builder,
+    {
       action: tracker.actionImpl.ArchiveIssue,
       label: tracker.string.ArchiveIssue,
       icon: tracker.icon.Issues,

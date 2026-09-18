@@ -44,7 +44,7 @@
     { id: AccountRole.Maintainer, label: 'Maintainers and owners' },
     { id: AccountRole.Owner, label: 'Owners only' }
   ]
-  const ACTIONS: Array<{ key: keyof PermissionScheme, label: string, hint: string }> = [
+  const ACTIONS: Array<{ key: RoleKey, label: string, hint: string }> = [
     { key: 'close', label: 'Close or cancel issues', hint: 'Moving an issue to a done or cancelled status.' },
     { key: 'reopen', label: 'Reopen issues', hint: 'Moving a resolved issue back to an open status.' },
     { key: 'delete', label: 'Delete issues', hint: 'Permanent removal.' },
@@ -67,20 +67,35 @@
     { key: 'watchers', label: 'Watchers' },
     { key: 'others', label: 'Everyone else' }
   ]
+  type RoleKey = Exclude<keyof PermissionScheme, 'fields'>
+  // field-level: any field may be limited to maintainers or owners
+  const BUILT_IN = ['title', 'description', 'assignee', 'priority', 'status', 'estimation', 'storyPoints', 'dueDate', 'startDate', 'sprint', 'milestone', 'component', 'severity', 'risk', 'resolution', 'customerOrg', 'slaDue', 'requestType']
+  const hierarchy = client.getHierarchy()
+  const custom = Array.from(hierarchy.getAllAttributes(tracker.class.Issue).values()).filter((a) => a.isCustom === true).map((a) => a.name)
+  const FIELD_LIST = [...BUILT_IN, ...custom.filter((c) => !BUILT_IN.includes(c))]
+  $: fieldRoles = perms.fields ?? {}
+  async function setFieldRole (key: string, e: Event): Promise<void> {
+    if (project === undefined) return
+    const role = (e.target as HTMLSelectElement).value as AccountRole
+    const next = { ...fieldRoles }
+    if (role === AccountRole.User) delete next[key]
+    else next[key] = role
+    await client.update(project, { permissions: { ...perms, fields: next } })
+  }
   function on (ev: keyof NotificationScheme, who: keyof NotificationRecipients): boolean {
     const s = notify[ev]
     if (s === undefined || s === true) return true
     if (s === false) return false
     return s[who] !== false
   }
-  async function setRole (key: keyof PermissionScheme, role: AccountRole): Promise<void> {
+  async function setRole (key: RoleKey, role: AccountRole): Promise<void> {
     if (project === undefined) return
     const next: PermissionScheme = { ...perms }
     if (role === AccountRole.User) delete next[key]
     else next[key] = role
     await client.update(project, { permissions: next })
   }
-  function onRole (key: keyof PermissionScheme, e: Event): void {
+  function onRole (key: RoleKey, e: Event): void {
     void setRole(key, (e.currentTarget as HTMLSelectElement).value as AccountRole)
   }
   async function toggle (ev: keyof NotificationScheme, who: keyof NotificationRecipients): Promise<void> {
@@ -117,6 +132,16 @@
   </section>
 
   <section class="card motion-rise" style="--i: 1">
+    <span class="card__title"><Label label={tracker.string.FieldPermissions} /></span>
+    <p class="muted">Limit who may change a field. Everyone else still sees it. Custom fields appear here too.</p>
+    <div class="fields">
+      {#each FIELD_LIST as key (key)}
+        <label class="field" class:field--set={fieldRoles[key] !== undefined}><span>{key}</span><select class="select" value={fieldRoles[key] ?? AccountRole.User} on:change={(e) => { void setFieldRole(key, e) }}>{#each ROLES as r (r.id)}<option value={r.id}>{r.label}</option>{/each}</select></label>
+      {/each}
+    </div>
+  </section>
+
+  <section class="card motion-rise" style="--i: 2">
     <span class="card__title">Who is notified</span>
     <div class="table-wrap">
       <table class="table">
@@ -154,4 +179,6 @@
   .th, .td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--theme-divider-color); text-align: center; }
   .th { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--theme-dark-color); &--name { text-align: left; } }
   .td { color: var(--theme-content-color); &--name { text-align: left; color: var(--theme-caption-color); } }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.4rem; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0.5rem; border: 1px solid var(--theme-divider-color); border-radius: 0.5rem; font-size: 0.8125rem; color: var(--theme-content-color); span { font-family: var(--mono-font, monospace); } &--set { border-color: var(--accent-brand); background: var(--accent-brand-soft); } }
 </style>

@@ -59,6 +59,11 @@ export async function runDigest (c: PlatformClient, cfg: DigestConfig): Promise<
   const stale = await c.findAll(tracker.class.Issue, { status: { $in: open }, modifiedOn: { $lt: Date.now() - 7 * DAY } }, { limit: 500, sort: { modifiedOn: SortingOrder.Ascending } })
   const projects = await c.findAll(tracker.class.Project, {})
   const projectOf = new Map(projects.map((p) => [p._id, p.identifier]))
+  const tpl = (await c.findAll(tracker.class.EmailTemplate, { kind: 'digest' }, { limit: 1 }))[0]
+  if (tpl !== undefined && !tpl.enabled) return { sent: 0 }
+  const fill = (s: string, vars: Record<string, string | number>): string => s.replace(/\{([a-zA-Z]+)\}/g, (m, k: string) => (vars[k] === undefined ? m : String(vars[k])))
+  const subjectTpl = tpl?.subject !== undefined && tpl.subject.trim() !== '' ? tpl.subject : 'Your day in {workspace}: {count} open, {due} due soon'
+  const introTpl = tpl?.body !== undefined && tpl.body.trim() !== '' ? tpl.body : 'Good morning. {count} open issue(s) assigned to you.'
   const link = (i: Issue): string => `${cfg.frontUrl.replace(/\/$/, '')}/workbench/${cfg.workspace}/tracker/${i.identifier}`
   let sent = 0
   for (const e of employees) {
@@ -77,8 +82,11 @@ export async function runDigest (c: PlatformClient, cfg: DigestConfig): Promise<
     const myStale = stale.filter((i) => i.assignee === e._id).slice(0, 5)
     const line = (i: Issue): string => `- ${i.identifier} ${i.title} (${statusName.get(i.status) ?? ''}${i.dueDate != null ? `, due ${new Date(i.dueDate).toLocaleDateString()}` : ''})`
     const hline = (i: Issue): string => `<li><a href="${link(i)}">${i.identifier}</a> ${escapeHtml(i.title)} <span style="color:#888">${statusName.get(i.status) ?? ''}${i.dueDate != null ? ` · due ${new Date(i.dueDate).toLocaleDateString()}` : ''}</span></li>`
+    const vars = { count: mine.length, due: due.length, workspace: projectOf.size > 1 ? 'CeePee' : projectOf.values().next().value ?? 'CeePee' }
+    const intro = fill(introTpl, vars)
+    const subject = fill(subjectTpl, vars)
     const text = [
-      `Good morning. ${mine.length} open issue${mine.length === 1 ? '' : 's'} assigned to you.`,
+      intro,
       '',
       'Next up:',
       ...next.map(line),
@@ -88,9 +96,9 @@ export async function runDigest (c: PlatformClient, cfg: DigestConfig): Promise<
       '',
       `Open CeePee: ${cfg.frontUrl}`
     ].join('\n')
-    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222"><p>Good morning. <b>${mine.length}</b> open issue${mine.length === 1 ? '' : 's'} assigned to you.</p><p><b>Next up</b></p><ul>${next.map(hline).join('')}</ul>${due.length > 0 ? `<p><b>Due within 3 days</b></p><ul>${due.map(hline).join('')}</ul>` : ''}${myStale.length > 0 ? `<p><b>Gone quiet (7+ days)</b></p><ul>${myStale.map(hline).join('')}</ul>` : ''}${needsTimesheet ? `<p><b>Timesheet</b> · ${Math.round(lastWeekHours * 10) / 10}h logged last week, not yet submitted. <a href="${timesheetUrl}">Submit it</a>.</p>` : ''}<p><a href="${cfg.frontUrl}">Open CeePee</a></p></div>`
+    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222"><p>${escapeHtml(intro)}</p><p><b>Next up</b></p><ul>${next.map(hline).join('')}</ul>${due.length > 0 ? `<p><b>Due within 3 days</b></p><ul>${due.map(hline).join('')}</ul>` : ''}${myStale.length > 0 ? `<p><b>Gone quiet (7+ days)</b></p><ul>${myStale.map(hline).join('')}</ul>` : ''}${needsTimesheet ? `<p><b>Timesheet</b> · ${Math.round(lastWeekHours * 10) / 10}h logged last week, not yet submitted. <a href="${timesheetUrl}">Submit it</a>.</p>` : ''}<p><a href="${cfg.frontUrl}">Open CeePee</a></p></div>`
     try {
-      await sendMail(cfg, to, `Your day in ${projectOf.size > 1 ? 'CeePee' : projectOf.values().next().value ?? 'CeePee'}: ${mine.length} open, ${due.length} due soon`, text, html)
+      await sendMail(cfg, to, subject, text, html)
       sent++
     } catch {
       // one bad address must not stop the rest
