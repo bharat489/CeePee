@@ -25,6 +25,7 @@
     "WorkspaceLimitReached": "Osiągnąłeś limit przestrzeni roboczych. Skontaktuj się z nami...",
     "ReadOnlyAccount": "Wersja demonstracyjna dla anonimowego gościa",
     "SystemAccount": "Konto systemowe",
-    "SocialIdAlreadyExists": "Identyfikator społecznościowy już istnieje"
+    "SocialIdAlreadyExists": "Identyfikator społecznościowy już istnieje",
+    "MailNotConfigured": "Ten serwer nie potrafi jeszcze wysyłać e-maili, więc link do resetu nie może zostać wysłany. Poproś właściciela przestrzeni o zresetowanie hasła w Ustawienia → Zespół lub ustaw MAIL_URL na serwerze."
   }
 }

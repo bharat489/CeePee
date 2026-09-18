@@ -20,12 +20,13 @@
     "WorkspaceRateLimit": "El servidor está ocupado. Espere un momento e inténtelo de nuevo",
     "AccountAlreadyConfirmed": "La cuenta ya está confirmada",
     "WorkspaceAlreadyExists": "El espacio de trabajo ya existe",
-        "InvalidOtp": "Código inválido",
+    "InvalidOtp": "Código inválido",
     "PasswordLoginLocked": "El inicio de sesión con contraseña está bloqueado debido a demasiados intentos fallidos. Use el método de inicio de sesión OTP para desbloquear su cuenta.",
     "InviteNotFound": "Invitación con correo electrónico:{email} no encontrada.",
     "WorkspaceLimitReached": "Ha alcanzado el límite de espacios de trabajo. Póngase en contacto con nosotros...",
     "ReadOnlyAccount": "Demo de invitado anónimo",
     "SystemAccount": "Cuenta del sistema",
-    "SocialIdAlreadyExists": "El ID social ya existe"
+    "SocialIdAlreadyExists": "El ID social ya existe",
+    "MailNotConfigured": "Este servidor aún no puede enviar correo, así que no se puede enviar un enlace de restablecimiento. Pida a un propietario del espacio que restablezca su contraseña en Ajustes → Equipo, o configure MAIL_URL en el servidor."
   }
 }

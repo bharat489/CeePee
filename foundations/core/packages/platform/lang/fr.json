@@ -26,6 +26,7 @@
     "WorkspaceLimitReached": "Vous avez atteint la limite d'espace de travail. Veuillez contacter nous...",
     "ReadOnlyAccount": "Démo invité anonyme",
     "SystemAccount": "Compte système",
-    "SocialIdAlreadyExists": "L'ID social existe déjà"
+    "SocialIdAlreadyExists": "L'ID social existe déjà",
+    "MailNotConfigured": "Ce serveur ne peut pas encore envoyer d’e-mails, le lien de réinitialisation ne peut donc pas être envoyé. Demandez à un propriétaire de l’espace de réinitialiser votre mot de passe dans Paramètres → Équipe, ou définissez MAIL_URL sur le serveur."
   }
 }

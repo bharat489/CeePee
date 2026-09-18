@@ -1521,6 +1521,12 @@ export async function requestPasswordReset (
     )
   }
 
+  // Without a mail service the link cannot go anywhere; say so instead of a 500, and point at
+  // the owner-made reset link in Settings → Team.
+  if ((getMetadata(accountPlugin.metadata.MAIL_URL) ?? '') === '') {
+    ctx.warn('Password reset requested but MAIL_URL is not set', { email: normalizedEmail })
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.MailNotConfigured, {}))
+  }
   const { mailURL, mailAuth } = getMailUrl()
   const front = getFrontUrl(branding)
 
@@ -1622,6 +1628,54 @@ export async function requestPasswordSetup (
   } else {
     ctx.error(`Failed to send password setup email: ${response.statusText}`, { accountUuid })
   }
+}
+
+/**
+ * A recovery link made by a workspace owner for one of the workspace's members, for servers that
+ * cannot send email. Same token the emailed link carries, but it expires in 24 hours and is handed
+ * to the owner to pass on. Owners cannot mint links for other owners.
+ */
+export async function createPasswordResetLink (
+  ctx: MeasureContext,
+  db: AccountDB,
+  branding: Branding | null,
+  token: string,
+  params: { email: string }
+): Promise<{ link: string, expiresInHours: number }> {
+  const { email } = params
+  if (email == null || email === '') {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, {}))
+  }
+  const { account, workspace, extra } = decodeTokenVerbose(ctx, token)
+  if (workspace == null) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+  }
+  const callerRole = await db.getWorkspaceRole(account, workspace)
+  verifyAllowedRole(callerRole, AccountRole.Owner, extra)
+
+  const normalizedEmail = cleanEmail(email)
+  const emailSocialId = await getEmailSocialId(db, normalizedEmail)
+  if (emailSocialId == null) {
+    throw new PlatformError(
+      new Status(Severity.ERROR, platform.status.SocialIdNotFound, { value: email, type: SocialIdType.EMAIL })
+    )
+  }
+  const target = await getAccount(db, emailSocialId.personUuid as AccountUuid)
+  if (target == null) {
+    throw new PlatformError(
+      new Status(Severity.ERROR, platform.status.AccountNotFound, { account: emailSocialId.personUuid })
+    )
+  }
+  const targetRole = await db.getWorkspaceRole(target.uuid, workspace)
+  if (targetRole == null || (targetRole === AccountRole.Owner && target.uuid !== account)) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+  }
+  const expiresInHours = 24
+  const resetToken = generateToken(target.uuid, undefined, { restoreEmail: normalizedEmail }, undefined, {
+    exp: Math.floor(Date.now() / 1000) + expiresInHours * 3600
+  })
+  ctx.info('Owner-made password reset link', { by: account, for: target.uuid, workspace })
+  return { link: concatLink(getFrontUrl(branding), `/login/recovery?id=${resetToken}`), expiresInHours }
 }
 
 export async function restorePassword (
@@ -3566,6 +3620,7 @@ export type AccountMethods =
   | 'checkHasPassword'
   | 'changePassword'
   | 'requestPasswordReset'
+  | 'createPasswordResetLink'
   | 'requestPasswordSetup'
   | 'restorePassword'
   | 'leaveWorkspace'
@@ -3651,6 +3706,7 @@ export function getMethods (hasSignUp: boolean = true): Partial<Record<AccountMe
     checkHasPassword: wrap(checkHasPassword),
     changePassword: wrap(changePassword),
     requestPasswordReset: wrap(requestPasswordReset),
+    createPasswordResetLink: wrap(createPasswordResetLink),
     requestPasswordSetup: wrap(requestPasswordSetup),
     restorePassword: wrap(restorePassword),
     leaveWorkspace: wrap(leaveWorkspace),

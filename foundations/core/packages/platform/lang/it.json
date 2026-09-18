@@ -26,6 +26,7 @@
     "WorkspaceLimitReached": "Hai raggiunto il limite di spazi di lavoro. Contattaci...",
     "ReadOnlyAccount": "Demo ospite anonimo",
     "SystemAccount": "Account di sistema",
-    "SocialIdAlreadyExists": "L'ID social esiste già"
+    "SocialIdAlreadyExists": "L'ID social esiste già",
+    "MailNotConfigured": "Questo server non può ancora inviare e-mail, quindi il link di reimpostazione non può essere spedito. Chiedi a un proprietario dello spazio di reimpostare la password da Impostazioni → Team, oppure imposta MAIL_URL sul server."
   }
 }

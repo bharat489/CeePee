@@ -32,7 +32,7 @@
   import { recordAudit } from '../audit'
   import contact, { type Employee, formatName } from '@hcengineering/contact'
   import { EmployeePresenter } from '@hcengineering/contact-resources'
-  import core, { type Account, AccountRole, type Enum, type Ref, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
+  import core, { type Account, AccountRole, type Enum, type Ref, SocialIdType, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
   import hr, { type Department } from '@hcengineering/hr'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import {
@@ -152,6 +152,39 @@
     busy?: boolean
     error?: string
   }
+  // ---- password reset without email: an owner makes a 24-hour link and passes it on --------
+  const isOwner = hasAccountRole(currentAccount, AccountRole.Owner)
+  let resetLinks: Record<string, string> = {}
+  let resetErrors: Record<string, string> = {}
+  let resetCopied = ''
+  async function emailOf (e: Employee): Promise<string | undefined> {
+    const ids = await client.findAll(contact.class.SocialIdentity, { attachedTo: e._id, type: SocialIdType.EMAIL })
+    return ids.find((x) => x.verifiedOn != null)?.value ?? ids[0]?.value
+  }
+  async function copyReset (e: Employee): Promise<void> {
+    const link = resetLinks[e._id]
+    if (link === undefined) return
+    try {
+      await navigator.clipboard.writeText(link)
+      resetCopied = e._id
+      setTimeout(() => { resetCopied = '' }, 1500)
+    } catch {}
+  }
+  async function resetPassword (e: Employee): Promise<void> {
+    const next = { ...resetErrors }
+    delete next[e._id]
+    resetErrors = next
+    try {
+      const email = await emailOf(e)
+      if (email === undefined) throw new Error('this person has no email address')
+      const r = await accountClient.createPasswordResetLink(email)
+      resetLinks = { ...resetLinks, [e._id]: r.link }
+      void recordAudit('password.reset-link', email, 'created by owner')
+      await copyReset(e)
+    } catch (err: any) {
+      resetErrors = { ...resetErrors, [e._id]: String(err?.message ?? err?.status?.code ?? err ?? 'failed').replace('platform:status:', '') }
+    }
+  }
   let adding: NewPerson[] = [blank()]
   function blank (): NewPerson {
     return { email: '', first: '', last: '', role: AccountRole.User }
@@ -215,6 +248,7 @@
             <span><Label label={setting.string.Position} /></span>
             <span><Label label={setting.string.Role} /></span>
             <span><Label label={setting.string.Department} /></span>
+            <span></span>
           </div>
           {#each employees as e, idx (e._id)}
             {@const uuid = e.personUuid ?? undefined}
@@ -258,6 +292,16 @@
                   void setDepartment(e, ev.detail)
                 }}
               />
+              {#if isOwner && uuid !== undefined && currentAccount.uuid !== uuid}
+                <span class="team__reset">
+                  {#if resetLinks[e._id] !== undefined}
+                    <button class="team__lnk" title={resetLinks[e._id]} on:click={() => { void copyReset(e) }}>{resetCopied === e._id ? 'link copied' : 'copy reset link'}</button>
+                  {:else}
+                    <button class="team__lnk" on:click={() => { void resetPassword(e) }}>reset password</button>
+                  {/if}
+                  {#if resetErrors[e._id] !== undefined}<span class="team__err" title={resetErrors[e._id]}>{resetErrors[e._id]}</span>{/if}
+                </span>
+              {/if}
             </div>
           {/each}
         {/if}
@@ -318,11 +362,14 @@
   .invite-error { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--negative-button-default); }
   .team { display: flex; flex-direction: column; gap: 0.5rem; }
   .team__hint { margin: 0 0 0.75rem; color: var(--theme-dark-color); font-size: 0.875rem; max-width: 60ch; }
+  .team__reset { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+  .team__lnk { border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.75rem; white-space: nowrap; cursor: pointer; &:hover { text-decoration: underline; } }
+  .team__err { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.7rem; color: var(--negative-button-default); }
   .team__empty { margin: 0; color: var(--theme-trans-color); font-size: 0.875rem; }
 
   .team__grid {
     display: grid;
-    grid-template-columns: minmax(14rem, 1.4fr) 1fr 1fr 1fr;
+    grid-template-columns: minmax(14rem, 1.4fr) 1fr 1fr 1fr auto;
     align-items: center;
     gap: 0.75rem;
     padding: 0.4rem 0.5rem;

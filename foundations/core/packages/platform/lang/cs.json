@@ -20,12 +20,13 @@
     "WorkspaceRateLimit": "Server je zaneprázdněný. Prosím, chvíli počkejte a zkuste to znovu",
     "AccountAlreadyConfirmed": "Účet již byl potvrzen",
     "WorkspaceAlreadyExists": "Pracovní prostor již existuje",
-        "InvalidOtp": "Neplatný kód",
+    "InvalidOtp": "Neplatný kód",
     "PasswordLoginLocked": "Přihlášení heslem je zablokováno z důvodu příliš mnoha neúspěšných pokusů. Pomocí metody přihlášení OTP odemkněte svůj účet.",
     "InviteNotFound": "Pozvánka s e-mailem:{email} nenalezena.",
     "WorkspaceLimitReached": "Dosáhli jste limitu pracovních prostorů. Kontaktujte nás...",
     "ReadOnlyAccount": "Anonymní hostovská ukázka",
     "SystemAccount": "Systémový účet",
-    "SocialIdAlreadyExists": "Sociální ID již existuje"
+    "SocialIdAlreadyExists": "Sociální ID již existuje",
+    "MailNotConfigured": "Tento server zatím neumí odesílat e-maily, takže odkaz pro obnovení nelze poslat. Požádejte vlastníka pracovního prostoru o obnovení hesla v Nastavení → Tým, nebo nastavte MAIL_URL na serveru."
   }
 }

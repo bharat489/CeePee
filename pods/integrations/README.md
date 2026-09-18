@@ -140,3 +140,11 @@ default automation email. The first two are sent by the transactor (needs `MAIL_
 Settings → Organisation shows counts, public surfaces, service health, audit retention and a SIEM endpoint: when set,
 every change to issues, projects, rules, forms, schemes, ideas, templates and audit records is posted there as one JSON
 event with the shared secret as a bearer token.
+
+## Password recovery without email
+
+Until `MAIL_URL` points at a mail service (SMTP or SES via the `mail` profile), the sign-in page's **Password
+recovery** cannot send a link and says so. A workspace owner can instead open Settings → Team, click **reset
+password** next to the person, and pass on the 24-hour link that is copied to the clipboard; the person opens it,
+sets a new password and is signed in. Owners cannot make links for other owners. To restore email recovery, fill
+`SMTP_*` in dev/.env, set `MAIL_URL=http://mail:8097`, and start the stack with `--profile mail`.

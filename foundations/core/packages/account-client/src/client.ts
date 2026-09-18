@@ -82,6 +82,7 @@ export interface AccountClient {
   restorePassword: (password: string) => Promise<LoginInfo>
   confirm: () => Promise<LoginInfo>
   requestPasswordReset: (email: string) => Promise<void>
+  createPasswordResetLink: (email: string) => Promise<{ link: string, expiresInHours: number }>
   sendInvite: (email: string, role: AccountRole) => Promise<void>
   resendInvite: (email: string, role: AccountRole) => Promise<void>
   createInviteLink: (
@@ -447,6 +448,16 @@ class AccountClientImpl implements AccountClient {
     }
 
     await this.rpc(request)
+  }
+
+  /** Owner-made recovery link for a member of the current workspace, for servers without email. */
+  async createPasswordResetLink (email: string): Promise<{ link: string, expiresInHours: number }> {
+    const request = {
+      method: 'createPasswordResetLink' as const,
+      params: { email }
+    }
+
+    return await this.rpc(request)
   }
 
   async sendInvite (email: string, role: AccountRole): Promise<void> {

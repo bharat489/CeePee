@@ -25,6 +25,7 @@
     "WorkspaceLimitReached": "You have reached the workspace limit. Please contact us...",
     "ReadOnlyAccount": "Anonymous Guest Demo",
     "SystemAccount": "System account",
-    "SocialIdAlreadyExists": "Social ID already exists"
+    "SocialIdAlreadyExists": "Social ID already exists",
+    "MailNotConfigured": "This server cannot send email yet, so a reset link cannot be mailed. Ask a workspace owner to reset your password from Settings → Team, or set MAIL_URL on the server."
   }
 }
