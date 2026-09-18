@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/ceepee/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/ceepee/favicon.svg">
   <link rel="shortcut icon" href="/huly/favicon.ico" sizes="any" id="default-favicon">
   <style>
     /* Boot screen: shown until the app mounts, then faded out by main.ts. */
@@ -33,6 +34,18 @@
     @keyframes boot-r3 { from { transform: rotateZ(0); } to { transform: rotateZ(360deg); } }
     #ceepee-boot .word { position: relative; font-size: 28px; font-weight: 800; letter-spacing: .34em; text-indent: .34em; background: linear-gradient(90deg, #e9ecf1 0%, #c0f010 45%, #4f8bff 60%, #e9ecf1 100%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: boot-shimmer 3.2s linear infinite; }
     @keyframes boot-shimmer { from { background-position: 220% 0; } to { background-position: -220% 0; } }
+    #ceepee-boot { --vibe-a: #7c3aed; --vibe-b: #ec4899; --vibe-c: #f97316; }
+    html[data-vibe="ocean"] #ceepee-boot { --vibe-a: #0ea5e9; --vibe-b: #6366f1; --vibe-c: #22d3ee; }
+    html[data-vibe="sunset"] #ceepee-boot { --vibe-a: #f97316; --vibe-b: #ec4899; --vibe-c: #a21caf; }
+    html[data-vibe="lime"] #ceepee-boot { --vibe-a: #2b6bea; --vibe-b: #6a45f5; --vibe-c: #c0f010; }
+    html[data-vibe="mono"] #ceepee-boot { --vibe-a: #2b6bea; --vibe-b: #2b6bea; --vibe-c: #2b6bea; }
+    #ceepee-boot .word svg { display: block; height: 40px; width: auto; overflow: visible; filter: drop-shadow(0 0 16px rgba(168,85,247,.35)); }
+    #ceepee-boot .word .g { stroke-dasharray: 420; animation: boot-draw 1.1s cubic-bezier(.2,.8,.3,1) both; animation-delay: calc(.15s + var(--i, 0) * .12s); }
+    #ceepee-boot .word .s { stroke-dasharray: 130; animation: boot-streak .9s cubic-bezier(.2,.8,.3,1) both; animation-delay: .95s; }
+    #ceepee-boot .word .core { transform-origin: 50px 50px; animation: boot-breathe 3.2s ease-in-out infinite; }
+    @keyframes boot-draw { from { stroke-dashoffset: 420; opacity: .2; } to { stroke-dashoffset: 0; opacity: 1; } }
+    @keyframes boot-streak { from { stroke-dashoffset: 130; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+    @keyframes boot-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
     #ceepee-boot .line { position: relative; width: 240px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
     html[data-vibe="aurora"] #ceepee-boot .word { background-image: linear-gradient(90deg, #e9ecf1 0%, #a855f7 40%, #ec4899 55%, #f97316 65%, #e9ecf1 100%); }
     html[data-vibe="ocean"] #ceepee-boot .word { background-image: linear-gradient(90deg, #e9ecf1 0%, #22d3ee 45%, #6366f1 60%, #e9ecf1 100%); }
@@ -54,7 +67,7 @@
     <div class="aurora"></div>
     <div class="stars"></div>
     <div class="orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="core"></span></div>
-    <div class="word">CEEPEE</div>
+    <div class="word" aria-label="CeePee"><svg viewBox="0 0 660 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: var(--vibe-a, #7c3aed)"/><stop offset=".55" style="stop-color: var(--vibe-b, #ec4899)"/><stop offset="1" style="stop-color: var(--vibe-c, #f97316)"/></linearGradient><linearGradient id="bg-streak" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: var(--vibe-c, #f97316)"/><stop offset="1" style="stop-color: var(--vibe-c, #f97316)" stop-opacity="0"/></linearGradient><path id="bg-orbit" d="M 94 50 A 44 15 0 1 1 6 50 A 44 15 0 1 1 94 50" transform="rotate(-28 50 50)"/></defs><use href="#bg-orbit" fill="none" stroke="url(#bg-grad)" stroke-width="6"/><circle class="core" cx="50" cy="50" r="13" fill="url(#bg-grad)"/><circle class="core" cx="50" cy="50" r="5" fill="#fff" fill-opacity=".9"/><circle r="5.5" fill="#fff"><animateMotion dur="5s" repeatCount="indefinite"><mpath href="#bg-orbit"/></animateMotion></circle><g fill="none" stroke="url(#bg-grad)" stroke-width="13" stroke-linejoin="miter"><path class="g" style="--i:0" d="M182 24 L170 12 H134 L122 24 V76 L134 88 H170 L182 76"/><path class="g" style="--i:1" d="M264 12 H216 L204 24 V76 L216 88 H264 M204 50 H252"/><path class="g" style="--i:2" d="M346 12 H298 L286 24 V76 L298 88 H346 M286 50 H334"/><path class="g" style="--i:3" d="M368 88 V24 L380 12 H416 L428 24 V40 L416 52 H368"/><path class="g" style="--i:4" d="M510 12 H462 L450 24 V76 L462 88 H510 M450 50 H498"/><path class="g" style="--i:5" d="M592 12 H544 L532 24 V76 L544 88 H592"/></g><path class="s" d="M532 50 H655" fill="none" stroke="url(#bg-streak)" stroke-width="13"/></svg></div>
     <div class="line"></div>
     <div class="phase" id="ceepee-boot-phase">Waking the workspace</div>
   </div>

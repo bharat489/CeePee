@@ -42,7 +42,7 @@
   import SelectWorkspace from './SelectWorkspace.svelte'
   import SignupForm from './SignupForm.svelte'
   import LoginTfaForm from './LoginTfaForm.svelte'
-  import LoginIcon from './icons/LoginIcon.svelte'
+  import CeePeeLogo from './icons/CeePeeLogo.svelte'
   import { Pages, getAccount, pages } from '..'
   import login from '../plugin'
 
@@ -126,10 +126,10 @@
       <span class="lg__grid" />
       <span class="lg__stars" />
     </div>
-    <div class="lg__brand" style:top={'calc(1.5rem + var(--huly-top-indent, 0rem))'}>
-      <LoginIcon /><span class="lg__brandname">{getMetadata(workbench.metadata.PlatformTitle)}</span>
-    </div>
     <div class="lg__layout">
+      <div class="lg__brand" title={getMetadata(workbench.metadata.PlatformTitle)}>
+        <CeePeeLogo height={$deviceInfo.docWidth <= 900 ? '2rem' : 'clamp(2rem, 3vw, 2.75rem)'} />
+      </div>
       {#if $deviceInfo.docWidth > 900}
         <section class="lg__hero">
           <span class="lg__eyebrow">Work management, reimagined</span>
@@ -197,10 +197,10 @@
   .lg__blob--c { left: 20vw; bottom: -35vmax; background: radial-gradient(circle at 50% 50%, var(--vibe-c), transparent 60%); animation-delay: -17s; }
   .lg__grid { position: absolute; inset: -40%; background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 72px 72px; transform: perspective(700px) rotateX(60deg) translateY(160px); mask-image: radial-gradient(ellipse at 50% 70%, #000 15%, transparent 65%); -webkit-mask-image: radial-gradient(ellipse at 50% 70%, #000 15%, transparent 65%); animation: lgGrid 18s linear infinite; }
   .lg__stars { position: absolute; inset: 0; opacity: 0.6; background-image: radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.7), transparent), radial-gradient(1px 1px at 70% 20%, rgba(255, 255, 255, 0.5), transparent), radial-gradient(1.5px 1.5px at 40% 80%, rgba(255, 255, 255, 0.6), transparent), radial-gradient(1px 1px at 85% 65%, rgba(255, 255, 255, 0.5), transparent), radial-gradient(1px 1px at 10% 75%, rgba(255, 255, 255, 0.4), transparent), radial-gradient(1px 1px at 55% 50%, rgba(255, 255, 255, 0.35), transparent); }
-  .lg__brand { position: fixed; left: clamp(0.75rem, 2.5vw, 1.75rem); z-index: 3; display: flex; align-items: center; gap: 0.5rem; }
-  .lg__brandname { font-size: clamp(0.9rem, 1.1vw, 1.1rem); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
-  .lg__layout { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, clamp(21rem, 38vw, 34rem)); gap: clamp(1.5rem, 4vw, 4rem); align-items: center; width: 100%; max-width: 120rem; min-height: 100%; margin: 0 auto; padding: clamp(4rem, 9vh, 6.5rem) clamp(1rem, 5vw, 4.5rem) clamp(1rem, 4vh, 3rem); box-sizing: border-box; }
-  .lg--narrow .lg__layout { grid-template-columns: 1fr; gap: 0; padding: clamp(4rem, 8vh, 5rem) clamp(0.5rem, 3vw, 1rem) 1rem; }
+  .lg__brand { grid-column: 1 / -1; align-self: start; display: flex; align-items: center; padding-bottom: clamp(0.5rem, 2vh, 1.5rem); }
+  .lg__layout { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, clamp(21rem, 38vw, 34rem)); grid-template-rows: auto 1fr; gap: clamp(1.5rem, 4vw, 4rem); row-gap: 0; align-items: center; width: 100%; max-width: 120rem; min-height: 100%; margin: 0 auto; padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 5vw, 4.5rem) clamp(1rem, 4vh, 3rem); box-sizing: border-box; }
+  .lg--narrow .lg__layout { grid-template-columns: 1fr; gap: 0; padding: 1rem clamp(0.5rem, 3vw, 1rem) 1rem; }
+  .lg--narrow .lg__brand { justify-content: center; padding-bottom: 1rem; }
   .lg__hero { display: flex; flex-direction: column; gap: clamp(0.6rem, 1.4vh, 1.1rem); min-width: 0; max-width: 40rem; animation: riseIn 0.7s var(--ease-enter, ease-out) both; }
   .lg__eyebrow { font-size: clamp(0.65rem, 0.8vw, 0.8rem); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(233, 236, 241, 0.6); }
   .lg__h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4.6rem); line-height: 1.02; font-weight: 900; letter-spacing: -0.03em; }
