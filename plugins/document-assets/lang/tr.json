@@ -51,6 +51,8 @@
     "ConfigDescription": "İşbirlikli doküman düzenleme için uzantı",
     "Icon": "İkon",
     "Color": "Renk",
-    "IssuesInDocument": "Bu sayfadaki kayıtlar"
+    "IssuesInDocument": "Bu sayfadaki kayıtlar",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

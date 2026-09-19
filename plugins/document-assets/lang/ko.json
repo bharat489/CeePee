@@ -53,6 +53,8 @@
     "Color": "색상",
     "ForbidCreateTeamspacePermission": "팀스페이스 생성 금지",
     "ForbidCreateTeamspacePermissionDescription": "사용자의 새 팀스페이스 생성을 금지합니다",
-    "IssuesInDocument": "이 페이지의 이슈"
+    "IssuesInDocument": "이 페이지의 이슈",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

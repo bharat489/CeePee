@@ -53,6 +53,8 @@
     "Color": "Kolor",
     "ForbidCreateTeamspacePermission": "Zabroń tworzenia przestrzeni zespołowych",
     "ForbidCreateTeamspacePermissionDescription": "Zabrania użytkownikom tworzenia nowych przestrzeni zespołowych",
-    "IssuesInDocument": "Zgłoszenia na tej stronie"
+    "IssuesInDocument": "Zgłoszenia na tej stronie",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

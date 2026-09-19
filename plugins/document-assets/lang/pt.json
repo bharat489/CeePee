@@ -53,6 +53,8 @@
     "Color": "Cor",
     "ForbidCreateTeamspacePermission": "Proibir criação de espaço de trabalho",
     "ForbidCreateTeamspacePermissionDescription": "Proíbe os utilizadores de criar novos espaços de trabalho",
-    "IssuesInDocument": "Problemas nesta página"
+    "IssuesInDocument": "Problemas nesta página",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

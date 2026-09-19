@@ -53,6 +53,8 @@
     "Color": "Farbe",
     "ForbidCreateTeamspacePermission": "Arbeitsbereichserstellung verbieten",
     "ForbidCreateTeamspacePermissionDescription": "Verbietet Benutzern das Erstellen neuer Arbeitsbereiche",
-    "IssuesInDocument": "Vorgänge auf dieser Seite"
+    "IssuesInDocument": "Vorgänge auf dieser Seite",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

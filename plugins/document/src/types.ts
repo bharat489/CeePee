@@ -19,6 +19,21 @@ import { IconProps } from '@hcengineering/view'
 /** @public */
 export interface Teamspace extends TypedSpace, IconProps {}
 
+/**
+ * Page permissions. 'inherit' follows the parent page; 'open' lets everyone in the
+ * space read and edit; 'restricted' limits the page to the listed people and groups
+ * (edit includes comment includes view). Enforced by the server. @public
+ */
+export interface PageAccess extends Document {
+  mode: 'inherit' | 'open' | 'restricted'
+  viewers: AccountUuid[]
+  commenters: AccountUuid[]
+  editors: AccountUuid[]
+  viewerGroups: Ref<Doc>[]
+  commenterGroups: Ref<Doc>[]
+  editorGroups: Ref<Doc>[]
+}
+
 /** @public */
 export interface Document extends Doc, IconProps {
   title: string

@@ -42,6 +42,7 @@ export default mergeIds(textEditorId, textEditor, {
     IsEditableNote: '' as Resource<TextActionVisibleFunction>,
     IsEditable: '' as Resource<TextActionVisibleFunction>,
     IsAiAvailable: '' as Resource<TextActionVisibleFunction>,
+    AiMenu: '' as Resource<TextActionFunction>,
     AiImprove: '' as Resource<TextActionFunction>,
     AiRewrite: '' as Resource<TextActionFunction>,
     AiShorten: '' as Resource<TextActionFunction>,

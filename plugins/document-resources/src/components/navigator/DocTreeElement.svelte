@@ -14,7 +14,8 @@
 -->
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Document } from '@hcengineering/document'
+  import document, { Document } from '@hcengineering/document'
+  import { getClient } from '@hcengineering/presentation'
   import type { Asset, IntlString } from '@hcengineering/platform'
   import type { Action, AnySvelteComponent } from '@hcengineering/ui'
   import { IconMoreH, Menu, navigate, showPopup, NavItem, ButtonIcon } from '@hcengineering/ui'
@@ -33,6 +34,11 @@
   export let level: number = 0
   export let actions: Action[] = []
   export let moreActions: (originalEvent?: MouseEvent) => Promise<Action[]> | undefined = async () => []
+
+  // restricted pages carry a lock so the tree shows at a glance where permissions narrow
+  const treeHierarchy = getClient().getHierarchy()
+  $: restricted = treeHierarchy.hasMixin(doc, document.mixin.PageAccess) && treeHierarchy.as(doc, document.mixin.PageAccess).mode === 'restricted'
+  $: shownTitle = restricted && title !== undefined ? '🔒 ' + title : title
   export let forciblyСollapsed: boolean = false
 
   let hovered: boolean = false
@@ -56,7 +62,7 @@
   {icon}
   {iconProps}
   {label}
-  {title}
+  title={shownTitle}
   {isFold}
   {level}
   {empty}

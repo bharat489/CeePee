@@ -21,7 +21,7 @@
 // endpoint.
 
 import { type Editor } from '@tiptap/core'
-import { addNotification, NotificationSeverity } from '@hcengineering/ui'
+import { addNotification, getEventPositionElement, Menu, NotificationSeverity, showPopup, type Action } from '@hcengineering/ui'
 import { aiAvailable, aiChat, AiError, aiLines, aiReachable } from '@hcengineering/presentation'
 import { type ActionContext } from '@hcengineering/text-editor'
 import { getEmbeddedLabel } from '@hcengineering/platform'
@@ -132,6 +132,17 @@ export async function aiAsk (editor: Editor): Promise<void> {
   const q = window.prompt('Ask the model about this text', 'What are the main risks here?')
   if (q === null || q.trim() === '') return
   await ask(editor, `${q.trim()}\n\nAnswer in a few sentences based only on the text below.`, 'below', { maxTokens: 500 })
+}
+
+/** The toolbar's single AI entry: a menu with every writing action. */
+export async function aiMenu (editor: Editor, event: MouseEvent): Promise<void> {
+  const items: Array<[string, (e: Editor) => Promise<void>]> = [
+    ['Improve writing', aiImprove], ['Rewrite', aiRewrite], ['Make shorter', aiShorten], ['Make longer', aiExpand],
+    ['Formal tone', aiFormal], ['Casual tone', aiCasual], ['Summarise', aiSummarize], ['Outline', aiOutline],
+    ['Action items', aiActionItems], ['Continue writing', aiContinue], ['Translate…', aiTranslate], ['Ask AI…', aiAsk]
+  ]
+  const actions: Action[] = items.map(([label, fn]) => ({ label: getEmbeddedLabel(label), action: async () => { await fn(editor) } }))
+  showPopup(Menu, { actions }, getEventPositionElement(event))
 }
 
 /** Toolbar actions show only when a model is configured and the editor is editable. */

@@ -61,6 +61,7 @@
   import { unlockContent } from '..'
   import document from '../plugin'
   import { getDocumentUrl } from '../utils'
+  import PageAccessPopup from './PageAccessPopup.svelte'
   import DocumentEditor from './DocumentEditor.svelte'
   import DocumentPresenter from './DocumentPresenter.svelte'
   import DocumentTitle from './DocumentTitle.svelte'
@@ -86,6 +87,7 @@
   const query = createQuery()
   const dispatch = createEventDispatcher()
   const client = getClient()
+  const hierarchy = client.getHierarchy()
 
   let doc: WithLookup<Document> | undefined
   let title = ''
@@ -239,6 +241,7 @@
   let editor: DocumentEditor
   let content: HTMLElement
 
+  const isRestricted = (d: Document): boolean => hierarchy.hasMixin(d, document.mixin.PageAccess) && hierarchy.as(d, document.mixin.PageAccess).mode === 'restricted'
   const manager = createFocusManager()
 
   onMount(() => {
@@ -306,6 +309,11 @@
     </svelte:fragment>
 
     <svelte:fragment slot="utils">
+      {#if doc && !$restrictionStore.disableActions}
+        <button class="pa-btn" class:pa-btn--r={isRestricted(doc)} title="Who can see and edit this page" on:click={() => { showPopup(PageAccessPopup, { value: doc }, 'top') }}>
+          <span aria-hidden="true">{isRestricted(doc) ? '🔒' : '🌐'}</span><span class="pa-btn__l">{isRestricted(doc) ? 'Restricted' : 'Share'}</span>
+        </button>
+      {/if}
       {#if doc}
         <ComponentExtensions
           extension={view.extensions.EditDocTitleExtension}
@@ -507,4 +515,6 @@
     height: 1px;
     background-color: var(--theme-divider-color);
   }
+  .pa-btn { display: inline-flex; align-items: center; gap: 0.3rem; height: 1.75rem; padding: 0 0.6rem; margin-right: 0.25rem; border: 1px solid var(--theme-divider-color); border-radius: 0.45rem; background: var(--theme-button-default); color: var(--theme-content-color); font: inherit; font-size: 0.78rem; cursor: pointer; &:hover { background: var(--theme-button-hovered); } &--r { color: #b45309; border-color: rgba(180, 83, 9, 0.4); } }
+  .pa-btn__l { @media (max-width: 48rem) { display: none; } }
 </style>

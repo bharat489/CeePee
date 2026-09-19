@@ -53,6 +53,8 @@
     "Color": "Couleur",
     "ForbidCreateTeamspacePermission": "Interdire la création d'espace d'équipe",
     "ForbidCreateTeamspacePermissionDescription": "Interdit aux utilisateurs de créer de nouveaux espaces d'équipe",
-    "IssuesInDocument": "Tickets sur cette page"
+    "IssuesInDocument": "Tickets sur cette page",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

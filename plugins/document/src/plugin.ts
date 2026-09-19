@@ -19,7 +19,7 @@ import type { Asset, Plugin, Resource } from '@hcengineering/platform'
 import { IntlString, plugin } from '@hcengineering/platform'
 import type { AnyComponent, Location, ResolvedLocation } from '@hcengineering/ui/src/types'
 import { Action } from '@hcengineering/view'
-import { Document, DocumentSnapshot, Teamspace } from './types'
+import { Document, DocumentSnapshot, PageAccess, Teamspace } from './types'
 
 /**
  * @public
@@ -36,7 +36,8 @@ export const documentPlugin = plugin(documentId, {
     Teamspace: '' as Ref<Class<Teamspace>>
   },
   mixin: {
-    DefaultTeamspaceTypeData: '' as Ref<Mixin<Teamspace>>
+    DefaultTeamspaceTypeData: '' as Ref<Mixin<Teamspace>>,
+    PageAccess: '' as Ref<Mixin<PageAccess>>
   },
   component: {
     CreateDocument: '' as AnyComponent,
@@ -66,6 +67,9 @@ export const documentPlugin = plugin(documentId, {
     Location: '' as Resource<(loc: Location) => Promise<ResolvedLocation | undefined>>
   },
   string: {
+    PageAccess: '' as IntlString,
+    Cancel: '' as IntlString,
+    Save: '' as IntlString,
     ConfigLabel: '' as IntlString,
     CreateDocument: '' as IntlString,
     Documents: '' as IntlString,

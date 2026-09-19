@@ -57,6 +57,8 @@
     "Color": "颜色",
     "ForbidCreateTeamspacePermission": "禁止创建团队空间",
     "ForbidCreateTeamspacePermissionDescription": "禁止用户创建新团队空间",
-    "IssuesInDocument": "本页中的事项"
+    "IssuesInDocument": "本页中的事项",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

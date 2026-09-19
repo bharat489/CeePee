@@ -53,6 +53,8 @@
     "Color": "Color",
     "ForbidCreateTeamspacePermission": "Forbid create teamspace",
     "ForbidCreateTeamspacePermissionDescription": "Forbid users creating new teamspaces",
-    "IssuesInDocument": "Issues on this page"
+    "IssuesInDocument": "Issues on this page",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

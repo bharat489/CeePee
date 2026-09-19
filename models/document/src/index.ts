@@ -24,8 +24,8 @@ import type {
   Role,
   RolesAssignment
 } from '@hcengineering/core'
-import { AccountRole, AccountUuid, IndexKind } from '@hcengineering/core'
-import { type Document, type DocumentSnapshot, type Teamspace, documentId } from '@hcengineering/document'
+import { AccountRole, AccountUuid, IndexKind, type Doc } from '@hcengineering/core'
+import { type Document, type DocumentSnapshot, type PageAccess, type Teamspace, documentId } from '@hcengineering/document'
 import {
   type Builder,
   Collection,
@@ -147,6 +147,18 @@ export class TDocumentSnapshot extends TDoc implements DocumentSnapshot {
 @UX(document.string.Teamspace, document.icon.Teamspace, 'Teamspace', 'name')
 export class TTeamspace extends TTypedSpace implements Teamspace {}
 
+@Mixin(document.mixin.PageAccess, document.class.Document)
+@UX(getEmbeddedLabel('Page permissions'))
+export class TPageAccess extends TDocument implements PageAccess {
+  mode!: 'inherit' | 'open' | 'restricted'
+  viewers!: AccountUuid[]
+  commenters!: AccountUuid[]
+  editors!: AccountUuid[]
+  viewerGroups!: Ref<Doc>[]
+  commenterGroups!: Ref<Doc>[]
+  editorGroups!: Ref<Doc>[]
+}
+
 @Mixin(document.mixin.DefaultTeamspaceTypeData, document.class.Teamspace)
 @UX(getEmbeddedLabel('Default teamspace type'), document.icon.Document)
 export class TDefaultTeamspaceTypeData extends TTeamspace implements RolesAssignment {
@@ -155,6 +167,7 @@ export class TDefaultTeamspaceTypeData extends TTeamspace implements RolesAssign
 
 function defineTeamspace (builder: Builder): void {
   builder.createModel(TTeamspace)
+  builder.createModel(TPageAccess)
 
   builder.createDoc(
     core.class.SpaceTypeDescriptor,

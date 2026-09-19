@@ -66,29 +66,14 @@ export class TTextEditorAction extends TDoc implements TextEditorAction {
 }
 
 function defineAiActions (builder: Builder): void {
-  const actions: Array<[Resource<any>, IntlString]> = [
-    [textEditor.function.AiImprove, textEditor.string.AiImprove],
-    [textEditor.function.AiRewrite, textEditor.string.AiRewrite],
-    [textEditor.function.AiShorten, textEditor.string.AiShorten],
-    [textEditor.function.AiExpand, textEditor.string.AiExpand],
-    [textEditor.function.AiFormal, textEditor.string.AiFormal],
-    [textEditor.function.AiCasual, textEditor.string.AiCasual],
-    [textEditor.function.AiSummarize, textEditor.string.AiSummarize],
-    [textEditor.function.AiOutline, textEditor.string.AiOutline],
-    [textEditor.function.AiActionItems, textEditor.string.AiActionItems],
-    [textEditor.function.AiContinue, textEditor.string.AiContinue],
-    [textEditor.function.AiTranslate, textEditor.string.AiTranslate],
-    [textEditor.function.AiAsk, textEditor.string.AiAsk]
-  ]
-  actions.forEach(([action, label], index) => {
-    builder.createDoc(textEditor.class.TextEditorAction, core.space.Model, {
-      action,
-      visibilityTester: textEditor.function.IsAiAvailable,
-      icon: view.icon.AiStar,
-      label,
-      category: 95,
-      index: index + 1
-    })
+  // one toolbar entry; the menu inside lists every AI writing action
+  builder.createDoc(textEditor.class.TextEditorAction, core.space.Model, {
+    action: textEditor.function.AiMenu,
+    visibilityTester: textEditor.function.IsAiAvailable,
+    icon: view.icon.AiStar,
+    label: textEditor.string.AiMenu,
+    category: 95,
+    index: 1
   })
 }
 

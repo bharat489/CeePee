@@ -53,6 +53,8 @@
     "Color": "Barva",
     "ForbidCreateTeamspacePermission": "Zakázat vytvoření týmového prostoru",
     "ForbidCreateTeamspacePermissionDescription": "Zakazuje uživatelům vytvářet nové týmové prostory",
-    "IssuesInDocument": "Úkoly na této stránce"
+    "IssuesInDocument": "Úkoly na této stránce",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

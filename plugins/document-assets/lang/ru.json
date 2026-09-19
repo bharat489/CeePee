@@ -53,6 +53,8 @@
     "Color": "Цвет",
     "ForbidCreateTeamspacePermission": "Запретить создание пространства",
     "ForbidCreateTeamspacePermissionDescription": "Запрещает пользователям создавать новые пространства",
-    "IssuesInDocument": "Задачи на этой странице"
+    "IssuesInDocument": "Задачи на этой странице",
+    "PageAccess": "Permissions",
+    "Save": "Save"
   }
 }

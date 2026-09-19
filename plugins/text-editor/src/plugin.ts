@@ -35,6 +35,7 @@ export default plugin(textEditorId, {
   },
   string: {
     AiGroup: '' as IntlString,
+    AiMenu: '' as IntlString,
     AiImprove: '' as IntlString,
     AiRewrite: '' as IntlString,
     AiShorten: '' as IntlString,
