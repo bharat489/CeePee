@@ -132,6 +132,7 @@ import { ensureMissingSocialIdentities } from './contact'
 import { performGithubAccountMigrations } from './github'
 import { performGmailAccountMigrations } from './gmail'
 import { getToolToken, getWorkspace, getWorkspaceTransactorEndpoint } from './utils'
+import { seedDemo } from './seed'
 
 import { createRestClient } from '@hcengineering/api-client'
 import { type CardID } from '@hcengineering/communication-types'
@@ -707,6 +708,24 @@ export function devTool (
       })
     })
 
+  program
+    .command('seed-demo <workspace>')
+    .description('Fill a workspace with sample projects, work items, sprints, docs, ideas, decisions and chat so a team can learn the product')
+    .action(async (workspace: string) => {
+      await withAccountDatabase(async (db) => {
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) throw new Error(`workspace ${workspace} not found`)
+        const endpoint = await getWorkspaceTransactorEndpoint(ws.uuid)
+        const connection = await connect(endpoint, ws.uuid, undefined, { service: 'tool', admin: 'true' })
+        try {
+          const ops = new TxOperations(connection, core.account.System)
+          await seedDemo(ops, (m) => { console.log('  • ' + m) })
+          console.log('seed-demo done')
+        } finally {
+          await connection.close()
+        }
+      })
+    })
   program
     .command('validate-workspace <workspace>')
     .description('Validate a (restored) workspace: connect as system, check model, data counts and blob download')
