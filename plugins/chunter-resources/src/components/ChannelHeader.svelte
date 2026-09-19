@@ -23,6 +23,46 @@
   import Header from './Header.svelte'
   import chunter from '../plugin'
   import { getObjectIcon, getChannelName } from '../utils'
+  import core, { getCurrentAccount, AccountRole } from '@hcengineering/core'
+  import { getMetadata, getResource } from '@hcengineering/platform'
+  import love, { RoomAccess, RoomType, type Room } from '@hcengineering/love'
+
+  // calls need a media server; without LIVEKIT_WS the button stays hidden
+  const callsEnabled = (getMetadata(love.metadata.WebSocketURL) ?? '') !== '' && getCurrentAccount().role !== AccountRole.ReadOnlyGuest
+  let calling = false
+  async function startCall (): Promise<void> {
+    if (object === undefined || calling) return
+    calling = true
+    try {
+      const roomName = `Call · ${title}`
+      let room: Room | undefined = await client.findOne(love.class.Room, { name: roomName })
+      if (room === undefined) {
+        // place the new room below everything else on the main floor
+        const rooms = await client.findAll(love.class.Room, { floor: love.ids.MainFloor })
+        const y = rooms.reduce((m, r) => Math.max(m, r.y + r.height), 0)
+        const id = await client.createDoc(love.class.Room, core.space.Workspace, {
+          name: roomName,
+          type: RoomType.Video,
+          access: RoomAccess.Open,
+          floor: love.ids.MainFloor,
+          width: 3,
+          height: 2,
+          x: 0,
+          y,
+          language: 'en',
+          startWithTranscription: false,
+          startWithRecording: false,
+          description: null
+        })
+        room = await client.findOne(love.class.Room, { _id: id })
+      }
+      if (room === undefined) return
+      const join = await getResource(love.function.JoinRoomCall)
+      await join(room)
+    } finally {
+      calling = false
+    }
+  }
   import PinnedMessages from './PinnedMessages.svelte'
 
   export let _id: Ref<Doc>
@@ -98,4 +138,17 @@
       on:select
     />
   {/if}
+  <svelte:fragment slot="actions">
+    {#if callsEnabled && object !== undefined}
+      <button class="call-btn" class:call-btn--busy={calling} title="Start a call in this channel" on:click={() => { void startCall() }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3.5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 6.5l4-2v7l-4-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span class="call-btn__l">Call</span>
+      </button>
+    {/if}
+  </svelte:fragment>
 </Header>
+
+<style lang="scss">
+  .call-btn { display: inline-flex; align-items: center; gap: 0.35rem; height: 2rem; padding: 0 0.7rem; border: none; border-radius: 0.5rem; background: var(--accent-gradient, var(--primary-button-default)); color: #fff; font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; box-shadow: var(--accent-glow, none); transition: transform var(--motion-fast, 0.12s) var(--ease-standard, ease); &:hover { transform: translateY(-1px); } &--busy { opacity: 0.6; pointer-events: none; } }
+  .call-btn__l { @media (max-width: 40rem) { display: none; } }
+</style>

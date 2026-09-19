@@ -42,6 +42,7 @@ import {
 import { toggleMicState, toggleCamState } from '@hcengineering/media-resources'
 
 export { setCustomCreateScreenTracks } from './utils'
+import { joinMeeting } from './meetings'
 
 export default async (): Promise<Resources> => ({
   component: {
@@ -75,6 +76,7 @@ export default async (): Promise<Resources> => ({
   function: {
     CreateMeeting: createMeeting,
     CreateMeetingSchedule: createMeetingSchedule,
+    JoinRoomCall: joinMeeting,
     CanShowRoomSettings: () => {
       if (!hasAccountRole(getCurrentAccount(), AccountRole.User)) {
         return

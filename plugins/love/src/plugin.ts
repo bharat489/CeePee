@@ -1,7 +1,7 @@
 import { Class, Mixin, Ref } from '@hcengineering/core'
 import { Drive } from '@hcengineering/drive'
 import { NotificationType } from '@hcengineering/notification'
-import { Asset, IntlString, Metadata, Plugin, plugin } from '@hcengineering/platform'
+import { Asset, IntlString, Metadata, Plugin, Resource, plugin } from '@hcengineering/platform'
 import { AnyComponent } from '@hcengineering/ui/src/types'
 import { Action, Viewlet, ViewletDescriptor } from '@hcengineering/view'
 import { Widget } from '@hcengineering/workbench'
@@ -105,6 +105,10 @@ const love = plugin(loveId, {
   sound: {
     Knock: '' as Asset,
     MeetingEndNotification: '' as Asset
+  },
+  function: {
+    // join (and if needed start) a call in a room; registered by love-resources
+    JoinRoomCall: '' as Resource<(room: Room) => Promise<void>>
   },
   metadata: {
     WebSocketURL: '' as Metadata<string>,
