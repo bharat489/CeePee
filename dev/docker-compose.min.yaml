@@ -67,7 +67,7 @@ services:
       - GIF_PROVIDER=${GIF_PROVIDER:-tenor}
       - GIF_API_KEY=${GIF_API_KEY:-}
       # free AI for Ask CeePee: an OpenAI-compatible chat endpoint such as Ollama (http://host.docker.internal:11434)
-      - AI_CHAT_URL=${AI_CHAT_URL:-}
+      - AI_CHAT_URL=${AI_CHAT_URL:-http://huly.local:11434}
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
       # no pulse (presence) service in the minimal stack: blank it so the browser stops retrying ws://…:8099
       - PULSE_URL=
@@ -77,6 +77,22 @@ services:
       # hulylake is not in the minimal stack (its port belongs to love)
       - HULYLAKE_URL=
     links: !override []
+# Open-source model for every AI feature (assistant, writing actions, summaries). The first start
+  # pulls AI_CHAT_MODEL (llama3.2 ≈ 2 GB); after that the model is cached in the ollama volume.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - 11434:11434
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_KEEP_ALIVE=30m
+      - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 4; ollama pull \"$$AI_CHAT_MODEL\" || true; wait"]
+
   livekit:
     image: livekit/livekit-server:v1.8
     container_name: livekit
@@ -239,3 +255,6 @@ services:
       - SECRET=secret
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
+
+volumes:
+  ollama:

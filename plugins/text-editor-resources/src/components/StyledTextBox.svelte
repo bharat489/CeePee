@@ -298,7 +298,7 @@
         },
         inlineCommands: inlineCommandsConfig(
           handleCommandSelected,
-          attachFile == null ? ['drawing-board', 'todo-list', 'image'] : ['drawing-board', 'todo-list']
+          attachFile == null ? ['drawing-board', 'todo-list', 'image', 'ai-summarize', 'ai-outline', 'ai-action-items', 'ai-continue', 'ai-improve'] : ['drawing-board', 'todo-list', 'ai-summarize', 'ai-outline', 'ai-action-items', 'ai-continue', 'ai-improve']
         ),
         ...kitOptions,
         leftMenu: {

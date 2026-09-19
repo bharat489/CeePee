@@ -23,6 +23,9 @@
 	handle_path /_livekit/* {
 		reverse_proxy livekit:7880
 	}
+	handle_path /_ai/* {
+		reverse_proxy ollama:11434
+	}
 	handle_path /_datalake/* {
 		reverse_proxy datalake:4030
 	}

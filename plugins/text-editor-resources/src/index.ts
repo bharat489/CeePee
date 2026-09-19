@@ -41,6 +41,7 @@ import {
 } from './components/extension/embed/embed'
 import { isMathBlockActive, isMathInlineActive } from './components/extension/mathematics'
 import { formatLink, isEditable, isHeadingVisible } from './utils'
+import { isAiAvailable, aiImprove, aiRewrite, aiShorten, aiExpand, aiFormal, aiCasual, aiSummarize, aiOutline, aiActionItems, aiContinue, aiTranslate, aiAsk } from './ai'
 export { SmartPasteExtension as TransformPastedContentExtension } from './components/extension/shortcuts/smartPaste'
 export { getReferenceFromUrl, getReferenceLabel, getTargetObjectFromUrl } from './components/extension/reference'
 export { TodoItemExtension, TodoListExtension } from './components/extension/todo/todo'
@@ -124,6 +125,19 @@ export default async (): Promise<Resources> => ({
     SeeOriginalTableData: seeOriginalTableData,
     IsEditableNote: isEditableNote,
     IsEditable: isEditable,
+    IsAiAvailable: isAiAvailable,
+    AiImprove: aiImprove,
+    AiRewrite: aiRewrite,
+    AiShorten: aiShorten,
+    AiExpand: aiExpand,
+    AiFormal: aiFormal,
+    AiCasual: aiCasual,
+    AiSummarize: aiSummarize,
+    AiOutline: aiOutline,
+    AiActionItems: aiActionItems,
+    AiContinue: aiContinue,
+    AiTranslate: aiTranslate,
+    AiAsk: aiAsk,
     IsHeadingVisible: isHeadingVisible,
     IsTextStylingEnabled: isTextStylingEnabled,
 

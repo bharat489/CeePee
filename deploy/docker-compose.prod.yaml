@@ -184,7 +184,7 @@ services:
       - PUBLIC_INTEGRATIONS_URL=https://${API_DOMAIN}
       - GIF_PROVIDER=${GIF_PROVIDER:-tenor}
       - GIF_API_KEY=${GIF_API_KEY:-}
-      - AI_CHAT_URL=${AI_CHAT_URL:-}
+      - AI_CHAT_URL=${AI_CHAT_URL:-https://${DOMAIN}/_ai}
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
       - PULSE_URL=
       - LIVEKIT_WS=wss://${DOMAIN}/_livekit
@@ -337,6 +337,20 @@ services:
       rekoni:
         condition: service_started
 
+  # ---- AI ------------------------------------------------------------------
+  # Open-source model behind every AI feature; no keys, nothing leaves the server.
+  # First start pulls AI_CHAT_MODEL (llama3.2 ≈ 2 GB, needs ~4 GB RAM; llama3.2:1b for small VMs).
+  ollama:
+    <<: *common
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_KEEP_ALIVE=30m
+      - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 4; ollama pull \"$$AI_CHAT_MODEL\" || true; wait"]
+
   backup:
     <<: *common
     image: cockroachdb/cockroach:latest-v24.3
@@ -356,6 +370,7 @@ services:
       - cockroach
 
 volumes:
+  ollama_data:
   elastic_data:
   caddy_data:
   caddy_config:

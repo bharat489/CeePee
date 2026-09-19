@@ -14,6 +14,7 @@
 //
 
 import textEditor from '@hcengineering/text-editor'
+import { aiAvailable } from '@hcengineering/presentation'
 import { IconScribble } from '@hcengineering/ui'
 import view from '@hcengineering/view'
 import { type Editor, type Range } from '@tiptap/core'
@@ -93,7 +94,12 @@ const inlineCommandsIds = [
   'separator-line',
   'todo-list',
   'drawing-board',
-  'mermaid'
+  'mermaid',
+  'ai-summarize',
+  'ai-outline',
+  'ai-action-items',
+  'ai-continue',
+  'ai-improve'
 ] as const
 export type InlineCommandId = (typeof inlineCommandsIds)[number]
 
@@ -114,7 +120,16 @@ export function inlineCommandsConfig (
           { id: 'separator-line', label: textEditor.string.SeparatorLine, icon: view.icon.SeparatorLine },
           { id: 'todo-list', label: textEditor.string.TodoItem, icon: view.icon.TodoList },
           { id: 'drawing-board', label: textEditor.string.DrawingBoard, icon: IconScribble as any },
-          { id: 'mermaid', label: textEditor.string.MermaidDiargram, icon: view.icon.Model }
+          { id: 'mermaid', label: textEditor.string.MermaidDiargram, icon: view.icon.Model },
+          ...(aiAvailable()
+            ? [
+                { id: 'ai-summarize', label: textEditor.string.AiSummarize, icon: view.icon.AiStar },
+                { id: 'ai-outline', label: textEditor.string.AiOutline, icon: view.icon.AiStar },
+                { id: 'ai-action-items', label: textEditor.string.AiActionItems, icon: view.icon.AiStar },
+                { id: 'ai-continue', label: textEditor.string.AiContinue, icon: view.icon.AiStar },
+                { id: 'ai-improve', label: textEditor.string.AiImprove, icon: view.icon.AiStar }
+              ]
+            : [])
         ].filter(({ id }) => !excludedCommands.includes(id as InlineCommandId))
       },
       command: ({ editor, range, props }: { editor: Editor, range: Range, props: any }) => {

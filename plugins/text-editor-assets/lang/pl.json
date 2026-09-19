@@ -81,12 +81,24 @@
     "CategoryVersioning": "Wersjonowanie",
     "TableDiffLabel": "Zmiany tabeli",
     "TableRefreshConfirmationLabel": "Potwierdź odświeżenie tabeli",
-
     "ConvertToLinkPreview": "Pokaż jako link",
     "ConvertToEmbedPreview": "Pokaż podgląd zawartości",
     "UnableToLoadEmbeddedContent": "Podgląd linku nie mógł zostać załadowany z powodu niewystarczających uprawnień lub nieobsługiwanej treści",
     "CannotConnectToCollaborationService": "Nie można połączyć się z modułem współpracy",
     "SourceURL": "Adres URL źródła",
-    "SelectedDocuments": "Wybrane dokumenty ({count, plural, =1 {1 element} other {# elementów}})"
+    "SelectedDocuments": "Wybrane dokumenty ({count, plural, =1 {1 element} other {# elementów}})",
+    "AiGroup": "AI",
+    "AiImprove": "Improve writing",
+    "AiRewrite": "Rewrite",
+    "AiShorten": "Make shorter",
+    "AiExpand": "Make longer",
+    "AiFormal": "Formal tone",
+    "AiCasual": "Casual tone",
+    "AiSummarize": "Summarise",
+    "AiOutline": "Outline",
+    "AiActionItems": "Action items",
+    "AiContinue": "Continue writing",
+    "AiTranslate": "Translate…",
+    "AiAsk": "Ask AI…"
   }
 }

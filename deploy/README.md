@@ -92,25 +92,13 @@ to the compose file (the copy in this folder works as is; set `rtc.use_external_
 VM so LiveKit advertises the public address). Signalling goes through Caddy at `/_livekit`, the
 love API at `/_love`. In the dev stack LiveKit runs in dev mode with the keys devkey / secret.
 
-## Free AI for "Ask CeePee"
+## AI (open-source model, bundled)
 
-The assistant answers from workspace data with no model and no key. For free-form questions
-("write an update about my week", "summarise this issue") point it at any OpenAI-compatible chat
-endpoint. The free, private option is Ollama on the same server:
-
-```sh
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2            # ~2 GB; llama3.2:1b fits a 4 GB VPS
-# in .env
-AI_CHAT_URL=http://172.17.0.1:11434
-AI_CHAT_MODEL=llama3.2
-docker compose -f docker-compose.prod.yaml up -d front
-```
-
-The browser calls the endpoint directly, so it must be reachable from users' machines when it is not
-on the same host as Caddy; add a `handle_path /_ai/*` block in the Caddyfile that reverse-proxies to
-`localhost:11434` and set `AI_CHAT_URL=https://<domain>/_ai`. Every answer that used the model is
-badged "AI · verify results" in the panel.
+The stack runs `ollama` and pulls `AI_CHAT_MODEL` (default `llama3.2`, about 2 GB, 4 GB RAM) on first start;
+the front reaches it at `https://<domain>/_ai`. Everything AI in CeePee (the assistant, writing actions in
+the editor, summaries, action items, translation) uses it, with no keys and no data leaving the server. For a
+faster model put Ollama on a GPU machine and set `AI_CHAT_URL` to it, or set any OpenAI-compatible endpoint.
+Answers from the model are badged so people know to verify them.
 
 ## Search
 

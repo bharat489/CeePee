@@ -65,6 +65,33 @@ export class TTextEditorAction extends TDoc implements TextEditorAction {
   index!: number
 }
 
+function defineAiActions (builder: Builder): void {
+  const actions: Array<[Resource<any>, IntlString]> = [
+    [textEditor.function.AiImprove, textEditor.string.AiImprove],
+    [textEditor.function.AiRewrite, textEditor.string.AiRewrite],
+    [textEditor.function.AiShorten, textEditor.string.AiShorten],
+    [textEditor.function.AiExpand, textEditor.string.AiExpand],
+    [textEditor.function.AiFormal, textEditor.string.AiFormal],
+    [textEditor.function.AiCasual, textEditor.string.AiCasual],
+    [textEditor.function.AiSummarize, textEditor.string.AiSummarize],
+    [textEditor.function.AiOutline, textEditor.string.AiOutline],
+    [textEditor.function.AiActionItems, textEditor.string.AiActionItems],
+    [textEditor.function.AiContinue, textEditor.string.AiContinue],
+    [textEditor.function.AiTranslate, textEditor.string.AiTranslate],
+    [textEditor.function.AiAsk, textEditor.string.AiAsk]
+  ]
+  actions.forEach(([action, label], index) => {
+    builder.createDoc(textEditor.class.TextEditorAction, core.space.Model, {
+      action,
+      visibilityTester: textEditor.function.IsAiAvailable,
+      icon: view.icon.AiStar,
+      label,
+      category: 95,
+      index: index + 1
+    })
+  })
+}
+
 function createHeaderAction (builder: Builder, level: number): void {
   let icon: Asset
   switch (level) {
@@ -185,6 +212,7 @@ function createTextAlignmentAction (builder: Builder, align: 'center' | 'left' |
 export function createModel (builder: Builder): void {
   builder.createModel(TRefInputActionItem, TTextEditorExtensionFactory, TTextEditorAction)
 
+  defineAiActions(builder)
   createHeaderAction(builder, 1)
   createHeaderAction(builder, 2)
   createHeaderAction(builder, 3)

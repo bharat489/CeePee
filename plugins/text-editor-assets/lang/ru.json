@@ -87,6 +87,19 @@
     "Superscript": "Верхний индекс",
     "Mathematics": "Формула",
     "MathematicsBlock": "Блок формул",
-    "LatestVersion": "Последняя"
+    "LatestVersion": "Последняя",
+    "AiGroup": "AI",
+    "AiImprove": "Improve writing",
+    "AiRewrite": "Rewrite",
+    "AiShorten": "Make shorter",
+    "AiExpand": "Make longer",
+    "AiFormal": "Formal tone",
+    "AiCasual": "Casual tone",
+    "AiSummarize": "Summarise",
+    "AiOutline": "Outline",
+    "AiActionItems": "Action items",
+    "AiContinue": "Continue writing",
+    "AiTranslate": "Translate…",
+    "AiAsk": "Ask AI…"
   }
 }

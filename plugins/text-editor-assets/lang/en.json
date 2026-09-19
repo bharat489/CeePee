@@ -81,13 +81,25 @@
     "CategoryVersioning": "Versioning",
     "TableDiffLabel": "Table Changes",
     "TableRefreshConfirmationLabel": "Confirm Table Refresh",
-
     "ConvertToLinkPreview": "Show as a link",
     "ConvertToEmbedPreview": "Show as a content preview",
     "UnableToLoadEmbeddedContent": "Link preview couldn't be loaded due to permission settings or unsupported content",
     "CannotConnectToCollaborationService": "Cannot connect to collaboration service",
     "SourceURL": "Source URL",
     "SelectedDocuments": "Selected documents ({count, plural, =1 {1 item} other {# items}})",
-    "LatestVersion": "Latest"
+    "LatestVersion": "Latest",
+    "AiGroup": "AI",
+    "AiImprove": "Improve writing",
+    "AiRewrite": "Rewrite",
+    "AiShorten": "Make shorter",
+    "AiExpand": "Make longer",
+    "AiFormal": "Formal tone",
+    "AiCasual": "Casual tone",
+    "AiSummarize": "Summarise",
+    "AiOutline": "Outline",
+    "AiActionItems": "Action items",
+    "AiContinue": "Continue writing",
+    "AiTranslate": "Translate…",
+    "AiAsk": "Ask AI…"
   }
 }

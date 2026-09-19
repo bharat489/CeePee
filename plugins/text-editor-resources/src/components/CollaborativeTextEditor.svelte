@@ -77,6 +77,7 @@
   import { SavedBoard } from './extension/drawingBoard'
   import { type FileAttachFunction } from './extension/types'
   import { inlineCommandsConfig } from './extensions'
+  import { handleAiCommand } from '../ai'
 
   export let object: Doc
   export let attribute: KeyedAttribute
@@ -272,6 +273,11 @@
   }
 
   async function handleLeftMenuClick (id: string, pos: number, targetItem?: MouseEvent | HTMLElement): Promise<void> {
+    if (id.startsWith('ai-')) {
+      editor.commands.focus(pos, { scrollIntoView: false })
+      await handleAiCommand(editor, id)
+      return
+    }
     editor.commands.focus(pos, { scrollIntoView: false })
 
     switch (id) {
