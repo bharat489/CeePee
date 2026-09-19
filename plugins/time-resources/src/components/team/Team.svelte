@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import { Ref, Doc } from '@hcengineering/core'
+  import { Ref, Doc, getCurrentAccount } from '@hcengineering/core'
   import type { IntlString } from '@hcengineering/platform'
   import task, { Project } from '@hcengineering/task'
   import {
@@ -34,7 +34,7 @@
   import TeamNavigator from './TeamNavigator.svelte'
   import Agenda from './agenda/Agenda.svelte'
   import Calendar from './calendar/Calendar.svelte'
-  import { IconWithEmoji, getClient } from '@hcengineering/presentation'
+  import { IconWithEmoji, createQuery, getClient } from '@hcengineering/presentation'
   import view from '@hcengineering/view'
   import { Analytics } from '@hcengineering/analytics'
   import tracker, { Project as Proj } from '@hcengineering/tracker'
@@ -45,6 +45,15 @@
   let currentDate: Date = new Date()
 
   let space: Ref<Project> | undefined = undefined
+  // the planner needs a project; without the navigator open nothing would ever pick one,
+  // so remember the last choice and otherwise start with the first project the person is in
+  const projectsQuery = createQuery()
+  let projects: Project[] = []
+  projectsQuery.query(task.class.Project, { archived: false, members: getCurrentAccount().uuid }, (r) => { projects = r })
+  $: if (space === undefined && projects.length > 0) {
+    const saved = localStorage.getItem('team_last_mode')
+    space = (saved !== null && projects.some((p) => p._id === saved) ? saved : projects[0]._id) as Ref<Project>
+  }
   const teamBreadcrumb: BreadcrumbItem = { icon: time.icon.Team, label: time.string.Team }
   let items: BreadcrumbItem[]
   let replacedPanel: HTMLElement
@@ -123,6 +132,15 @@
       {:else}
         <Agenda {space} bind:currentDate />
       {/if}
+    {:else}
+      <div class="team-empty">
+        <b>{projects.length === 0 ? 'You are not a member of any project yet' : 'Pick a project'}</b>
+        <span>{projects.length === 0 ? 'Join or create a project in Tracker; the planner shows its members\' agenda and calendar here.' : 'Choose a project in the panel on the left to see its team\'s agenda and calendar.'}</span>
+      </div>
     {/if}
   </div>
 </div>
+
+<style lang="scss">
+  .team-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; flex: 1; padding: 3rem 1rem; text-align: center; color: var(--theme-dark-color); b { font-size: 1rem; color: var(--theme-caption-color); } span { max-width: 28rem; font-size: 0.875rem; } }
+</style>
