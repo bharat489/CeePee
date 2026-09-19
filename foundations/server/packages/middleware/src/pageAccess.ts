@@ -32,6 +32,9 @@ import core, {
   type FindResult,
   type MeasureContext,
   type Ref,
+  type SearchOptions,
+  type SearchQuery,
+  type SearchResult,
   type SessionData,
   type Tx,
   type TxApplyIf,
@@ -132,6 +135,34 @@ export class PageAccessMiddleware extends BaseMiddleware implements Middleware {
     }
     if (removed === 0) return result
     return toFindResult(kept, result.total !== undefined && result.total >= 0 ? result.total - removed : result.total, result.lookupMap)
+  }
+
+  /** Full-text results go through the same rule: a hidden page never shows up in search. */
+  override async searchFulltext (ctx: MeasureContext<SessionData>, query: SearchQuery, options: SearchOptions): Promise<SearchResult> {
+    const result = await this.provideSearchFulltext(ctx, query, options)
+    if (result.docs.length === 0 || !this.hasDocuments() || this.bypass(ctx)) return result
+    const pages = result.docs.filter((d) => d.doc?._class !== undefined && this.isPage(d.doc._class))
+    if (pages.length === 0) return result
+    const loaded = await this.provideFindAll(ctx, DOCUMENT, { _id: { $in: pages.map((p) => p.doc._id) } } as any)
+    const known = new Map<string, PageDoc>()
+    for (const d of loaded) known.set(d._id as string, d as unknown as PageDoc)
+    const account = ctx.contextData.account.uuid as string
+    let groups: Set<string> | undefined
+    const hiddenIds = new Set<string>()
+    for (const p of pages) {
+      const page = known.get(p.doc._id as string)
+      if (page === undefined) {
+        hiddenIds.add(p.doc._id as string)
+        continue
+      }
+      const access = effectiveAccess(this.toNodes(await this.chainOf(ctx, page, known)))
+      if (access.mode === 'open') continue
+      if (groups === undefined) groups = await this.groupsOf(ctx)
+      if (hidden(access, account, groups)) hiddenIds.add(p.doc._id as string)
+    }
+    if (hiddenIds.size === 0) return result
+    const docs = result.docs.filter((d) => !hiddenIds.has(d.doc?._id as string))
+    return { ...result, docs, total: result.total !== undefined ? Math.max(0, result.total - hiddenIds.size) : undefined }
   }
 
   private forbid (): never {
