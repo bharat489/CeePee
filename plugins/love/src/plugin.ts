@@ -108,7 +108,8 @@ const love = plugin(loveId, {
   },
   function: {
     // join (and if needed start) a call in a room; registered by love-resources
-    JoinRoomCall: '' as Resource<(room: Room) => Promise<void>>
+    JoinRoomCall: '' as Resource<(room: Room) => Promise<void>>,
+    LeaveRoomCall: '' as Resource<() => Promise<void>>
   },
   metadata: {
     WebSocketURL: '' as Metadata<string>,

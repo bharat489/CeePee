@@ -781,7 +781,7 @@
     "ExportJson": "Export JSON",
     "ImportJson": "Import JSON",
     "ProjectTemplates": "New project",
-    "ProjectTemplatesHint": "Start from a template. Scrum, Kanban, Bug tracking, Service desk or Simple; team-managed or company-managed.",
+    "ProjectTemplatesHint": "Start from a template: software, product, marketing, operations, people and sales. Each one sets up the workflow, components, milestones, labels and starter issues; team-managed or company-managed.",
     "Scenario": "Scenario",
     "Apply": "Apply",
     "Discard": "Discard",

@@ -62,6 +62,7 @@ export * from './filetypes'
 export * from './drafts'
 export { presentationId }
 export * from './collaborator'
+export * from './docTemplates'
 export * from './configuration'
 export * from './context'
 export * from './pipeline'

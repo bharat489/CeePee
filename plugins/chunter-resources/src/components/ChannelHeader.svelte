@@ -15,50 +15,41 @@
 <script lang="ts">
   import { Class, Doc, Ref } from '@hcengineering/core'
   import { getDocTitle } from '@hcengineering/view-resources'
-  import { getClient } from '@hcengineering/presentation'
+  import { createQuery, getClient } from '@hcengineering/presentation'
   import { Channel } from '@hcengineering/chunter'
   import { ActivityMessagesFilter, WithReferences } from '@hcengineering/activity'
-  import contact from '@hcengineering/contact'
+  import contact, { getCurrentEmployee } from '@hcengineering/contact'
   import view from '@hcengineering/view'
   import Header from './Header.svelte'
   import chunter from '../plugin'
   import { getObjectIcon, getChannelName } from '../utils'
-  import core, { getCurrentAccount, AccountRole } from '@hcengineering/core'
-  import { getMetadata, getResource } from '@hcengineering/platform'
-  import love, { RoomAccess, RoomType, type Room } from '@hcengineering/love'
+  import love, { type ParticipantInfo, type Room } from '@hcengineering/love'
+  import { huddleRoomName, huddlesEnabled, joinHuddle, leaveHuddle } from '../huddle'
 
-  // calls need a media server; without LIVEKIT_WS the button stays hidden
-  const callsEnabled = (getMetadata(love.metadata.WebSocketURL) ?? '') !== '' && getCurrentAccount().role !== AccountRole.ReadOnlyGuest
+  // huddles: one call room per chat; the button reflects who is in it
+  const callsEnabled = huddlesEnabled()
+  const me = getCurrentEmployee()
+  const roomQ = createQuery()
+  const partQ = createQuery()
+  let room: Room | undefined
+  let participants: ParticipantInfo[] = []
   let calling = false
+  $: if (callsEnabled && title !== undefined) {
+    roomQ.query(love.class.Room, { name: huddleRoomName(title) }, (r) => { room = r[0] })
+  }
+  $: if (room !== undefined) {
+    partQ.query(love.class.ParticipantInfo, { room: room._id }, (r) => { participants = r })
+  } else {
+    partQ.unsubscribe()
+    participants = []
+  }
+  $: inCall = participants.some((p) => p.person === me)
   async function startCall (): Promise<void> {
-    if (object === undefined || calling) return
+    if (title === undefined || calling) return
     calling = true
     try {
-      const roomName = `Call · ${title}`
-      let room: Room | undefined = await client.findOne(love.class.Room, { name: roomName })
-      if (room === undefined) {
-        // place the new room below everything else on the main floor
-        const rooms = await client.findAll(love.class.Room, { floor: love.ids.MainFloor })
-        const y = rooms.reduce((m, r) => Math.max(m, r.y + r.height), 0)
-        const id = await client.createDoc(love.class.Room, core.space.Workspace, {
-          name: roomName,
-          type: RoomType.Video,
-          access: RoomAccess.Open,
-          floor: love.ids.MainFloor,
-          width: 3,
-          height: 2,
-          x: 0,
-          y,
-          language: 'en',
-          startWithTranscription: false,
-          startWithRecording: false,
-          description: null
-        })
-        room = await client.findOne(love.class.Room, { _id: id })
-      }
-      if (room === undefined) return
-      const join = await getResource(love.function.JoinRoomCall)
-      await join(room)
+      if (inCall) await leaveHuddle()
+      else await joinHuddle(title)
     } finally {
       calling = false
     }
@@ -140,9 +131,13 @@
   {/if}
   <svelte:fragment slot="actions">
     {#if callsEnabled && object !== undefined}
-      <button class="call-btn" class:call-btn--busy={calling} title="Start a call in this channel" on:click={() => { void startCall() }}>
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3.5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 6.5l4-2v7l-4-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        <span class="call-btn__l">Call</span>
+      <button class="call-btn" class:call-btn--busy={calling} class:call-btn--live={!inCall && participants.length > 0} class:call-btn--leave={inCall} title={inCall ? 'Leave the huddle' : participants.length > 0 ? `Join the huddle (${participants.length} in the call)` : 'Start a huddle in this chat'} on:click={() => { void startCall() }}>
+        {#if inCall}
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5.5C5.5 2.5 10.5 2.5 14 5.5l-2 2.5c-2.4-1.6-5.6-1.6-8 0z" fill="currentColor"/></svg>
+        {:else}
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3.5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 6.5l4-2v7l-4-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        {/if}
+        <span class="call-btn__l">{inCall ? 'Leave' : participants.length > 0 ? `Join · ${participants.length}` : 'Huddle'}</span>
       </button>
     {/if}
   </svelte:fragment>
@@ -150,5 +145,8 @@
 
 <style lang="scss">
   .call-btn { display: inline-flex; align-items: center; gap: 0.35rem; height: 2rem; padding: 0 0.7rem; border: none; border-radius: 0.5rem; background: var(--accent-gradient, var(--primary-button-default)); color: #fff; font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; box-shadow: var(--accent-glow, none); transition: transform var(--motion-fast, 0.12s) var(--ease-standard, ease); &:hover { transform: translateY(-1px); } &--busy { opacity: 0.6; pointer-events: none; } }
+  .call-btn--live { background: #16a34a; animation: call-live 1.6s ease-in-out infinite; }
+  .call-btn--leave { background: #e11d48; }
+  @keyframes call-live { 0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); } 50% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); } }
   .call-btn__l { @media (max-width: 40rem) { display: none; } }
 </style>

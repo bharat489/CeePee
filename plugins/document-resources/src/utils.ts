@@ -68,7 +68,7 @@ export async function createEmptyDocument (
   id: Ref<Document>,
   space: Ref<Teamspace>,
   parentId?: Ref<Document>,
-  data: Partial<Pick<Data<Document>, 'title' | 'icon' | 'color'>> = {}
+  data: Partial<Pick<Data<Document>, 'title' | 'icon' | 'color' | 'content'>> = {}
 ): Promise<void> {
   const title = await translate(document.string.Untitled, {})
   const parent = parentId ?? document.ids.NoParent

@@ -34,6 +34,7 @@
 
   import ChannelComponent from './Channel.svelte'
   import ChannelHeader from './ChannelHeader.svelte'
+  import HuddleBar from './HuddleBar.svelte'
   import DocAside from './chat/DocAside.svelte'
   import chunter from '../plugin'
   import ChannelAside from './chat/ChannelAside.svelte'
@@ -122,6 +123,7 @@
       isAsideShown = !isAsideShown
     }}
   />
+  <HuddleBar _id={object._id} _class={object._class} {object} />
 
   <div class="popupPanel-body" class:asideShown={withAside && isAsideShown}>
     <div class="popupPanel-body__main chat-bubbles">

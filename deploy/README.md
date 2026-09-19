@@ -112,7 +112,13 @@ on the same host as Caddy; add a `handle_path /_ai/*` block in the Caddyfile tha
 `localhost:11434` and set `AI_CHAT_URL=https://<domain>/_ai`. Every answer that used the model is
 badged "AI · verify results" in the panel.
 
+## Search
+
+The stack runs `elastic`, `rekoni` and `fulltext`, so the global search (Ctrl+K / Cmd+K) covers issues, pages, messages,
+contacts and the text inside attachments. Elasticsearch wants about 1 GB of RAM. On a smaller machine remove the three
+services and blank `FULLTEXT_URL` on `transactor_cockroach` and `tool`; everything else keeps working without search.
+
 ## What is not in this stack
 
-Full-text search (Elastic), link previews, thumbnails, print/sign, the AI service, GitHub app. Each is one more
-service in `dev/docker-compose.yaml`; add it when a team asks for it.
+Link previews, thumbnails, print/sign, the AI service, GitHub app. Each is one more service in
+`dev/docker-compose.yaml`; add it when a team asks for it.
