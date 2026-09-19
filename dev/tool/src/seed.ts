@@ -283,3 +283,43 @@ export async function seedDemo (ops: TxOperations, log: (s: string) => void): Pr
     } else log('#general: already active, skipped')
   }
 }
+
+// Remove everything seedDemo created: the two demo projects with all their
+// work, their docs spaces, and the demo chat in #general.
+export async function unseedDemo (ops: TxOperations, log: (s: string) => void): Promise<void> {
+  for (const seed of SEEDS) {
+    const project = await ops.findOne(tracker.class.Project, { identifier: seed.key })
+    if (project === undefined) {
+      log(`${seed.key}: not present`)
+      continue
+    }
+    const space = project._id
+    const issues = await ops.findAll(tracker.class.Issue, { space })
+    for (const i of issues) {
+      for (const c of await ops.findAll(chunter.class.ChatMessage, { attachedTo: i._id })) await ops.remove(c)
+      for (const t of await ops.findAll(tags.class.TagReference, { attachedTo: i._id })) await ops.remove(t)
+    }
+    for (const i of issues) await ops.remove(i)
+    for (const cls of [tracker.class.Sprint, tracker.class.Milestone, tracker.class.Component, tracker.class.Idea, tracker.class.Decision] as Array<Ref<any>>) {
+      for (const d of await ops.findAll(cls, { space } as any)) await ops.remove(d)
+    }
+    await ops.remove(project)
+    for (const ts of await ops.findAll('document:class:Teamspace' as any, { name: seed.name } as any)) {
+      for (const d of await ops.findAll('document:class:Document' as any, { space: ts._id } as any)) await ops.remove(d)
+      await ops.remove(ts)
+    }
+    log(`${seed.key}: removed ${issues.length} work items and the project`)
+  }
+  const general = await ops.findOne(chunter.class.Channel, { _id: 'chunter:space:General' as Ref<Channel> })
+  if (general !== undefined) {
+    const msgs = await ops.findAll(chunter.class.ChatMessage, { attachedTo: general._id })
+    let n = 0
+    for (const m of msgs) {
+      if (CHAT.some((t) => String(m.message).includes(t))) {
+        await ops.remove(m)
+        n++
+      }
+    }
+    log(`#general: removed ${n} demo messages`)
+  }
+}

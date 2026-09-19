@@ -503,6 +503,15 @@
       ((navigatorModel?.spaces?.length ?? 0) > 0 || (navigatorModel?.specials?.length ?? 0) > 0)
     ) {
       const last = localStorage.getItem(`${locationStorageKeyId}_${app}`)
+      // nothing remembered for this app: open its first page instead of an empty area
+      const remembered = last !== null ? (JSON.parse(last) as Location).path[3] : undefined
+      const firstSpecial = navigatorModel?.specials?.[0]?.id
+      if (remembered == null && firstSpecial !== undefined && fragment === undefined) {
+        loc.path[3] = firstSpecial as Ref<Space>
+        loc.path.length = 4
+        navigate(loc)
+        return
+      }
       if (last !== null) {
         const newLocation: Location = JSON.parse(last)
         if (newLocation.path[3] != null) {

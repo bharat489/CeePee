@@ -132,7 +132,7 @@ import { ensureMissingSocialIdentities } from './contact'
 import { performGithubAccountMigrations } from './github'
 import { performGmailAccountMigrations } from './gmail'
 import { getToolToken, getWorkspace, getWorkspaceTransactorEndpoint } from './utils'
-import { seedDemo } from './seed'
+import { seedDemo, unseedDemo } from './seed'
 
 import { createRestClient } from '@hcengineering/api-client'
 import { type CardID } from '@hcengineering/communication-types'
@@ -721,6 +721,24 @@ export function devTool (
           const ops = new TxOperations(connection, core.account.System)
           await seedDemo(ops, (m) => { console.log('  • ' + m) })
           console.log('seed-demo done')
+        } finally {
+          await connection.close()
+        }
+      })
+    })
+  program
+    .command('unseed-demo <workspace>')
+    .description('Remove the sample data that seed-demo created')
+    .action(async (workspace: string) => {
+      await withAccountDatabase(async (db) => {
+        const ws = await getWorkspace(db, workspace)
+        if (ws === null) throw new Error('workspace ' + workspace + ' not found')
+        const endpoint = await getWorkspaceTransactorEndpoint(ws.uuid)
+        const connection = await connect(endpoint, ws.uuid, undefined, { service: 'tool', admin: 'true' })
+        try {
+          const ops = new TxOperations(connection, core.account.System)
+          await unseedDemo(ops, (m) => { console.log('  • ' + m) })
+          console.log('unseed-demo done')
         } finally {
           await connection.close()
         }
