@@ -69,8 +69,17 @@
   }
   let openSpace: Ref<Space> | undefined
   $: space = spaces.find((s) => s._id === openSpace)
-  $: assignment = (space !== undefined && openKind?.type.targetClass !== undefined ? (hierarchy.as(space, openKind.type.targetClass) as unknown as Record<string, AccountUuid[] | undefined>) : {})
   $: openKind = kinds.find((x) => x.type._id === openType)
+  // the assignment lives in the space type's mixin; a query on the mixin class keeps it live after every change
+  const aq = createQuery()
+  let assignmentDoc: Space | undefined
+  $: if (openSpace !== undefined && openKind?.type.targetClass !== undefined) {
+    aq.query(openKind.type.targetClass, { _id: openSpace }, (r) => { assignmentDoc = r[0] })
+  } else {
+    aq.unsubscribe()
+    assignmentDoc = undefined
+  }
+  $: assignment = (assignmentDoc !== undefined && openKind?.type.targetClass !== undefined ? (hierarchy.as(assignmentDoc, openKind.type.targetClass) as unknown as Record<string, AccountUuid[] | undefined>) : {})
 
   // roles
   let creating = false

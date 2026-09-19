@@ -39,7 +39,8 @@
   let spaces: Space[] = []
   let employees: Employee[] = []
   gq.query(contact.class.UserGroup, {}, (r) => { groups = r }, { sort: { name: SortingOrder.Ascending } })
-  sq.query(core.class.Space, { archived: false }, (r) => { spaces = r.filter((s) => hierarchy.isDerived(s._class, core.class.TypedSpace) || s._class === ('chunter:class:Channel' as Ref<any>)) }, { sort: { name: SortingOrder.Ascending } })
+  // the spaces a group can be applied to: projects, teamspaces, drives, vacancies, channels — not internal or system spaces
+  sq.query(core.class.Space, { archived: false }, (r) => { spaces = r.filter((s) => s._class !== core.class.Space && s._class !== core.class.TypedSpace && hierarchy.getClass(s._class).label !== undefined && (hierarchy.isDerived(s._class, core.class.TypedSpace) || s._class === ('chunter:class:Channel' as Ref<any>))) }, { sort: { name: SortingOrder.Ascending } })
   eq.query(contact.mixin.Employee, { active: true }, (r) => { employees = r })
   $: byUuid = new Map(employees.filter((e) => e.personUuid != null).map((e) => [e.personUuid as AccountUuid, e]))
   $: kinds = Array.from(new Set(spaces.map((s) => s._class))).map((c) => ({ _class: c, label: hierarchy.getClass(c).label, spaces: spaces.filter((s) => s._class === c) }))

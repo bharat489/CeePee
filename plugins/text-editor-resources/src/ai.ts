@@ -22,7 +22,7 @@
 
 import { type Editor } from '@tiptap/core'
 import { addNotification, NotificationSeverity } from '@hcengineering/ui'
-import { aiAvailable, aiChat, AiError, aiLines } from '@hcengineering/presentation'
+import { aiAvailable, aiChat, AiError, aiLines, aiReachable } from '@hcengineering/presentation'
 import { type ActionContext } from '@hcengineering/text-editor'
 import { getEmbeddedLabel } from '@hcengineering/platform'
 import AiNotification from './components/AiNotification.svelte'
@@ -136,7 +136,7 @@ export async function aiAsk (editor: Editor): Promise<void> {
 
 /** Toolbar actions show only when a model is configured and the editor is editable. */
 export async function isAiAvailable (editor: Editor, ctx: ActionContext): Promise<boolean> {
-  return editor.isEditable && ctx.mode !== 'compact' && aiAvailable()
+  return editor.isEditable && ctx.mode !== 'compact' && aiAvailable() && (await aiReachable())
 }
 
 /** Slash-command entries; ids are handled by handleAiCommand. */

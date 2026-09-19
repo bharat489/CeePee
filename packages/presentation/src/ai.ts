@@ -105,6 +105,17 @@ export async function aiPing (timeoutMs = 5000): Promise<{ ok: boolean, models?:
   }
 }
 
+let reachableAt = 0
+let reachable = false
+/** aiPing, cached for a minute: cheap enough for toolbar visibility checks. */
+export async function aiReachable (): Promise<boolean> {
+  if (!aiAvailable()) return false
+  if (Date.now() - reachableAt < 60_000) return reachable
+  reachableAt = Date.now()
+  reachable = (await aiPing(4000)).ok
+  return reachable
+}
+
 /** Split a model answer into trimmed non-empty lines, dropping list bullets and numbering. */
 export function aiLines (text: string): string[] {
   return text
