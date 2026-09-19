@@ -68,8 +68,6 @@ export const documentPlugin = plugin(documentId, {
   },
   string: {
     PageAccess: '' as IntlString,
-    Cancel: '' as IntlString,
-    Save: '' as IntlString,
     ConfigLabel: '' as IntlString,
     CreateDocument: '' as IntlString,
     Documents: '' as IntlString,
