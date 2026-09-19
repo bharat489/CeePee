@@ -184,6 +184,7 @@ services:
       - GIF_API_KEY=${GIF_API_KEY:-}
       - AI_CHAT_URL=${AI_CHAT_URL:-}
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
+      - PULSE_URL=
       - STATS_URL=
       - PREVIEW_URL=
       - LINK_PREVIEW_URL=

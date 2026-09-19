@@ -70,6 +70,8 @@ services:
       # free AI for Ask CeePee: an OpenAI-compatible chat endpoint such as Ollama (http://host.docker.internal:11434)
       - AI_CHAT_URL=${AI_CHAT_URL:-}
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
+      # no pulse (presence) service in the minimal stack: blank it so the browser stops retrying ws://…:8099
+      - PULSE_URL=
     links: !override []
   transactor_cockroach:
     environment:
