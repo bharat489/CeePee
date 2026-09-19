@@ -41,7 +41,9 @@ export interface NewIssue extends Partial<DocData<Issue>> {
 export async function createIssueDoc (project: Project, data: NewIssue, descriptionText?: string, parent?: Issue): Promise<Ref<Issue>> {
   const client = getClient()
   const inc = await client.updateDoc(tracker.class.Project, core.space.Space, project._id, { $inc: { sequence: 1 } }, true)
-  const number = (inc as any).object.sequence as number
+  // the increment is applied either way; when the transactor returns no object, read the counter back
+  let number = (inc as any)?.object?.sequence as number | undefined
+  if (number === undefined) number = (await client.findOne(tracker.class.Project, { _id: project._id }))?.sequence ?? project.sequence + 1
   const identifier = `${project.identifier}-${number}`
   const _id = generateId<Issue>()
   const last = await client.findOne(tracker.class.Issue, { space: project._id }, { sort: { rank: SortingOrder.Descending } })
