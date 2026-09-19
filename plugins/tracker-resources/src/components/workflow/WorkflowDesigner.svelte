@@ -50,8 +50,12 @@
   sq.query(tracker.class.IssueStatus, {}, (r) => { statuses = r })
   wq.query(tracker.class.WorkflowScheme, {}, (r) => { schemes = r })
   let typeId: Ref<TaskType> | undefined
-  $: if (typeId === undefined && types.length > 0) typeId = (types.find((t) => t.name === 'Issue') ?? types[0])._id
-  $: type = types.find((t) => t._id === typeId)
+  // the chosen type, falling back to Issue (then the first type) so the diagram never
+  // waits on a select that has not been touched yet
+  $: type = types.find((t) => t._id === typeId) ?? types.find((t) => t.name === 'Issue') ?? types[0]
+  function pickType (e: Event): void {
+    typeId = (e.currentTarget as HTMLSelectElement).value as Ref<TaskType>
+  }
   $: ordered = ((type?.statuses ?? []) as Ref<IssueStatus>[]).map((id) => statuses.find((s) => s._id === id)).filter((s): s is IssueStatus => s !== undefined)
   $: transitions = (type?.transitions ?? {}) as Record<string, Ref<IssueStatus>[]>
   $: rules = (type?.transitionRules ?? []) as TransitionRule[]
@@ -409,7 +413,7 @@
 <div class="wf">
   <header class="wf__head">
     <span class="wf__title"><Label label={tracker.string.Workflow} /></span>
-    <select class="select" bind:value={typeId}>{#each types as t (t._id)}<option value={t._id}>{t.name}</option>{/each}</select>
+    <select class="select" value={type?._id ?? ''} on:change={pickType}>{#each types as t (t._id)}<option value={t._id}>{t.name}</option>{/each}</select>
     <span class="muted">{picked !== undefined ? `From ${nameOf(picked)}: click a status to allow or forbid the move, or click it again to cancel.` : 'Drag statuses to arrange them. Drag from a status\'s ○ handle onto another status to allow that move, or click one then the other. Click an arrow to edit its rule. "+ Add status" creates one in that column.'}</span>
     <span class="grow" />
     <button class="lnk" on:click={() => { void autoLayout() }}>auto layout</button>
