@@ -17,6 +17,21 @@
 import { createApp } from '@hcengineering/ui'
 import { configurePlatform } from './platform'
 
+// After a deploy, tabs that are still open hold the old chunk names; the first
+// lazy load that 404s would leave a blank panel. Reload once instead.
+window.addEventListener('unhandledrejection', (e) => {
+  const reason: any = e.reason
+  const msg = String(reason?.message ?? reason ?? '')
+  if (reason?.name === 'ChunkLoadError' || /Loading (CSS )?chunk .* failed/i.test(msg)) {
+    const key = 'ceepee.chunkReload'
+    if (sessionStorage.getItem(key) !== '1') {
+      sessionStorage.setItem(key, '1')
+      window.location.reload()
+    }
+  }
+})
+window.addEventListener('load', () => { setTimeout(() => { sessionStorage.removeItem('ceepee.chunkReload') }, 15000) })
+
 configurePlatform().then(() => {
   createApp(document.body)
   // the boot screen from index.ejs fades out once the app shell has mounted
