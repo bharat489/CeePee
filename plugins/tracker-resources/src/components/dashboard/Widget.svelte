@@ -648,11 +648,20 @@
   {#if type === 'cvr' && series !== undefined}
     {@const n = series.days.length}
     {@const max = Math.max(1, ...series.a, ...(series.b ?? []))}
-    <svg viewBox="0 0 300 100" class="line-chart" role="img">
-      <path d={linePath(series.a, n, max)} class="ln" class:ln--red={type === 'cvr'} />
-      {#if series.b !== undefined}<path d={linePath(series.b, n, max)} class="ln ln--lime" />{/if}
+    {@const slot = 290 / Math.max(1, n)}
+    <svg viewBox="0 0 320 122" class="bar-chart" role="img">
+      {#each [0, 0.5, 1] as fr}
+        <line x1="28" x2="318" y1={100 - fr * 88} y2={100 - fr * 88} class="gl" />
+        <text x="25" y={103 - fr * 88} class="ax" text-anchor="end">{Math.round(max * fr)}</text>
+      {/each}
+      <polyline points={series.a.map((v, k) => `${28 + (k + 0.5) * slot},${100 - (v / max) * 88}`).join(' ')} class="lnx lnx--red" />
+      {#if series.b !== undefined}<polyline points={series.b.map((v, k) => `${28 + (k + 0.5) * slot},${100 - (v / max) * 88}`).join(' ')} class="lnx lnx--green" />{/if}
+      {#each series.a as v, k}{#if v > 0}<circle cx={28 + (k + 0.5) * slot} cy={100 - (v / max) * 88} r="2.5" class="ptx ptx--red"><title>{new Date(series.days[k]).toLocaleDateString()}: {v} created</title></circle>{/if}{/each}
+      {#each series.b ?? [] as v, k}{#if v > 0}<circle cx={28 + (k + 0.5) * slot} cy={100 - (v / max) * 88} r="2.5" class="ptx ptx--green"><title>{new Date(series.days[k]).toLocaleDateString()}: {v} resolved</title></circle>{/if}{/each}
+      <text x="28" y="116" class="ax">{new Date(series.days[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>
+      <text x="318" y="116" class="ax" text-anchor="end">{new Date(series.days[n - 1]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>
     </svg>
-    {#if type === 'cvr'}<div class="legend"><span><i class="sw sw--red" />created {series.a.reduce((a, b) => a + b, 0)}</span><span><i class="sw sw--lime" />resolved {(series.b ?? []).reduce((a, b) => a + b, 0)}</span></div>{/if}
+    <div class="legend"><span><i class="sw sw--red" />Created {series.a.reduce((a, b) => a + b, 0)}</span><span><i class="sw sw--green" />Resolved {(series.b ?? []).reduce((a, b) => a + b, 0)}</span></div>
   {/if}
 
   {#if type === 'burndown'}
@@ -720,7 +729,9 @@
   .pie__svg { width: 7rem; height: 7rem; flex-shrink: 0; }
   .pie__n { fill: var(--theme-caption-color); font-size: 14px; font-weight: 700; }
   .pie__legend { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.75rem; color: var(--theme-content-color); li { display: flex; align-items: center; gap: 0.4rem; } .muted { margin: 0 0 0 auto; } }
-  .sw { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; flex-shrink: 0; &--red { background: #e0475b; } &--lime { background: var(--accent-brand); } }
+  .sw { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; flex-shrink: 0; &--red { background: #ff5630; } &--green { background: #36b37e; } &--lime { background: var(--accent-brand); } }
+  .lnx { fill: none; stroke-width: 2; stroke-linejoin: round; &--red { stroke: #ff5630; } &--green { stroke: #36b37e; } }
+  .ptx { stroke: #fff; stroke-width: 1.5; &--red { fill: #ff5630; } &--green { fill: #36b37e; } }
   .line-chart { width: 100%; height: auto; }
   .bar-chart { width: 100%; height: auto; }
   .gl { stroke: var(--theme-divider-color); stroke-width: 1; }
