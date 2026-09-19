@@ -60,6 +60,8 @@ import type {
   AutomationRule,
   AutomationHeartbeat,
   AutomationRun,
+  AutomationJob,
+  AutomationJobState,
   SavedQuery,
   QuerySubscription,
   CustomerReply,
@@ -1155,6 +1157,39 @@ export class TAutomationRun extends TDoc implements AutomationRun {
   matched!: number
   actions!: string[]
   error?: string
+  attempt?: number
+  note?: string
+}
+
+@Model(tracker.class.AutomationJob, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Automation)
+export class TAutomationJob extends TDoc implements AutomationJob {
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<Project>
+
+  @Prop(TypeRef(tracker.class.AutomationRule), tracker.string.Automation)
+  @Index(IndexKind.Indexed)
+    rule!: Ref<AutomationRule>
+
+  ruleName!: string
+  issue!: Ref<Issue>
+  identifier!: string
+  action!: AutomationAction
+  kind!: 'delay' | 'retry'
+
+  @Index(IndexKind.Indexed)
+    runAt!: Timestamp
+
+  attempts!: number
+  maxAttempts!: number
+
+  @Index(IndexKind.Indexed)
+    state!: AutomationJobState
+
+  lastError?: string | null
+  doneAt?: Timestamp
+  payload?: Record<string, any>
 }
 
 @Model(tracker.class.SavedQuery, core.class.Doc, DOMAIN_TRACKER)

@@ -357,6 +357,32 @@ export interface AutomationRun extends Doc {
   matched: number
   actions: string[]
   error?: string
+  /** which attempt this was, for retried and delayed actions */
+  attempt?: number
+  note?: string
+}
+/** @public */
+export type AutomationJobState = 'waiting' | 'retry' | 'done' | 'skipped' | 'failed' | 'cancelled'
+/**
+ * A deferred or retried action. Delayed actions wait for their time and run with
+ * the rule's conditions re-checked; failed deliveries come back with a growing
+ * gap until they succeed or run out of attempts. @public
+ */
+export interface AutomationJob extends Doc {
+  space: Ref<Project>
+  rule: Ref<AutomationRule>
+  ruleName: string
+  issue: Ref<Issue>
+  identifier: string
+  action: AutomationAction
+  kind: 'delay' | 'retry'
+  runAt: Timestamp
+  attempts: number
+  maxAttempts: number
+  state: AutomationJobState
+  lastError?: string | null
+  doneAt?: Timestamp
+  payload?: Record<string, any>
 }
 /** A named query; shared ones show for everyone. @public */
 export interface SavedQuery extends Doc {
@@ -579,6 +605,8 @@ export interface AutomationAction {
   target?: 'self' | 'parent' | 'children' | 'blocked-by' | 'blocking'
   /** Slack / Teams incoming-webhook URL, or a plain webhook URL. */
   url?: string
+  /** Run this action later: minutes after the trigger; the rule's conditions are re-checked then. */
+  delayMinutes?: number
 }
 /** Which issues a scheduled rule looks at. @public */
 export type AutomationScope = 'open' | 'all' | 'stale7' | 'due3' | 'overdue' | 'unassigned'
@@ -602,6 +630,12 @@ export interface AutomationRule extends Doc {
   /** webhook: last delivery, set by the integrations service; the trigger fires on it. */
   lastWebhook?: Timestamp
   lastPayload?: Record<string, any>
+  /** scheduled: fire once a day at HH:MM (in the writer's timezone) instead of every N minutes. */
+  at?: string
+  /** scheduled: weekdays (0 = Sunday) a daily schedule runs on; empty = every day. */
+  days?: number[]
+  /** minutes east of UTC where the schedule was written. */
+  tz?: number
   /** issues matched on the last run. */
   lastMatched?: number
   /** Applies to every project (space is the workspace); projects narrows it. */
@@ -1368,6 +1402,7 @@ const pluginState = plugin(trackerId, {
     AutomationRule: '' as Ref<Class<AutomationRule>>,
     AutomationHeartbeat: '' as Ref<Class<AutomationHeartbeat>>,
     AutomationRun: '' as Ref<Class<AutomationRun>>,
+    AutomationJob: '' as Ref<Class<AutomationJob>>,
     SavedQuery: '' as Ref<Class<SavedQuery>>,
     QuerySubscription: '' as Ref<Class<QuerySubscription>>,
     CustomerReply: '' as Ref<Class<CustomerReply>>,

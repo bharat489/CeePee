@@ -3,7 +3,7 @@
 # (rush docker:up:min)
 # Excluded: preview, link-preview, redis, stats, payment, billing,
 #           print, sign, hulykvs, hulygun, hulypulse, backup-cockroach,
-#           backup-api, rating_cockroach
+#           backup-api, rating_cockroach, hulylake
 # Overrides below remove dependencies on excluded services so the min project validates.
 
 services:
@@ -34,6 +34,9 @@ services:
   backup-api:
     profiles: ["full"]
   rating_cockroach:
+    profiles: ["full"]
+  # hulylake shares port 8096 with the love (calls) service and nothing in the minimal stack uses it
+  hulylake:
     profiles: ["full"]
   account:
     environment:
@@ -71,6 +74,8 @@ services:
       # calls: LiveKit (self-hosted, dev keys) + the love service
       - LIVEKIT_WS=${LIVEKIT_WS:-ws://huly.local:7880}
       - LOVE_ENDPOINT=${LOVE_ENDPOINT:-http://huly.local:8096}
+      # hulylake is not in the minimal stack (its port belongs to love)
+      - HULYLAKE_URL=
     links: !override []
   livekit:
     image: livekit/livekit-server:v1.8
@@ -111,6 +116,7 @@ services:
       # web push: the transactor hands push payloads to the notification service below
       - WEB_PUSH_URL=${WEB_PUSH_URL:-http://notification:8091}
       - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
+      - HULYLAKE_URL=
       - STATS_URL=
     links: !override
       - cockroach

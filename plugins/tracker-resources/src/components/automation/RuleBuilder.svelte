@@ -27,8 +27,8 @@
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
-  import { IssuePriority, type AutomationAction, type AutomationCondition, type AutomationRule, type AutomationRun, type AutomationTrigger, type Component as TComponent, type IssueStatus, type Milestone, type Project, type Sprint } from '@hcengineering/tracker'
-  import { Button, IconAdd, Toggle } from '@hcengineering/ui'
+  import { IssuePriority, type AutomationAction, type AutomationCondition, type AutomationJob, type AutomationRule, type AutomationRun, type AutomationTrigger, type Component as TComponent, type IssueStatus, type Milestone, type Project, type Sprint } from '@hcengineering/tracker'
+  import { Button, IconAdd, ticker, Toggle } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
 
@@ -43,6 +43,7 @@
   const mq = createQuery()
   const pq = createQuery()
   const runq = createQuery()
+  const jq = createQuery()
   let own: AutomationRule[] = []
   let globals: AutomationRule[] = []
   let statuses: IssueStatus[] = []
@@ -51,6 +52,7 @@
   let milestones: Milestone[] = []
   let projects: Project[] = []
   let runs: AutomationRun[] = []
+  let jobs: AutomationJob[] = []
   let people: Array<{ _id: Ref<Person>, name: string }> = []
   let labels: Array<{ _id: string, title: string }> = []
   $: rq.query(tracker.class.AutomationRule, { space: currentSpace }, (r) => { own = r.filter((x) => x.global !== true) }, { sort: { createdOn: SortingOrder.Ascending } })
@@ -63,6 +65,10 @@
   pq.query(tracker.class.Project, { archived: false }, (r) => { projects = r })
   runq.query(tracker.class.AutomationRun, {}, (r) => { runs = r }, { sort: { at: SortingOrder.Descending }, limit: 200 })
   $: shownRuns = runs.filter((r) => rules.some((x) => x._id === r.rule)).slice(0, 60)
+  jq.query(tracker.class.AutomationJob, {}, (r) => { jobs = r }, { sort: { runAt: SortingOrder.Ascending }, limit: 300 })
+  $: shownJobs = jobs.filter((j) => rules.some((x) => x._id === j.rule))
+  $: pendingJobs = shownJobs.filter((j) => j.state === 'waiting' || j.state === 'retry')
+  $: finishedJobs = shownJobs.filter((j) => j.state !== 'waiting' && j.state !== 'retry').sort((a, b) => (b.doneAt ?? b.runAt) - (a.doneAt ?? a.runAt)).slice(0, 40)
   void client.findAll(contact.mixin.Employee, { active: true }).then((r) => { people = r.map((p) => ({ _id: p._id, name: formatName(p.name) })) })
   void client.findAll(tags.class.TagElement, { targetClass: tracker.class.Issue }).then((r) => { labels = r.map((t) => ({ _id: t._id, title: t.title })) })
   let projectStatuses: IssueStatus[] = []
@@ -83,6 +89,15 @@
     { id: 'scheduled', label: 'on a schedule' },
     { id: 'webhook', label: 'an incoming webhook is called' }
   ]
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const DELAYS = [{ v: 0, l: 'immediately' }, { v: 15, l: 'after 15 minutes' }, { v: 60, l: 'after 1 hour' }, { v: 240, l: 'after 4 hours' }, { v: 1440, l: 'after 1 day' }, { v: 2880, l: 'after 2 days' }, { v: 4320, l: 'after 3 days' }, { v: 10080, l: 'after 1 week' }]
+  const delayLabel = (m: number): string => (m % 10080 === 0 ? `${m / 10080} week${m > 10080 ? 's' : ''}` : m % 1440 === 0 ? `${m / 1440} day${m > 1440 ? 's' : ''}` : m % 60 === 0 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} min`)
+  const inLabel = (t: number, now: number): string => {
+    const d = t - now
+    if (d <= 0) return 'due now'
+    const m = Math.round(d / 60_000)
+    return m < 60 ? `in ${m} min` : m < 1440 ? `in ${Math.round(m / 60)} h` : `in ${Math.round(m / 1440)} d`
+  }
   const EVERY = [{ v: 15, l: 'every 15 minutes' }, { v: 60, l: 'every hour' }, { v: 240, l: 'every 4 hours' }, { v: 1440, l: 'every day' }, { v: 10080, l: 'every week' }]
   const SCOPES: Array<{ id: NonNullable<AutomationRule['scope']>, label: string }> = [
     { id: 'open', label: 'open issues' }, { id: 'stale7', label: 'open issues untouched for 7 days' }, { id: 'due3', label: 'open issues due within 3 days' }, { id: 'overdue', label: 'overdue open issues' }, { id: 'unassigned', label: 'unassigned open issues' }, { id: 'all', label: 'all issues' }
@@ -112,6 +127,9 @@
   let trigger: AutomationTrigger = 'created'
   let every = 60
   let scope: NonNullable<AutomationRule['scope']> = 'open'
+  let schedMode: 'every' | 'daily' = 'every'
+  let at = '09:00'
+  let days: number[] = [1, 2, 3, 4, 5]
   let token = ''
   let isGlobal = false
   let onlyKeys = ''
@@ -126,11 +144,14 @@
     trigger = r?.trigger ?? 'created'
     every = r?.every ?? 60
     scope = r?.scope ?? 'open'
+    schedMode = (r?.at ?? '') !== '' ? 'daily' : 'every'
+    at = (r?.at ?? '') !== '' ? (r?.at as string) : '09:00'
+    days = r?.days ?? [1, 2, 3, 4, 5]
     token = r?.token ?? newToken()
     isGlobal = r?.global === true
     onlyKeys = (r?.projects ?? []).map((id) => projects.find((p) => p._id === id)?.identifier ?? '').filter((k) => k !== '').join(', ')
     conditions = r?.conditions.map((c) => ({ ...c })) ?? []
-    actions = r?.actions.map((a) => ({ ...a })) ?? [{ type: 'add-comment', value: 'Automation: {identifier} matched this rule', target: 'self' }]
+    actions = r?.actions.map((a) => ({ ...a, delayMinutes: a.delayMinutes ?? 0 })) ?? [{ type: 'add-comment', value: 'Automation: {identifier} matched this rule', target: 'self', delayMinutes: 0 }]
   }
   async function save (): Promise<void> {
     if (name.trim() === '' || actions.length === 0) return
@@ -142,6 +163,9 @@
       conditions,
       actions,
       every: trigger === 'scheduled' ? every : undefined,
+      at: trigger === 'scheduled' && schedMode === 'daily' ? at : '',
+      days: trigger === 'scheduled' && schedMode === 'daily' ? days : [],
+      tz: trigger === 'scheduled' && schedMode === 'daily' ? -new Date().getTimezoneOffset() : undefined,
       scope: trigger === 'scheduled' || trigger === 'webhook' ? scope : undefined,
       token: trigger === 'webhook' ? token : undefined,
       global: isGlobal,
@@ -156,20 +180,22 @@
     await client.remove(r)
   }
   function describe (r: AutomationRule): string {
-    const when = r.trigger === 'scheduled' ? `${EVERY.find((e) => e.v === r.every)?.l ?? 'on a schedule'} over ${SCOPES.find((s) => s.id === r.scope)?.label ?? 'open issues'}` : r.trigger === 'webhook' ? 'an incoming webhook is called' : TRIGGERS.find((t) => t.id === r.trigger)?.label ?? r.trigger
-    return `when ${when}${r.conditions.length > 0 ? ` if ${r.conditions.length} condition${r.conditions.length > 1 ? 's' : ''}` : ''} → ${r.actions.map((a) => `${ACTIONS.find((x) => x.id === a.type)?.label ?? a.type}${a.target !== undefined && a.target !== 'self' ? ` (${TARGETS.find((t) => t.id === a.target)?.label})` : ''}`).join(', ')}`
+    const daily = (r.at ?? '') !== '' ? `daily at ${r.at}${(r.days ?? []).length > 0 && (r.days ?? []).length < 7 ? ` on ${(r.days ?? []).map((d) => DAYS[d]).join(', ')}` : ''}` : (EVERY.find((e) => e.v === r.every)?.l ?? 'on a schedule')
+    const when = r.trigger === 'scheduled' ? `${daily} over ${SCOPES.find((s) => s.id === r.scope)?.label ?? 'open issues'}` : r.trigger === 'webhook' ? 'an incoming webhook is called' : TRIGGERS.find((t) => t.id === r.trigger)?.label ?? r.trigger
+    return `when ${when}${r.conditions.length > 0 ? ` if ${r.conditions.length} condition${r.conditions.length > 1 ? 's' : ''}` : ''} → ${r.actions.map((a) => `${ACTIONS.find((x) => x.id === a.type)?.label ?? a.type}${a.target !== undefined && a.target !== 'self' ? ` (${TARGETS.find((t) => t.id === a.target)?.label})` : ''}${(a.delayMinutes ?? 0) > 0 ? ` after ${delayLabel(a.delayMinutes ?? 0)}` : ''}`).join(', ')}`
   }
   const isIssueAction = (t: AutomationAction['type']): boolean => ACTIONS.find((a) => a.id === t)?.issue === true
   let showLog = false
+  let showJobs = false
   const fmt = (t: number): string => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 </script>
 
 <section class="card motion-rise" style="--i: 2">
   <div class="card__head">
     <span class="card__title">Rules</span>
-    <span class="tools"><button class="lnk" on:click={() => { showLog = !showLog }}>{showLog ? 'hide run log' : `run log (${shownRuns.length})`}</button><Button kind={'primary'} icon={IconAdd} label={tracker.string.NewRule} on:click={() => { edit(undefined) }} /></span>
+    <span class="tools"><button class="lnk" class:lnk--warn={pendingJobs.some((j) => j.state === 'retry')} on:click={() => { showJobs = !showJobs }}>{showJobs ? 'hide queue' : `queue (${pendingJobs.length})`}</button><button class="lnk" on:click={() => { showLog = !showLog }}>{showLog ? 'hide run log' : `run log (${shownRuns.length})`}</button><Button kind={'primary'} icon={IconAdd} label={tracker.string.NewRule} on:click={() => { edit(undefined) }} /></span>
   </div>
-  <p class="hint">Rules run on the server after every change. Scheduled rules fire on the integrations service heartbeat (or on issue traffic once due). A rule's own changes can trigger other rules, two levels deep at most. Templates: {'{identifier}'} {'{title}'} {'{status}'} {'{assignee}'} {'{priority}'} {'{url}'} {'{payload.field}'}.</p>
+  <p class="hint">Rules run on the server after every change. Scheduled rules fire on the integrations service heartbeat (or on issue traffic once due). A rule's own changes can trigger other rules, two levels deep at most. Any action can run after a delay; the conditions are checked again when the time comes. Email, Slack, Teams and webhook deliveries that fail are retried up to five times with a growing gap. Templates: {'{identifier}'} {'{title}'} {'{status}'} {'{assignee}'} {'{priority}'} {'{url}'} {'{payload.field}'}.</p>
 
   {#if editing !== null}
     <div class="editor motion-pop">
@@ -182,7 +208,13 @@
         <span class="kw">WHEN</span>
         <select class="input" bind:value={trigger}>{#each TRIGGERS as t (t.id)}<option value={t.id}>{t.label}</option>{/each}</select>
         {#if trigger === 'scheduled'}
-          <select class="input" bind:value={every}>{#each EVERY as e (e.v)}<option value={e.v}>{e.l}</option>{/each}</select>
+          <select class="input" bind:value={schedMode}><option value="every">repeating</option><option value="daily">daily at a time</option></select>
+          {#if schedMode === 'every'}
+            <select class="input" bind:value={every}>{#each EVERY as e (e.v)}<option value={e.v}>{e.l}</option>{/each}</select>
+          {:else}
+            at <input class="input input--time" type="time" bind:value={at} />
+            on <span class="dows">{#each DAYS as d, k}<button class="dow" class:dow--on={days.includes(k)} on:click={() => { days = days.includes(k) ? days.filter((x) => x !== k) : [...days, k].sort((a, b) => a - b) }}>{d}</button>{/each}</span>
+          {/if}
           over <select class="input" bind:value={scope}>{#each SCOPES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}</select>
         {/if}
         {#if trigger === 'webhook'}
@@ -239,6 +271,7 @@
           {#if isIssueAction(a.type)}
             on <select class="input" bind:value={a.target}>{#each TARGETS as t (t.id)}<option value={t.id}>{t.label}</option>{/each}</select>
           {/if}
+          <select class="input input--delay" bind:value={a.delayMinutes}>{#each DELAYS as d (d.v)}<option value={d.v}>{d.l}</option>{/each}</select>
           <button class="x" on:click={() => { actions = actions.filter((_, k) => k !== i) }}>×</button>
         </div>
       {/each}
@@ -276,9 +309,35 @@
           <span class="log__at">{fmt(run.at)}</span>
           <span class="log__rule">{run.ruleName}</span>
           <span class="log__what">{run.identifier ?? `${run.matched} matched`} · {run.trigger} · {run.actions.join(', ')}</span>
-          <span class="log__state">{run.ok ? 'ok' : run.error ?? 'failed'}</span>
+          <span class="log__state">{run.ok ? (run.note ?? 'ok') : run.error ?? 'failed'}{#if run.attempt !== undefined && run.attempt > 1} · attempt {run.attempt}{/if}</span>
         </div>
       {/each}
+    </div>
+  {/if}
+
+  {#if showJobs}
+    <div class="log motion-pop">
+      <span class="card__title">Queue · waiting and retrying</span>
+      {#if pendingJobs.length === 0}<p class="hint">Nothing waiting. Delayed actions and retries appear here until they run; they are picked up on the next heartbeat (every few minutes) or as soon as you press run now.</p>{/if}
+      {#each pendingJobs as j (j._id)}
+        <div class="log__row" class:log__row--bad={j.state === 'retry'}>
+          <span class="log__at">{j.state === 'retry' ? `retry ${j.attempts + 1}/${j.maxAttempts}` : 'waiting'} · {inLabel(j.runAt, $ticker)}</span>
+          <span class="log__rule">{j.ruleName}</span>
+          <span class="log__what">{j.identifier} · {ACTIONS.find((x) => x.id === j.action.type)?.label ?? j.action.type}{#if j.lastError} · <span class="bad">{j.lastError}</span>{/if}</span>
+          <span class="log__state"><button class="lnk" on:click={() => { void client.update(j, { runAt: Date.now() }) }}>run now</button> <button class="lnk lnk--bad" on:click={() => { void client.update(j, { state: 'cancelled', doneAt: Date.now() }) }}>cancel</button></span>
+        </div>
+      {/each}
+      {#if finishedJobs.length > 0}
+        <span class="card__title card__title--sub">Finished</span>
+        {#each finishedJobs as j (j._id)}
+          <div class="log__row" class:log__row--bad={j.state === 'failed'}>
+            <span class="log__at">{fmt(j.doneAt ?? j.runAt)}</span>
+            <span class="log__rule">{j.ruleName}</span>
+            <span class="log__what">{j.identifier} · {ACTIONS.find((x) => x.id === j.action.type)?.label ?? j.action.type}{#if j.lastError} · {j.lastError}{/if}</span>
+            <span class="log__state">{j.state}{#if j.state === 'failed'} · <button class="lnk" on:click={() => { void client.update(j, { state: 'retry', attempts: 0, runAt: Date.now(), lastError: null }) }}>retry</button>{/if}</span>
+          </div>
+        {/each}
+      {/if}
     </div>
   {/if}
 </section>
@@ -308,6 +367,12 @@
   .rule__tools { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
   .log { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--theme-divider-color); }
   .log__row { display: grid; grid-template-columns: 9rem 12rem 1fr 8rem; gap: 0.6rem; font-size: 0.75rem; color: var(--theme-content-color); padding: 0.2rem 0; &--bad .log__state { color: var(--negative-button-default); } }
+  .card__title--sub { margin-top: 0.4rem; font-size: 0.8rem; color: var(--theme-dark-color); }
+  .input--time { width: 7.5rem; }
+  .input--delay { color: var(--theme-dark-color); }
+  .dows { display: inline-flex; gap: 0.15rem; }
+  .dow { padding: 0.15rem 0.4rem; border: 1px solid var(--theme-divider-color); border-radius: 0.3rem; background: var(--theme-bg-color); color: var(--theme-content-color); font: inherit; font-size: 0.7rem; cursor: pointer; &--on { background: var(--accent-brand-soft); color: var(--accent-brand); border-color: var(--accent-brand); font-weight: 600; } }
+  .lnk--warn { color: var(--negative-button-default); font-weight: 600; }
   .log__at { color: var(--theme-trans-color); }
   .log__rule { font-weight: 600; color: var(--theme-caption-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .log__what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

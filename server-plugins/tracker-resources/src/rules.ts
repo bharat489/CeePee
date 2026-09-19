@@ -29,17 +29,24 @@
 // Rule-made changes are ordinary transactions and can trigger other rules;
 // a per-request depth counter stops that at two levels.
 //
-// Also hosts the retention sweep (audit events, activity, run log).
+// Actions can wait (delayMinutes): they become AutomationJobs, run on the next
+// heartbeat after their time with the conditions re-checked. Deliveries that
+// fail (email, Slack, Teams, webhooks) become retry jobs with a growing gap,
+// five attempts at most. Both show in the project's automation queue.
+//
+// Also hosts the retention sweep (audit events, activity, run log, jobs).
 
 import contact from '@hcengineering/contact'
 import { runReminders } from './reminders'
 import { templateFor } from './mailTemplates'
+import { backoffMinutes, isScheduleDue, MAX_ATTEMPTS } from './schedule'
 import core, { type AttachedData, type Class, type Doc, type Ref, type Tx, type TxCreateDoc, type TxCUD, type TxUpdateDoc } from '@hcengineering/core'
 import { type TriggerControl } from '@hcengineering/server-core'
 import task, { makeRank, type TaskType } from '@hcengineering/task'
 import tracker, {
   type AutomationAction,
   type AutomationCondition,
+  type AutomationJob,
   type AutomationRule,
   type AutomationTrigger,
   type Issue,
@@ -55,7 +62,7 @@ const TAG_ELEMENT = 'tags:class:TagElement' as Ref<Class<Doc>>
 const CHAT_MESSAGE = 'chunter:class:ChatMessage' as Ref<Class<Doc>>
 
 interface Event {
-  trigger: AutomationTrigger
+  trigger: AutomationTrigger | 'job'
   issue?: Issue
   ruleId?: Ref<AutomationRule>
   payload?: Record<string, unknown>
@@ -63,6 +70,8 @@ interface Event {
 
 async function eventOf (cud: TxCUD<Doc>, control: TriggerControl): Promise<Event | undefined> {
   if (cud.objectClass === tracker.class.AutomationHeartbeat) return { trigger: 'scheduled' }
+  // someone pressed "run now" / "retry" on a job: process the queue
+  if (cud.objectClass === tracker.class.AutomationJob) return cud._class === core.class.TxUpdateDoc ? { trigger: 'job' } : undefined
   if (cud.objectClass === tracker.class.AutomationRule && cud._class === core.class.TxUpdateDoc) {
     const ops = (cud as TxUpdateDoc<AutomationRule>).operations as Partial<AutomationRule>
     if (ops.lastWebhook !== undefined) return { trigger: 'webhook', ruleId: cud.objectId as Ref<AutomationRule>, payload: ops.lastPayload ?? {} }
@@ -215,10 +224,44 @@ export async function render (tpl: string, issue: Issue, project: Project, contr
     .replace(/\{payload\.([a-zA-Z0-9_.]+)\}/g, (_m, key: string) => String(key.split('.').reduce<unknown>((o, k) => (o != null && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), payload) ?? ''))
 }
 
-function post (url: string, body: unknown): void {
-  if (!/^https?:\/\//i.test(url)) return
+/** POST JSON and wait for the answer; throws on bad URLs, network errors, an 8 s timeout and non-2xx replies. */
+async function deliver (url: string, body: unknown): Promise<void> {
+  if (!/^https?:\/\//i.test(url)) throw new Error(`Not an http(s) URL: ${url.slice(0, 60)}`)
   const g = globalThis as any
-  void g.fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {})
+  const ctrl = typeof g.AbortController === 'function' ? new g.AbortController() : undefined
+  const timer = setTimeout(() => ctrl?.abort(), 8000)
+  try {
+    const res = await g.fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl?.signal })
+    if (res === undefined || res.ok !== true) throw new Error(`HTTP ${res?.status ?? '?'} from ${new URL(url).host}`)
+  } catch (err: any) {
+    throw new Error(err?.name === 'AbortError' ? `Timeout after 8 s calling ${new URL(url).host}` : String(err?.message ?? err))
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Where a run comes from: the rule (for retry jobs on failure) and, for jobs, the attempt number. */
+export interface RunCtx {
+  rule?: AutomationRule
+  attempt?: number
+  fromJob?: boolean
+}
+
+function jobTx (control: TriggerControl, rule: AutomationRule, issue: Issue, action: AutomationAction, kind: AutomationJob['kind'], runAt: number, attempts: number, error?: string, payload?: Record<string, unknown>): Tx {
+  return control.txFactory.createTxCreateDoc(tracker.class.AutomationJob, rule.space, {
+    rule: rule._id,
+    ruleName: rule.name,
+    issue: issue._id,
+    identifier: issue.identifier,
+    action,
+    kind,
+    runAt,
+    attempts,
+    maxAttempts: MAX_ATTEMPTS,
+    state: kind === 'delay' ? 'waiting' : 'retry',
+    lastError: error ?? null,
+    ...(payload !== undefined ? { payload } : {})
+  } as any)
 }
 
 /** Email addresses for a recipients spec: "assignee", "reporter", "watchers" or literal addresses, comma-separated. */
@@ -247,15 +290,21 @@ async function resolveRecipients (spec: string, issue: Issue, control: TriggerCo
   return Array.from(out)
 }
 
-export function sendMail (to: string[], subject: string, text: string): void {
+/** Send one email per address through the mail service and wait for it; throws when the service is missing or refuses. */
+export async function deliverMail (to: string[], subject: string, text: string): Promise<void> {
   const mail = env('MAIL_URL').replace(/\/$/, '')
-  if (mail === '' || to.length === 0) return
+  if (to.length === 0) return
+  if (mail === '') throw new Error('MAIL_URL is not configured')
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   const key = env('MAIL_API_KEY')
   if (key !== '') headers.authorization = `Bearer ${key}`
-  const g = globalThis as any
   const html = `<div style="font-family:system-ui,sans-serif;font-size:14px">${text.split('\n').map((l) => `<p>${l.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] ?? ch)}</p>`).join('')}</div>`
-  for (const addr of to) void g.fetch(`${mail}/send`, { method: 'POST', headers, body: JSON.stringify({ to: addr, subject, text, html }) }).catch(() => {})
+  for (const addr of to) await deliver(`${mail}/send`, { to: addr, subject, text, html })
+}
+
+/** Fire-and-forget email for callers that do not track delivery. */
+export function sendMail (to: string[], subject: string, text: string): void {
+  void deliverMail(to, subject, text).catch(() => {})
 }
 
 /** Transactions that create one issue in `project`, numbered after its sequence, modelled on `like`. */
@@ -300,8 +349,26 @@ async function createIssueTxes (control: TriggerControl, project: Project, title
   ]
 }
 
-export async function perform (a: AutomationAction, issue: Issue, project: Project, control: TriggerControl, activeSprints: string[], payload?: Record<string, unknown>): Promise<Tx[]> {
+export async function perform (a: AutomationAction, issue: Issue, project: Project, control: TriggerControl, activeSprints: string[], payload?: Record<string, unknown>, run?: RunCtx): Promise<Tx[]> {
   const v = (a.value ?? '').trim()
+  // outbound deliveries: without a rule context (workflow post-functions) fire and forget as before;
+  // from a job, let the error reach the job processor; from a rule run, schedule the first retry
+  const outbound = async (fn: () => Promise<void>): Promise<Tx[]> => {
+    if (run === undefined) {
+      void fn().catch(() => {})
+      return []
+    }
+    if (run.fromJob === true || run.rule === undefined) {
+      await fn()
+      return []
+    }
+    try {
+      await fn()
+      return []
+    } catch (err: any) {
+      return [jobTx(control, run.rule, issue, a, 'retry', Date.now() + backoffMinutes(1) * 60_000, 1, String(err?.message ?? err).slice(0, 300), payload)]
+    }
+  }
   const update = (ops: Partial<Issue>): Tx => control.txFactory.createTxUpdateDoc(tracker.class.Issue, issue.space, issue._id, ops)
   switch (a.type) {
     case 'set-status': {
@@ -375,23 +442,20 @@ export async function perform (a: AutomationAction, issue: Issue, project: Proje
       const tplText = v !== '' ? v : (await templateFor(control, 'rule'))?.body ?? '{identifier} {title}\n{status} · {priority}\n{url}'
       const body = await render(tplText, issue, project, control, payload)
       const [subject, ...rest] = body.split('\n')
-      sendMail(to, subject, rest.length > 0 ? rest.join('\n') : subject)
-      return []
+      return await outbound(async () => { await deliverMail(to, subject, rest.length > 0 ? rest.join('\n') : subject) })
     }
     case 'webhook': {
-      post(v, { event: 'automation', at: Date.now(), workspace: control.workspace.url, project: project.identifier, issue: { _id: issue._id, identifier: issue.identifier, title: issue.title, status: issue.status, priority: issue.priority, assignee: issue.assignee }, payload })
-      return []
+      return await outbound(async () => { await deliver(v, { event: 'automation', at: Date.now(), workspace: control.workspace.url, project: project.identifier, issue: { _id: issue._id, identifier: issue.identifier, title: issue.title, status: issue.status, priority: issue.priority, assignee: issue.assignee }, payload }) })
     }
     case 'slack': {
       if (a.url === undefined) return []
-      post(a.url, { text: await render(v !== '' ? v : '*{identifier}* {title} — {status}\n{url}', issue, project, control, payload) })
-      return []
+      const slackText = await render(v !== '' ? v : '*{identifier}* {title} — {status}\n{url}', issue, project, control, payload)
+      return await outbound(async () => { await deliver(a.url as string, { text: slackText }) })
     }
     case 'teams': {
       if (a.url === undefined) return []
       const text = await render(v !== '' ? v : '**{identifier}** {title} — {status}\n\n{url}', issue, project, control, payload)
-      post(a.url, { '@type': 'MessageCard', '@context': 'http://schema.org/extensions', summary: text.split('\n')[0], text })
-      return []
+      return await outbound(async () => { await deliver(a.url as string, { '@type': 'MessageCard', '@context': 'http://schema.org/extensions', summary: text.split('\n')[0], text }) })
     }
   }
   return []
@@ -438,7 +502,7 @@ interface Lookups {
   sprintsOf: (space: Ref<Project>) => Promise<string[]>
 }
 
-function runLog (control: TriggerControl, rule: AutomationRule, issues: Issue[], ok: boolean, matched: number, error?: string): Tx {
+function runLog (control: TriggerControl, rule: AutomationRule, issues: Issue[], ok: boolean, matched: number, error?: string, extra?: { attempt?: number, note?: string, action?: string }): Tx {
   const one = issues.length === 1 ? issues[0] : undefined
   return control.txFactory.createTxCreateDoc(tracker.class.AutomationRun, rule.space, {
     rule: rule._id,
@@ -449,8 +513,10 @@ function runLog (control: TriggerControl, rule: AutomationRule, issues: Issue[],
     at: Date.now(),
     ok,
     matched,
-    actions: rule.actions.map((a) => a.type),
-    ...(error !== undefined ? { error: error.slice(0, 300) } : {})
+    actions: extra?.action !== undefined ? [extra.action] : rule.actions.map((a) => a.type),
+    ...(error !== undefined ? { error: error.slice(0, 300) } : {}),
+    ...(extra?.attempt !== undefined ? { attempt: extra.attempt } : {}),
+    ...(extra?.note !== undefined ? { note: extra.note } : {})
   } as any)
 }
 
@@ -471,7 +537,11 @@ async function runRule (rule: AutomationRule, issues: Issue[], control: TriggerC
     if (!ok) continue
     matched++
     for (const a of rule.actions) {
-      for (const t of await targetsOf(issue, a.target, control)) out.push(...(await perform(a, t, project, control, active, payload)))
+      const delay = Math.max(0, Number(a.delayMinutes ?? 0))
+      for (const t of await targetsOf(issue, a.target, control)) {
+        if (delay > 0) out.push(jobTx(control, rule, t, a, 'delay', Date.now() + delay * 60_000, 0, undefined, payload))
+        else out.push(...(await perform(a, t, project, control, active, payload, { rule })))
+      }
     }
   }
   out.push(control.txFactory.createTxUpdateDoc(tracker.class.AutomationRule, rule.space, rule._id, { runs: (rule.runs ?? 0) + 1, lastRun: Date.now(), lastError: null, lastMatched: matched }))
@@ -486,6 +556,8 @@ async function retentionSweep (control: TriggerControl): Promise<Tx[]> {
   const out: Tx[] = []
   const runs = await control.findAll(control.ctx, tracker.class.AutomationRun, { at: { $lt: Date.now() - RUN_RETENTION_DAYS * DAY } }, { limit: 500 })
   for (const r of runs) out.push(control.txFactory.createTxRemoveDoc(r._class, r.space, r._id))
+  const jobs = await control.findAll(control.ctx, tracker.class.AutomationJob, { state: { $in: ['done', 'skipped', 'failed', 'cancelled'] }, doneAt: { $lt: Date.now() - RUN_RETENTION_DAYS * DAY } }, { limit: 500 })
+  for (const j of jobs) out.push(control.txFactory.createTxRemoveDoc(j._class, j.space, j._id))
   const policy = (await control.findAll(control.ctx, tracker.class.AuditPolicy, {}, { limit: 1 }))[0]
   if (policy === undefined || policy.retentionDays <= 0) return out
   const before = Date.now() - policy.retentionDays * DAY
@@ -499,7 +571,67 @@ async function retentionSweep (control: TriggerControl): Promise<Tx[]> {
 async function dueScheduledRules (control: TriggerControl): Promise<AutomationRule[]> {
   const rules = await control.findAll(control.ctx, tracker.class.AutomationRule, { enabled: true, trigger: 'scheduled' })
   const now = Date.now()
-  return rules.filter((r) => now - (r.lastRun ?? 0) >= Math.max(5, r.every ?? 60) * 60_000)
+  return rules.filter((r) => isScheduleDue(r, now))
+}
+
+/** Due jobs: delayed actions whose time has come (conditions re-checked) and retries. */
+async function processJobs (control: TriggerControl, look: Lookups): Promise<Tx[]> {
+  const now = Date.now()
+  const jobs = await control.findAll(control.ctx, tracker.class.AutomationJob, { state: { $in: ['waiting', 'retry'] }, runAt: { $lte: now } }, { limit: 50, sort: { runAt: 1 as any } })
+  const out: Tx[] = []
+  const ruleCache = new Map<Ref<AutomationRule>, AutomationRule | undefined>()
+  for (const job of jobs) {
+    const finish = (ops: Partial<AutomationJob>): void => {
+      out.push(control.txFactory.createTxUpdateDoc(tracker.class.AutomationJob, job.space, job._id, { ...ops, doneAt: now } as any))
+    }
+    if (!ruleCache.has(job.rule)) ruleCache.set(job.rule, (await control.findAll(control.ctx, tracker.class.AutomationRule, { _id: job.rule }, { limit: 1 }))[0])
+    const rule = ruleCache.get(job.rule)
+    if (rule === undefined || !rule.enabled) {
+      finish({ state: 'cancelled', lastError: rule === undefined ? 'the rule was deleted' : 'the rule is switched off' })
+      continue
+    }
+    const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: job.issue }, { limit: 1 }))[0]
+    if (issue === undefined || issue.archived === true) {
+      finish({ state: 'cancelled', lastError: 'the issue is gone' })
+      continue
+    }
+    const project = await look.projectOf(issue.space)
+    if (project === undefined) {
+      finish({ state: 'cancelled', lastError: 'the project is gone' })
+      continue
+    }
+    const active = await look.sprintsOf(issue.space)
+    const attempt = job.attempts + 1
+    if (job.kind === 'delay') {
+      let still = true
+      for (const c of rule.conditions) {
+        if (!(await holds(c, issue, control, active))) {
+          still = false
+          break
+        }
+      }
+      if (!still) {
+        finish({ state: 'skipped', attempts: attempt, lastError: 'conditions no longer match' })
+        out.push(runLog(control, rule, [issue], true, 0, undefined, { attempt, note: 'skipped: conditions no longer match', action: job.action.type }))
+        continue
+      }
+    }
+    try {
+      out.push(...(await perform(job.action, issue, project, control, active, job.payload, { rule, attempt, fromJob: true })))
+      finish({ state: 'done', attempts: attempt, lastError: null })
+      out.push(runLog(control, rule, [issue], true, 1, undefined, { attempt, action: job.action.type, note: job.kind === 'delay' ? 'ran after the delay' : 'delivered on retry' }))
+    } catch (err: any) {
+      const msg = String(err?.message ?? err).slice(0, 300)
+      if (attempt >= job.maxAttempts) {
+        finish({ state: 'failed', attempts: attempt, lastError: msg })
+        out.push(runLog(control, rule, [issue], false, 0, msg, { attempt, action: job.action.type }))
+        out.push(control.txFactory.createTxUpdateDoc(tracker.class.AutomationRule, rule.space, rule._id, { lastError: `${job.action.type}: ${msg}`.slice(0, 200) }))
+      } else {
+        out.push(control.txFactory.createTxUpdateDoc(tracker.class.AutomationJob, job.space, job._id, { state: 'retry', attempts: attempt, lastError: msg, runAt: now + backoffMinutes(attempt) * 60_000 } as any))
+      }
+    }
+  }
+  return out
 }
 
 /** Rules that apply to an issue in `space`: the project's own plus global ones not narrowed away. */
@@ -532,12 +664,17 @@ export async function OnAutomationRules (txes: Tx[], control: TriggerControl): P
   }
 
   let sawHeartbeat = false
+  let sawPoke = false
   for (const tx of txes) {
     const ev = await eventOf(tx as TxCUD<Doc>, control)
     if (ev === undefined) continue
     try {
       if (ev.trigger === 'scheduled') {
         sawHeartbeat = true
+        continue
+      }
+      if (ev.trigger === 'job') {
+        sawPoke = true
         continue
       }
       if (ev.trigger === 'webhook' && ev.ruleId !== undefined) {
@@ -566,8 +703,8 @@ export async function OnAutomationRules (txes: Tx[], control: TriggerControl): P
     }
   }
 
-  // Scheduled rules: run those that are due, on the heartbeat or on any issue traffic.
-  if (sawHeartbeat || txes.some((t) => (t as TxCUD<Doc>).objectClass === tracker.class.Issue)) {
+  // Scheduled rules and the job queue: on the heartbeat, on a "run now", or on any issue traffic once due.
+  if (sawHeartbeat || sawPoke || txes.some((t) => (t as TxCUD<Doc>).objectClass === tracker.class.Issue)) {
     for (const rule of await dueScheduledRules(control)) {
       const issues = await scopeIssues(rule, control).catch(() => [] as Issue[])
       try {
@@ -575,6 +712,11 @@ export async function OnAutomationRules (txes: Tx[], control: TriggerControl): P
       } catch (err) {
         failed(rule, err, issues)
       }
+    }
+    try {
+      out.push(...(await processJobs(control, look)))
+    } catch {
+      // a broken job must not block rules
     }
   }
 
