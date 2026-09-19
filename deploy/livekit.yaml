@@ -1,0 +1,11 @@
+# LiveKit media server for CeePee calls (production).
+# Keys come from the LIVEKIT_KEYS environment variable set in docker-compose.prod.yaml.
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # on a cloud VM behind NAT this lets LiveKit discover and advertise the public address
+  use_external_ip: true
+logging:
+  level: info

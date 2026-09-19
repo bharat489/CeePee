@@ -83,6 +83,15 @@ Test a restore once: `cockroach sql --insecure -e "RESTORE DATABASE defaultdb FR
 UptimeRobot (free) pinging `https://ceepee.example.com/` every five minutes emails you when it is down. Container
 logs rotate at 20 MB × 5 files each; `docker compose logs -f transactor_cockroach` shows the live log.
 
+## Calls in chat
+
+Audio and video calls run on a self-hosted LiveKit server (open source, no account needed) plus
+the `love` service; both are in the production compose. Open UDP 50000-50100 and TCP 7881 on the
+firewall, set `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` in `.env`, and keep `livekit.yaml` next
+to the compose file (the copy in this folder works as is; set `rtc.use_external_ip: true` on a cloud
+VM so LiveKit advertises the public address). Signalling goes through Caddy at `/_livekit`, the
+love API at `/_love`. In the dev stack LiveKit runs in dev mode with the keys devkey / secret.
+
 ## Free AI for "Ask CeePee"
 
 The assistant answers from workspace data with no model and no key. For free-form questions

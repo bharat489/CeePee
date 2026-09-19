@@ -72,7 +72,38 @@ services:
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
       # no pulse (presence) service in the minimal stack: blank it so the browser stops retrying ws://…:8099
       - PULSE_URL=
+      # calls: LiveKit (self-hosted, dev keys) + the love service
+      - LIVEKIT_WS=${LIVEKIT_WS:-ws://huly.local:7880}
+      - LOVE_ENDPOINT=${LOVE_ENDPOINT:-http://huly.local:8096}
     links: !override []
+  livekit:
+    image: livekit/livekit-server:v1.8
+    container_name: livekit
+    command: --dev --bind 0.0.0.0
+    restart: unless-stopped
+    ports:
+      - 7880:7880
+      - 7881:7881
+      - 7882:7882/udp
+      - 50000-50050:50000-50050/udp
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"
+  love:
+    image: hardcoreeng/love
+    container_name: love
+    restart: unless-stopped
+    ports:
+      - 8096:8096
+    environment:
+      - PORT=8096
+      - SECRET=secret
+      - ACCOUNTS_URL=http://account:3000
+      - LIVEKIT_HOST=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - STORAGE_PROVIDER_NAME=datalake
+      - STATS_URL=
   transactor_cockroach:
     environment:
       - MAIL_URL=${MAIL_URL:-}

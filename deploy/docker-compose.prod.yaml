@@ -185,6 +185,8 @@ services:
       - AI_CHAT_URL=${AI_CHAT_URL:-}
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
       - PULSE_URL=
+      - LIVEKIT_WS=wss://${DOMAIN}/_livekit
+      - LOVE_ENDPOINT=https://${DOMAIN}/_love
       - STATS_URL=
       - PREVIEW_URL=
       - LINK_PREVIEW_URL=
@@ -263,6 +265,30 @@ services:
       - SMTP_TLS_MODE=${SMTP_TLS_MODE:-upgrade}
 
   # Nightly database dump kept 7 days; copy the folder off the box with rclone (see README).
+  livekit:
+    <<: *common
+    image: livekit/livekit-server:v1.8
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - 7881:7881
+      - 50000-50100:50000-50100/udp
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+  love:
+    <<: *common
+    image: ${IMAGE_PREFIX}/love:${IMAGE_TAG}
+    environment:
+      - PORT=8096
+      - SECRET=${SERVER_SECRET}
+      - ACCOUNTS_URL=http://account:3000
+      - LIVEKIT_HOST=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - STORAGE_PROVIDER_NAME=datalake
+      - STATS_URL=
   backup:
     <<: *common
     image: cockroachdb/cockroach:latest-v24.3

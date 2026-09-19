@@ -188,6 +188,7 @@
       class:filledHover={hoverStyles === 'filledHover'}
       class:stale
       class:own={own}
+      class:system={person == null && !$$slots.icon}
       class:pending
       on:click={onClick}
       on:contextmenu={handleContextMenu}

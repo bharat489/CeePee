@@ -46,7 +46,11 @@
       recorder.start(250)
       timer = setInterval(() => { seconds++ }, 1000)
     } catch (e: any) {
-      error = 'Microphone not available'
+      // browsers hand out the microphone only on a secure context (https, or localhost)
+      if (!window.isSecureContext || navigator.mediaDevices === undefined) error = 'Voice notes need HTTPS or localhost. Open the app at https://… (production) or http://localhost:8087 (development).'
+      else if (e?.name === 'NotAllowedError') error = 'Microphone blocked. Allow it for this site in the browser address bar, then try again.'
+      else if (e?.name === 'NotFoundError') error = 'No microphone found on this device.'
+      else error = 'Microphone not available: ' + String(e?.message ?? e)
     }
   })
   onDestroy(() => {

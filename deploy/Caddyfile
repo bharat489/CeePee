@@ -17,6 +17,12 @@
 		reverse_proxy collaborator:3078
 	}
 	# files
+	handle_path /_love/* {
+		reverse_proxy love:8096
+	}
+	handle_path /_livekit/* {
+		reverse_proxy livekit:7880
+	}
 	handle_path /_datalake/* {
 		reverse_proxy datalake:4030
 	}
