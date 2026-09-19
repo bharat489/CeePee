@@ -31,6 +31,7 @@
 
   import tracker from '../../plugin'
   import { runQuery } from '../query/run'
+  import { icon } from '../projects/icons'
 
   export let type: string
   export let params: Record<string, any> = {}
@@ -81,6 +82,9 @@
     }
     return undefined
   }
+  const bucketOf = (i: Issue): 'todo' | 'doing' | 'done' => { const c = category.get(i.status); return c === task.statusCategory.Won || c === task.statusCategory.Lost ? 'done' : c === task.statusCategory.Active ? 'doing' : 'todo' }
+  const kindIcon = (i: Issue): string => (kindOf(i) === 'epic' ? 'epic' : kindOf(i) === 'initiative' ? 'initiative' : kindOf(i) === 'sub' ? 'subtask' : 'issue')
+  const kindColor = (i: Issue): string => (kindOf(i) === 'epic' ? '#904ee2' : kindOf(i) === 'initiative' ? '#f38a3f' : kindOf(i) === 'sub' ? '#6554c0' : '#388bff')
   const kindOf = (i: Issue): 'epic' | 'initiative' | 'sub' | 'issue' => (i.kind === tracker.taskTypes.Epic ? 'epic' : i.kind === tracker.taskTypes.Initiative ? 'initiative' : i.parents.length > 0 ? 'sub' : 'issue')
 
   let names = new Map<Ref<Person>, string>()
@@ -108,7 +112,7 @@
   let kpi: { value: string, sub: string } | undefined
 
   const rank = (p: IssuePriority): number => (p === IssuePriority.NoPriority ? 99 : p)
-  const PALETTE = ['#2b6bea', '#c0f010', '#6a45f5', '#f5a623', '#e0475b', '#2bb3a0', '#8d8f9a', '#d97ce0']
+  const PALETTE = ['#0052cc', '#00a3bf', '#6554c0', '#ff991f', '#36b37e', '#ff5630', '#8993a4', '#8777d9']
   const prioLabel: Record<IssuePriority, string> = { [IssuePriority.Urgent]: 'Urgent', [IssuePriority.High]: 'High', [IssuePriority.Medium]: 'Medium', [IssuePriority.Low]: 'Low', [IssuePriority.NoPriority]: 'None' }
 
   // the issue set every widget starts from: project + filter narrowing
@@ -522,37 +526,38 @@
       {#each groups as g (g.label)}
         <div class="bar-row"><span class="bar-row__label" class:bar-row__label--wide={['workload', 'hours', 'labels', 'time-in-status', 'goals'].includes(type)}>{g.label}</span><span class="track"><span class="fill" class:fill--blue={type === 'workload' || type === 'heatmap'} style="width: {(g.n / maxN) * 100}%" /></span><span class="bar-row__n">{g.n}{type === 'hours' ? 'h' : type === 'time-in-status' ? 'd' : type === 'goals' ? '%' : ''}</span></div>
       {/each}
-      {#if groups.length === 0 && !busy}<p class="muted">Nothing here.</p>{/if}
+      {#if groups.length === 0 && !busy}<div class="empty"><i>{@html icon('check')}</i><span>Nothing here yet</span></div>{/if}
     </div>
   {/if}
 
   {#if ['mine', 'due', 'stale', 'query', 'sla', 'recent'].includes(type)}
     {#each rows as i, idx (i._id)}
       <button class="row motion-rise" style="--i: {idx}" on:click={() => { open(i) }}>
+        <i class="tico" style="color: {kindColor(i)}">{@html icon(kindIcon(i))}</i>
         <span class="row__id">{i.identifier}</span>
         <span class="row__title">{i.title}</span>
         {#if type === 'due'}<span class="row__meta" class:row__meta--late={(i.dueDate ?? 0) < Date.now()}>{due(i.dueDate)}</span>
         {:else if type === 'stale'}<span class="row__meta">{ago(i.modifiedOn)}</span>
         {:else if type === 'recent'}<span class="row__meta">{ago(i.createdOn ?? i.modifiedOn)} · {i.assignee != null ? names.get(i.assignee) ?? '' : 'unassigned'}</span>
-        {:else if type === 'sla'}<span class="row__meta" class:row__meta--late={(i.slaDue ?? 0) < Date.now()}>{hoursLeft(i.slaDue)}</span>
-        {:else}<span class="row__meta">{statusName.get(i.status) ?? ''}</span>{/if}
+        {:else if type === 'sla'}<span class="row__meta" class:row__meta--late={(i.slaDue ?? 0) < Date.now()}>{hoursLeft(i.slaDue)}</span>{/if}
+        <span class="chip chip--{bucketOf(i)}">{statusName.get(i.status) ?? ''}</span>
       </button>
     {/each}
-    {#if rows.length === 0 && !busy && errors.length === 0}<p class="muted">Nothing here.</p>{/if}
+    {#if rows.length === 0 && !busy && errors.length === 0}<div class="empty"><i>{@html icon('check')}</i><span>Nothing here yet</span></div>{/if}
   {/if}
 
   {#if type === 'sprints'}
     {#each progress as p (p.label)}
       <div class="sprint"><div class="sprint__head"><span class="sprint__name">{p.label}</span><span class="sprint__meta">{p.sub}</span></div><span class="track track--wide"><span class="fill" style="width: {p.total === 0 ? 0 : (p.done / p.total) * 100}%" /></span><span class="sprint__n">{p.done} / {p.total}</span></div>
     {/each}
-    {#if progress.length === 0 && !busy}<p class="muted">No active sprint.</p>{/if}
+    {#if progress.length === 0 && !busy}<div class="empty"><i>{@html icon('backlog')}</i><span>No sprint is running</span></div>{/if}
   {/if}
 
   {#if type === 'decisions'}
     {#each decisions as d, idx (d._id)}
       <button class="row motion-rise" style="--i: {idx}" on:click={() => { showPanel(view.component.EditDoc, d._id, d._class, 'content') }}><span class="row__title">{d.title}</span><span class="row__meta">{ago(d.modifiedOn)}</span></button>
     {/each}
-    {#if decisions.length === 0 && !busy}<p class="muted">No decisions yet.</p>{/if}
+    {#if decisions.length === 0 && !busy}<div class="empty"><i>{@html icon('docs')}</i><span>No decisions yet</span></div>{/if}
   {/if}
 
   {#if type === 'pie'}
@@ -595,7 +600,7 @@
         </div>
       {/each}
       {#if groups.length > 0}<div class="stats__row stats__row--total"><span class="stats__label">Total</span><span class="stats__n">{total}</span></div>{/if}
-      {#if groups.length === 0 && !busy}<p class="muted">Nothing here.</p>{/if}
+      {#if groups.length === 0 && !busy}<div class="empty"><i>{@html icon('check')}</i><span>Nothing here yet</span></div>{/if}
     </div>
   {/if}
 
@@ -618,7 +623,7 @@
           {/each}
         </tbody>
       </table>
-      {#if rows.length === 0 && !busy && errors.length === 0}<p class="muted">Nothing matches.</p>{/if}
+      {#if rows.length === 0 && !busy && errors.length === 0}<div class="empty"><i>{@html icon('filter')}</i><span>Nothing matches this filter</span></div>{/if}
       {#if rows.length > 0}<span class="muted">{rows.length} of {params.limit ?? 20} max · click a row to open it</span>{/if}
     </div>
   {/if}
@@ -652,7 +657,7 @@
 
   {#if type === 'burndown'}
     {#if burn === undefined}
-      {#if !busy}<p class="muted">No active sprint.</p>{/if}
+      {#if !busy}<div class="empty"><i>{@html icon('backlog')}</i><span>No sprint is running</span></div>{/if}
     {:else}
       {@const n = burn.ideal.length}
       {@const max = Math.max(1, burn.total)}
@@ -667,7 +672,7 @@
     {#each countdown as c (c.label + c.sub)}
       <div class="cd"><span class="cd__n" class:cd__n--late={c.days < 0}>{c.days < 0 ? `${-c.days}d over` : `${c.days}d`}</span><div class="cd__t"><span class="cd__l">{c.label}</span><span class="cd__s">{c.sub}</span></div></div>
     {/each}
-    {#if countdown.length === 0 && !busy}<p class="muted">Nothing scheduled.</p>{/if}
+    {#if countdown.length === 0 && !busy}<div class="empty"><i>{@html icon('calendar')}</i><span>Nothing scheduled</span></div>{/if}
   {/if}
 
   {#if type === 'activity'}
@@ -686,20 +691,25 @@
 
 <style lang="scss">
   .w { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; &--wall { font-size: 1.1rem; } }
-  .muted { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--theme-trans-color); }
+  .muted { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #626f86; }
+  .empty { display: flex; align-items: center; gap: 0.5rem; padding: 0.9rem 0.25rem; font-size: 0.8125rem; color: #626f86; i { display: inline-flex; color: #8590a2; :global(svg) { width: 1rem; height: 1rem; } } }
+  .tico { display: inline-flex; flex-shrink: 0; align-self: center; :global(svg) { width: 1rem; height: 1rem; } }
+  .chip { flex-shrink: 0; margin-left: 0.25rem; padding: 0.1rem 0.45rem; border-radius: 0.2rem; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; &--todo { background: #dfe1e6; color: #42526e; } &--doing { background: #deebff; color: #0747a6; } &--done { background: #e3fcef; color: #006644; } }
   .errs { margin: 0; padding-left: 1.2rem; font-size: 0.75rem; color: var(--negative-button-default); }
   .filt { font-size: 0.7rem; font-family: var(--mono-font, ui-monospace, Menlo, monospace); color: var(--theme-trans-color); }
   .kpi { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.25rem; }
   .kpi__v { font-size: 1.5rem; font-weight: 700; color: var(--theme-caption-color); }
   .kpi__s { font-size: 0.75rem; color: var(--theme-trans-color); }
   .bars { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
-  .bar-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--theme-dark-color); }
+  .bar-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.15rem 0; font-size: 0.8125rem; color: #172b4d; }
+  :global(.theme-dark) .bar-row { color: #b6c2cf; }
   .bar-row__label { width: 4rem; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--wide { width: 8rem; } }
-  .bar-row__n { width: 2rem; text-align: right; color: var(--theme-caption-color); }
-  .track { flex: 1; height: 0.4rem; border-radius: 999px; background: var(--theme-button-pressed); overflow: hidden; &--wide { height: 0.5rem; } }
-  .fill { display: block; height: 100%; border-radius: inherit; background: var(--accent-brand); transition: width var(--motion-slow) var(--ease-enter); &--blue { background: var(--primary-button-default); } }
-  .row { display: flex; align-items: baseline; gap: 0.5rem; width: 100%; padding: 0.3rem 0.4rem; border: none; border-radius: 0.375rem; background: transparent; color: var(--theme-content-color); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; &:hover { background: var(--theme-button-hovered); color: var(--theme-caption-color); } }
-  .row__id { flex-shrink: 0; font-size: 0.7rem; color: var(--theme-trans-color); }
+  .bar-row__n { width: 2.2rem; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .track { flex: 1; height: 0.5rem; border-radius: 2px; background: #ebecf0; overflow: hidden; &--wide { height: 0.65rem; } }
+  .fill { display: block; height: 100%; border-radius: inherit; background: #0052cc; transition: width var(--motion-slow) var(--ease-enter); &--blue { background: #0052cc; } }
+  .row { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.4rem 0.35rem; border: none; border-top: 1px solid rgba(9, 30, 66, 0.1); background: transparent; color: #172b4d; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; &:first-child { border-top: none; } &:hover { background: rgba(9, 30, 66, 0.05); } }
+  :global(.theme-dark) .row { color: #b6c2cf; border-top-color: #38414a; &:hover { background: rgba(255, 255, 255, 0.06); } }
+  .row__id { flex-shrink: 0; font-size: 0.78rem; color: #0c66e4; font-weight: 500; }
   .row__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row__meta { flex-shrink: 0; font-size: 0.7rem; color: var(--theme-trans-color); &--late { color: var(--negative-button-default); font-weight: 600; } }
   .sprint { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.25rem 0.6rem; padding: 0.3rem 0; }

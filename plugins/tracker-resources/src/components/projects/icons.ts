@@ -59,6 +59,22 @@ export const ICONS: Record<string, string> = {
   high: `<path d="M3.5 10.5L8 6l4.5 4.5" ${S} stroke-width="1.8"/>`,
   medium: `<path d="M3.5 6h9M3.5 10h9" ${S} stroke-width="1.8"/>`,
   low: `<path d="M3.5 5.5L8 10l4.5-4.5" ${S} stroke-width="1.8"/>`,
+  refresh: `<path d='M13.5 8a5.5 5.5 0 1 1-1.6-3.9' ${S}/><path d='M13.5 2.5v3h-3' ${S}/>`,
+  maximize: `<path d='M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9' ${S}/>`,
+  minimize: `<path d='M13.5 6.5h-4v-4M9.5 6.5L14 2M2.5 9.5h4v4M6.5 9.5L2 14' ${S}/>`,
+  star: `<path d='M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z' ${S}/>`,
+  starFilled: `<path d='M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z' fill='currentColor'/>`,
+  plus: `<path d='M8 3v10M3 8h10' ${S}/>`,
+  trash: `<path d='M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4' ${S}/>`,
+  settings: `<circle cx='8' cy='8' r='2.2' ${S}/><path d='M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1' ${S}/>`,
+  grip: `<circle cx='6' cy='4' r='1' fill='currentColor'/><circle cx='10' cy='4' r='1' fill='currentColor'/><circle cx='6' cy='8' r='1' fill='currentColor'/><circle cx='10' cy='8' r='1' fill='currentColor'/><circle cx='6' cy='12' r='1' fill='currentColor'/><circle cx='10' cy='12' r='1' fill='currentColor'/>`,
+  gadget: `<rect x='2' y='2' width='12' height='12' rx='2' ${S}/><path d='M2 6h12M6 6v8' ${S}/>`,
+  mail2: `<rect x='1.75' y='3.25' width='12.5' height='9.5' rx='1.5' ${S}/><path d='M2.5 4.5L8 9l5.5-4.5' ${S}/>`,
+  wall: `<rect x='1.5' y='2.5' width='13' height='9' rx='1.5' ${S}/><path d='M5.5 14h5M8 11.5V14' ${S}/>`,
+  copy: `<rect x='5.5' y='5.5' width='8' height='8' rx='1.5' ${S}/><path d='M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2' ${S}/>`,
+  down: `<path d='M8 2.5v9M4.5 8L8 11.5 11.5 8M3 13.5h10' ${S}/>`,
+  up: `<path d='M8 11.5v-9M4.5 6L8 2.5 11.5 6M3 13.5h10' ${S}/>`,
+  close: `<path d='M4 4l8 8M12 4l-8 8' ${S}/>`,
   none: `<circle cx="8" cy="8" r="3.5" ${S}/>`
 }
 export const icon = (name: string): string => `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name] ?? ''}</svg>`
