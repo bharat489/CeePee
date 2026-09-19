@@ -162,11 +162,10 @@ html[data-chatwall='none'] .chat-bubbles::before {
       font-size: 0.78rem;
       &::before { display: none; }
     }
-    .header {
-      display: inline;
-      .username { display: none; }
-      > .text-sm.lower { position: static; margin-left: 0.5rem; font-size: 0.65rem; }
-    }
+    // one line: the text, then the time; the 'System' name is noise here
+    .header { display: inline; }
+    .header > * { display: none; }
+    .header > .text-sm.lower { display: inline; position: static; margin-left: 0.5rem; font-size: 0.65rem; }
     > .time { display: none; }
   }
   &.own {

@@ -118,3 +118,6 @@ CLAUDE.md
 # CeePee production deploy kit is tracked (the upstream rule above ignores any "deploy"); the filled .env never is
 !/deploy/
 /deploy/.env
+
+# browser QA screenshots and snapshots (Playwright MCP)
+/.playwright-mcp/

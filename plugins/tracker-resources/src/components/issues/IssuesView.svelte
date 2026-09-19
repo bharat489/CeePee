@@ -12,7 +12,7 @@
     showPopup,
     themeStore
   } from '@hcengineering/ui'
-  import { ViewOptions, Viewlet } from '@hcengineering/view'
+  import { ViewOptions, Viewlet, ViewletDescriptor } from '@hcengineering/view'
   import {
     FilterBar,
     FilterButton,
@@ -45,6 +45,7 @@
   export let label: string = ''
   export let icon: Asset | undefined = undefined
   export let modeSelectorProps: IModeSelector | undefined = undefined
+  export let viewletDescriptor: Ref<ViewletDescriptor> | undefined = undefined
 
   let viewlet: WithLookup<Viewlet> | undefined = undefined
   const viewlets: WithLookup<Viewlet>[] | undefined = undefined
@@ -149,7 +150,7 @@
   bind:viewlet
   bind:search
   showLabelSelector={$$slots.label_selector}
-  viewletQuery={{ attachTo: tracker.class.Issue, variant: { $nin: ['subissue', 'component', 'milestone'] } }}
+  viewletQuery={{ attachTo: tracker.class.Issue, variant: { $nin: ['subissue', 'component', 'milestone'] }, ...(viewletDescriptor !== undefined ? { descriptor: viewletDescriptor } : {}) }}
   {viewlets}
   {label}
   {space}

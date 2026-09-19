@@ -17,7 +17,7 @@
   targets and sprint start/end. Drag an issue to another day to re-date it.
 -->
 <script lang="ts">
-  import { type Ref } from '@hcengineering/core'
+  import { SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import task from '@hcengineering/task'
   import { IssuePriority, type Issue, type IssueStatus, type Milestone, type Project, type Sprint } from '@hcengineering/tracker'
@@ -44,6 +44,11 @@
   $: from = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getTime()
   $: to = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1).getTime()
   $: iq.query(tracker.class.Issue, { space: currentSpace, dueDate: { $gte: from - 7 * DAY, $lt: to + 7 * DAY } }, (r) => { issues = r }, { limit: 2000 })
+  const uq = createQuery()
+  let unscheduled: Issue[] = []
+  $: uq.query(tracker.class.Issue, { space: currentSpace, dueDate: null, archived: { $ne: true } }, (r) => { unscheduled = r }, { limit: 500, sort: { modifiedOn: SortingOrder.Descending } })
+  let showUnscheduled = true
+  let mode: 'month' | 'week' = 'month'
   sq.query(tracker.class.IssueStatus, {}, (r) => { statuses = r })
   $: mq.query(tracker.class.Milestone, { space: currentSpace }, (r) => { milestones = r })
   $: spq.query(tracker.class.Sprint, { space: currentSpace }, (r) => { sprints = r })
@@ -54,24 +59,28 @@
   $: cells = ((): Cell[] => {
     const first = new Date(from)
     const lead = (first.getDay() + 6) % 7
-    const start = from - lead * DAY
-    const out: Cell[] = []
     const todayT = new Date(); todayT.setHours(0, 0, 0, 0)
-    for (let k = 0; k < 42; k++) {
+    // week mode shows the seven days of the cursor week
+    const weekStart = weekCursor - ((new Date(weekCursor).getDay() + 6) % 7) * DAY
+    const start = mode === 'week' ? weekStart : from - lead * DAY
+    const out: Cell[] = []
+    for (let k = 0; k < (mode === 'week' ? 7 : 42); k++) {
       const t = start + k * DAY
       const end = t + DAY
       const dayIssues = issues.filter((i) => i.dueDate != null && i.dueDate >= t && i.dueDate < end && (!hideDone || !done.has(i.status))).sort((a, b) => a.priority - b.priority)
       const marks: string[] = []
       for (const m of milestones) if (m.targetDate >= t && m.targetDate < end) marks.push(`◆ ${m.label}`)
       for (const s of sprints) { if (s.startDate >= t && s.startDate < end) marks.push(`▶ ${s.name}`); if (s.endDate >= t && s.endDate < end) marks.push(`■ ${s.name} ends`) }
-      out.push({ t, inMonth: t >= from && t < to, today: t === todayT.getTime(), issues: dayIssues, marks })
+      out.push({ t, inMonth: mode === 'week' || (t >= from && t < to), today: t === todayT.getTime(), issues: dayIssues, marks })
     }
     return out
   })()
   const PRIO_C: Record<number, string> = { [IssuePriority.Urgent]: '#ef4444', [IssuePriority.High]: '#f97316', [IssuePriority.Medium]: '#eab308', [IssuePriority.Low]: '#22c55e', [IssuePriority.NoPriority]: '#94a3b8' }
-  function prev (): void { cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1) }
-  function next (): void { cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1) }
-  function today (): void { const d = new Date(); cursor = new Date(d.getFullYear(), d.getMonth(), 1) }
+  let weekCursor = ((): number => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() })()
+  const monthOf = (t: number): Date => new Date(new Date(t).getFullYear(), new Date(t).getMonth(), 1)
+  function prev (): void { if (mode === 'week') { weekCursor -= 7 * DAY; cursor = monthOf(weekCursor) } else cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1) }
+  function next (): void { if (mode === 'week') { weekCursor += 7 * DAY; cursor = monthOf(weekCursor) } else cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1) }
+  function today (): void { const d = new Date(); cursor = new Date(d.getFullYear(), d.getMonth(), 1); d.setHours(0, 0, 0, 0); weekCursor = d.getTime() }
   const open = (i: Issue): void => { showPanel(view.component.EditDoc, i._id, i._class, 'content') }
 
   // drag to re-date
@@ -79,24 +88,35 @@
   let over: number | undefined
   function dragStart (e: DragEvent, i: Issue): void { dragId = i._id; e.dataTransfer?.setData('text/plain', i.identifier); if (e.dataTransfer !== null) e.dataTransfer.effectAllowed = 'move' }
   async function drop (t: number): Promise<void> {
-    const issue = issues.find((i) => i._id === dragId)
+    const issue = issues.find((i) => i._id === dragId) ?? unscheduled.find((i) => i._id === dragId)
     over = undefined
     dragId = undefined
     if (issue === undefined) return
     const keepTime = issue.dueDate != null ? issue.dueDate % DAY : 17 * 3_600_000
     await client.update(issue, { dueDate: t + keepTime })
   }
-  $: monthLabel = cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-  $: unscheduled = issues.length
+  $: monthLabel = mode === 'week' ? `${new Date(cells[0]?.t ?? weekCursor).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${new Date(cells[6]?.t ?? weekCursor).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  async function unschedule (): Promise<void> {
+    const i = issues.find((x) => x._id === dragId)
+    dragId = undefined
+    over = undefined
+    if (i !== undefined) await client.update(i, { dueDate: null })
+  }
 </script>
 
 <div class="cal">
   <header class="cal__head">
-    <div class="cal__nav"><button class="cal__btn" on:click={prev}>‹</button><span class="cal__month">{monthLabel}</span><button class="cal__btn" on:click={next}>›</button><button class="cal__btn cal__btn--t" on:click={today}>Today</button></div>
-    <div class="cal__tools"><label class="check"><input type="checkbox" bind:checked={hideDone} /> hide done</label><span class="muted">{unscheduled} dated items around this month · drag to re-date · milestones ◆ · sprints ▶ ■</span></div>
+    <div class="cal__nav"><button class="cal__btn cal__btn--t" on:click={today}>Today</button><button class="cal__btn" on:click={prev}>‹</button><button class="cal__btn" on:click={next}>›</button><span class="cal__month">{monthLabel}</span></div>
+    <div class="cal__tools">
+      <span class="seg"><button class="seg__b" class:seg__b--on={mode === 'week'} on:click={() => { mode = 'week' }}>Week</button><button class="seg__b" class:seg__b--on={mode === 'month'} on:click={() => { mode = 'month' }}>Month</button></span>
+      <label class="check"><input type="checkbox" bind:checked={hideDone} /> Hide done</label>
+      <button class="cal__btn cal__btn--t" class:cal__btn--on={showUnscheduled} on:click={() => { showUnscheduled = !showUnscheduled }}>Unscheduled work · {unscheduled.length}</button>
+    </div>
   </header>
+  <div class="cal__body">
+  <div class="cal__main">
   <div class="cal__dow">{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as d}<span>{d}</span>{/each}</div>
-  <div class="cal__grid">
+  <div class="cal__grid" class:cal__grid--week={mode === 'week'}>
     {#each cells as c (c.t)}
       <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div class="day" class:day--out={!c.inMonth} class:day--today={c.today} class:day--over={over === c.t} on:dragover|preventDefault={() => { over = c.t }} on:dragleave={() => { if (over === c.t) over = undefined }} on:drop|preventDefault={() => { void drop(c.t) }}>
@@ -109,20 +129,43 @@
       </div>
     {/each}
   </div>
+  </div>
+  {#if showUnscheduled}
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <aside class="cal__side" on:dragover|preventDefault on:drop|preventDefault={() => { void unschedule() }}>
+      <div class="cal__side-head"><b>Unscheduled work</b><span class="muted">Drag onto a day to set its due date. Drop here to clear one.</span></div>
+      <div class="cal__side-list">
+        {#each unscheduled.filter((i) => !hideDone || !done.has(i.status)) as i (i._id)}
+          <button class="uchip" draggable="true" style="--c: {PRIO_C[i.priority] ?? '#94a3b8'}" on:dragstart={(e) => { dragStart(e, i) }} on:click={() => { open(i) }}><i class="chip__dot" /><span class="chip__k">{i.identifier}</span><span class="chip__t">{i.title}</span></button>
+        {/each}
+        {#if unscheduled.length === 0}<p class="muted">Every work item has a date.</p>{/if}
+      </div>
+    </aside>
+  {/if}
+  </div>
 </div>
 
 <style lang="scss">
-  .cal { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0.75rem 1.25rem 1rem; gap: 0.5rem; }
+  .cal { --j-text: #172b4d; --j-sub: #626f86; --j-link: #0c66e4; --j-border: rgba(9, 30, 66, 0.14); --j-surface: #fff; --j-hover: rgba(9, 30, 66, 0.06); display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0.75rem 1.5rem 1rem; gap: 0.5rem; color: var(--j-text); }
+  :global(.theme-dark) .cal { --j-text: #b6c2cf; --j-sub: #8c9bab; --j-link: #579dff; --j-border: #38414a; --j-surface: #22272b; --j-hover: rgba(255, 255, 255, 0.08); }
+  .cal__body { flex: 1; min-height: 0; display: flex; gap: 1rem; }
+  .cal__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+  .cal__side { width: 17rem; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--j-border); border-radius: 0.35rem; background: var(--j-surface); overflow: hidden; }
+  .cal__side-head { display: flex; flex-direction: column; gap: 0.15rem; b { font-size: 0.875rem; color: var(--j-text); } }
+  .cal__side-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0.25rem; }
+  .uchip { display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.5rem; border: 1px solid var(--j-border); border-radius: 0.3rem; background: var(--j-surface); color: var(--j-text); font: inherit; font-size: 0.78rem; text-align: left; cursor: grab; min-width: 0; &:hover { background: var(--j-hover); } }
+  .seg { display: inline-flex; border: 1px solid var(--j-border); border-radius: 0.3rem; overflow: hidden; }
+  .seg__b { padding: 0.3rem 0.7rem; border: none; background: var(--j-surface); color: var(--j-sub); font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; &--on { background: #e9f2ff; color: var(--j-link); } }
   .cal__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   .cal__nav { display: flex; align-items: center; gap: 0.4rem; }
-  .cal__month { min-width: 11rem; text-align: center; font-weight: 700; color: var(--theme-caption-color); }
-  .cal__btn { padding: 0.25rem 0.6rem; border: 1px solid var(--theme-divider-color); border-radius: 0.4rem; background: var(--theme-panel-color); color: var(--theme-content-color); font: inherit; cursor: pointer; &:hover { background: var(--theme-button-hovered); } &--t { font-size: 0.75rem; } }
+  .cal__month { margin-left: 0.5rem; font-size: 1.05rem; font-weight: 600; color: var(--j-text); }
+  .cal__btn { padding: 0.3rem 0.65rem; border: 1px solid var(--j-border); border-radius: 0.3rem; background: var(--j-surface); color: var(--j-text); font: inherit; font-weight: 500; cursor: pointer; &:hover { background: var(--j-hover); } &--t { font-size: 0.8125rem; } &--on { background: #e9f2ff; color: var(--j-link); border-color: transparent; } }
   .cal__tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8125rem; color: var(--theme-content-color); }
   .muted { font-size: 0.72rem; color: var(--theme-trans-color); }
   .cal__dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; span { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--theme-dark-color); padding: 0 0.4rem; } }
-  .cal__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(6rem, 1fr); gap: 0.3rem; overflow: auto; }
-  .day { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.3rem 0.35rem; border: 1px solid var(--theme-divider-color); border-radius: 0.6rem; background: var(--theme-panel-color); min-width: 0; overflow: hidden; transition: box-shadow 0.15s ease; &--out { opacity: 0.45; } &--today { border-color: var(--accent-brand); box-shadow: inset 0 0 0 1px var(--accent-brand); } &--over { box-shadow: 0 0 0 3px var(--accent-brand-soft); border-color: var(--accent-brand); } }
+  .cal__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(6rem, 1fr); gap: 0.3rem; overflow: auto; &--week { grid-auto-rows: 1fr; } }
+  .day { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.3rem 0.35rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); min-width: 0; overflow: hidden; transition: box-shadow 0.15s ease; &--out { opacity: 0.45; } &--today { border-color: var(--accent-brand); box-shadow: inset 0 0 0 1px var(--accent-brand); } &--over { box-shadow: 0 0 0 3px var(--accent-brand-soft); border-color: var(--accent-brand); } }
   .day__n { font-size: 0.72rem; font-weight: 600; color: var(--theme-dark-color); }
   .day--today .day__n { color: var(--accent-brand-ink); }
   .mark { font-size: 0.62rem; font-weight: 600; color: var(--accent-brand-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

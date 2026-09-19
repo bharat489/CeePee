@@ -18,7 +18,7 @@
   import { createQuery } from '@hcengineering/presentation'
   import { Issue, IssueStatus, Project } from '@hcengineering/tracker'
   import { IModeSelector, resolvedLocationStore } from '@hcengineering/ui'
-  import view, { Viewlet } from '@hcengineering/view'
+  import view, { Viewlet, ViewletDescriptor } from '@hcengineering/view'
   import { createEventDispatcher } from 'svelte'
 
   import { TypeSelector, selectedTaskTypeStore, selectedTypeStore, taskTypeStore } from '@hcengineering/task-resources'
@@ -36,6 +36,8 @@
   export let allProjectsTypes: boolean = false
 
   export let baseClass = tracker.class.Issue
+  // when set, only viewlets with this descriptor are offered (the project home tabs pin table / kanban / gantt)
+  export let viewletDescriptor: Ref<ViewletDescriptor> | undefined = undefined
 
   const dispatch = createEventDispatcher()
 
@@ -123,7 +125,7 @@
 </script>
 
 {#if query !== undefined && modeSelectorProps !== undefined}
-  <IssuesView query={finalQuery} space={currentSpace} {icon} {title} {modeSelectorProps}>
+  <IssuesView query={finalQuery} space={currentSpace} {icon} {title} {modeSelectorProps} {viewletDescriptor}>
     <svelte:fragment slot="type_selector" let:viewlet>
       {#if !allProjectsTypes}
         <TypeSelector {baseClass} project={currentSpace} allTypes={toVL(viewlet)?.descriptor === view.viewlet.List} />

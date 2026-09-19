@@ -863,6 +863,36 @@ export function defineViewlets (builder: Builder): void {
     tracker.viewlet.IssueKanban
   )
 
+  // Jira-style list: a spreadsheet of type, key, summary, status, assignee,
+  // priority, due date, labels and last update, every cell editable in place
+  builder.createDoc(
+    view.class.Viewlet,
+    core.space.Model,
+    {
+      attachTo: tracker.class.Issue,
+      descriptor: view.viewlet.Table,
+      viewOptions: issuesOptions(false),
+      configOptions: {
+        strict: true,
+        sortable: true,
+        hiddenKeys: ['title', 'blockedBy', 'relations', 'description', 'number', 'reportedTime', 'reports', 'remainingTime', 'attachedTo', 'createdBy', 'modifiedBy']
+      },
+      config: [
+        { key: 'kind', presenter: task.component.TaskTypeListPresenter, label: task.string.TaskType, props: { kind: 'list', size: 'small', justify: 'center' } },
+        { key: '', presenter: tracker.component.IssuePresenter, label: tracker.string.Identifier, sortingKey: 'number' },
+        { key: '', presenter: tracker.component.TitlePresenter, label: tracker.string.Title, sortingKey: 'title', props: {} },
+        { key: '', presenter: tracker.component.StatusEditor, label: tracker.string.Status, sortingKey: 'status', props: { kind: 'list', size: 'small', justify: 'center' } },
+        'assignee',
+        { key: '', presenter: tracker.component.PriorityEditor, label: tracker.string.Priority, sortingKey: 'priority', props: { type: 'priority', kind: 'list', size: 'small' } },
+        'dueDate',
+        { key: 'labels', presenter: tags.component.LabelsPresenter, label: tracker.string.Labels, sortingKey: 'labels', props: { kind: 'list', full: false } },
+        'estimation',
+        'modifiedOn'
+      ]
+    },
+    tracker.viewlet.IssueTable
+  )
+
   // Gantt is registered AFTER List + Kanban so List remains the default
   // viewlet (ViewletSelector falls back to viewlets[0] when no preference
   // is saved). Putting Gantt last avoids surprising users with an empty

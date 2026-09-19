@@ -26,6 +26,7 @@
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type Project } from '@hcengineering/tracker'
   import { Component, showPopup, type AnyComponent } from '@hcengineering/ui'
+  import view from '@hcengineering/view'
   import workbench from '@hcengineering/workbench'
   import { openWidget } from '@hcengineering/workbench-resources'
 
@@ -48,22 +49,24 @@
   eq.query(contact.mixin.Employee, { active: true }, (r) => { employees = r })
   $: members = employees.filter((e) => e.personUuid != null && (project?.members ?? []).includes(e.personUuid)).map((e) => e._id)
 
-  type TabId = 'summary' | 'list' | 'board' | 'backlog' | 'calendar' | 'timeline' | 'docs' | 'forms' | 'reports' | 'dashboard' | 'workflow' | 'sprints' | 'components' | 'milestones' | 'epics' | 'initiatives' | 'decisions' | 'ideas' | 'servicedesk' | 'automation' | 'releases' | 'assets' | 'oncall' | 'fields' | 'permissions' | 'templates'
+  type TabId = 'summary' | 'list' | 'board' | 'backlog' | 'calendar' | 'timeline' | 'docs' | 'forms' | 'reports' | 'dashboard' | 'workflow' | 'sprints' | 'swimlanes' | 'roadmap' | 'components' | 'milestones' | 'epics' | 'initiatives' | 'decisions' | 'ideas' | 'servicedesk' | 'automation' | 'releases' | 'assets' | 'oncall' | 'fields' | 'permissions' | 'templates'
   interface Tab { id: TabId, label: string, icon: string, component?: AnyComponent, props?: Record<string, any>, more?: boolean }
   const issuesProps = (title: any, kind?: any): Record<string, any> => ({ icon: tracker.icon.Issues, title, config: kind === undefined ? [['all', tracker.string.All, {}], ['active', tracker.string.Active, {}], ['backlog', tracker.string.Backlog, {}], ['archived', tracker.string.Archived, {}]] : [['all', tracker.string.All, { kind }]] })
   const TABS: Tab[] = [
     { id: 'summary', label: 'Summary', icon: 'globe' },
-    { id: 'list', label: 'List', icon: 'list', component: tracker.component.Issues, props: issuesProps(tracker.string.Issues) },
-    { id: 'board', label: 'Board', icon: 'board', component: tracker.component.SwimlaneBoard },
+    { id: 'list', label: 'List', icon: 'list', component: tracker.component.Issues, props: { ...issuesProps(tracker.string.Issues), viewletDescriptor: view.viewlet.Table } },
+    { id: 'board', label: 'Board', icon: 'board', component: tracker.component.Issues, props: { ...issuesProps(tracker.string.Issues), viewletDescriptor: tracker.viewlet.Kanban } },
     { id: 'backlog', label: 'Backlog', icon: 'backlog', component: tracker.component.ProjectBacklog },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-    { id: 'timeline', label: 'Timeline', icon: 'timeline', component: tracker.component.Roadmap },
+    { id: 'timeline', label: 'Timeline', icon: 'timeline', component: tracker.component.Issues, props: { ...issuesProps(tracker.string.Issues), viewletDescriptor: tracker.viewlet.Gantt } },
     { id: 'docs', label: 'Docs', icon: 'docs' },
     { id: 'forms', label: 'Forms', icon: 'forms', component: tracker.component.Forms },
     { id: 'reports', label: 'Reports', icon: 'reports' },
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', component: tracker.component.Dashboard },
     { id: 'workflow', label: 'Workflow', icon: 'workflow', component: tracker.component.WorkflowDesigner },
     { id: 'sprints', label: 'Sprints', icon: 'timeline', component: tracker.component.ProjectSprints, more: true },
+    { id: 'swimlanes', label: 'Board · swimlanes', icon: 'board', component: tracker.component.SwimlaneBoard, more: true },
+    { id: 'roadmap', label: 'Roadmap · all projects', icon: 'timeline', component: tracker.component.Roadmap, more: true },
     { id: 'epics', label: 'Epics', icon: 'epic', component: tracker.component.Issues, props: issuesProps(tracker.string.Epics, tracker.taskTypes.Epic), more: true },
     { id: 'initiatives', label: 'Initiatives', icon: 'initiative', component: tracker.component.Issues, props: issuesProps(tracker.string.Initiatives, tracker.taskTypes.Initiative), more: true },
     { id: 'components', label: 'Components', icon: 'components', component: tracker.component.ProjectComponents, more: true },
