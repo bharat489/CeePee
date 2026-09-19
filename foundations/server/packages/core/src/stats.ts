@@ -91,7 +91,10 @@ export function initStatisticsContext (
     metricsContext = new MeasureMetricsContext(serviceName, {}, {}, newMetrics())
   }
 
-  const statsUrl = ops?.statsUrl ?? process.env.STATS_URL
+  // An empty STATS_URL means "no statistics service" (the minimal stack runs none).
+  // Without this guard every service would PUT to a relative URL every 30 s and warn.
+  const rawStatsUrl = ops?.statsUrl ?? process.env.STATS_URL
+  const statsUrl = rawStatsUrl !== undefined && rawStatsUrl.trim() !== "" ? rawStatsUrl : undefined
 
   let errorToSend = 0
 
