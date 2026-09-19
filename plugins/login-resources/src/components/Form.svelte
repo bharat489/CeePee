@@ -92,7 +92,10 @@
     return true
   })
 
+  // hints like "Required field" wait until the person has typed or tried to submit
+  let touched = false
   export function invalidate (): void {
+    touched = true
     void validate($themeStore.language)
   }
 
@@ -164,7 +167,7 @@
           password={field.password}
           disabled={inAction || field.disabled}
           bind:value={object[field.name]}
-          on:input={() => validate($themeStore.language)}
+          on:input={() => { touched = true; void validate($themeStore.language) }}
           on:blur={() => {
             trim(field.name)
           }}
@@ -175,7 +178,7 @@
     <slot name="extra-fields" />
 
     <div class="status">
-      <StatusControl {status} />
+      <StatusControl status={touched || status.severity !== Severity.INFO ? status : OK} />
     </div>
 
     <div class="form-row send">

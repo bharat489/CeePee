@@ -303,6 +303,10 @@
 
 <style lang="scss">
   .qs,
+  // phones: sit above the composer / bottom bars and shrink
+  @media (max-width: 40rem) {
+    .qs-pill { bottom: 5.75rem; right: 0.75rem; padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+  }
   .qs-pill {
     position: fixed;
     right: 1rem;
