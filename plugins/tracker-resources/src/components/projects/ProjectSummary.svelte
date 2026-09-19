@@ -68,7 +68,19 @@
     else next.add(k)
     who = next
   }
-  $: scope = who.size === 0 ? live : live.filter((i) => who.has(i.assignee == null ? 'unassigned' : i.assignee))
+  type Insight = 'overdue' | 'unassigned' | 'blocked' | 'stale'
+  let insight: Insight | undefined
+  const STALE = 14 * DAY
+  const isOpen = (i: Issue): boolean => bucket(i) !== 'done'
+  const INSIGHTS: Array<{ k: Insight, l: string, test: (i: Issue) => boolean }> = [
+    { k: 'overdue', l: 'overdue', test: (i) => isOpen(i) && i.dueDate != null && i.dueDate < Date.now() },
+    { k: 'unassigned', l: 'unassigned', test: (i) => isOpen(i) && i.assignee == null },
+    { k: 'blocked', l: 'blocked', test: (i) => isOpen(i) && (i.blockedBy?.length ?? 0) > 0 },
+    { k: 'stale', l: 'quiet for 14 days', test: (i) => isOpen(i) && i.modifiedOn < Date.now() - STALE }
+  ]
+  $: byWho = who.size === 0 ? live : live.filter((i) => who.has(i.assignee == null ? 'unassigned' : i.assignee))
+  $: insights = INSIGHTS.map((x) => ({ ...x, n: byWho.filter(x.test).length }))
+  $: scope = insight === undefined ? byWho : byWho.filter(INSIGHTS.find((x) => x.k === insight)?.test ?? (() => true))
   $: open = scope.filter((i) => bucket(i) !== 'done')
 
   // ---- KPIs -----------------------------------------------------------------------------------------
@@ -181,6 +193,15 @@
         </div>
       {/if}
     </span>
+  </div>
+
+  <div class="insights">
+    <span class="insights__l">Needs attention</span>
+    {#each insights as x (x.k)}
+      <button class="ins" class:ins--on={insight === x.k} class:ins--zero={x.n === 0} disabled={x.n === 0 && insight !== x.k} on:click={() => { insight = insight === x.k ? undefined : x.k }}><b>{x.n}</b>{x.l}</button>
+    {/each}
+    {#if insight !== undefined}<button class="lnk" on:click={() => { insight = undefined }}>Show everything</button>{/if}
+    <span class="insights__hint">Click one to focus every card below on it.</span>
   </div>
 
   <div class="kpis">
@@ -326,6 +347,10 @@
   .menu__t { padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--j-sub); }
   .menu__row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer; &:hover { background: var(--j-hover); } }
   .menu__clear { padding: 0.35rem 0.5rem; text-align: left; }
+  .insights { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .insights__l { margin-right: 0.25rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--j-sub); }
+  .insights__hint { margin-left: auto; font-size: 0.75rem; color: var(--j-sub); }
+  .ins { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.65rem; border: 1px solid var(--j-border); border-radius: 999px; background: var(--j-surface); color: var(--j-text); font: inherit; font-size: 0.8125rem; cursor: pointer; transition: transform 0.12s ease, background 0.12s ease; b { font-weight: 700; color: #c9372c; } &:hover:not(:disabled) { transform: translateY(-1px); background: var(--j-hover); } &--zero b { color: #22a06b; } &:disabled { cursor: default; opacity: 0.7; } &--on { background: #e9f2ff; border-color: var(--j-link); color: var(--j-link); b { color: var(--j-link); } } }
   .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
   @media (max-width: 70rem) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .kpi { display: flex; align-items: center; gap: 0.9rem; padding: 1.1rem 1.25rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); }
