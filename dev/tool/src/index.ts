@@ -133,6 +133,7 @@ import { performGithubAccountMigrations } from './github'
 import { performGmailAccountMigrations } from './gmail'
 import { getToolToken, getWorkspace, getWorkspaceTransactorEndpoint } from './utils'
 import { seedDemo, unseedDemo } from './seed'
+import { seedApps } from './seedApps'
 
 import { createRestClient } from '@hcengineering/api-client'
 import { type CardID } from '@hcengineering/communication-types'
@@ -720,6 +721,7 @@ export function devTool (
         try {
           const ops = new TxOperations(connection, core.account.System)
           await seedDemo(ops, (m) => { console.log('  • ' + m) })
+          await seedApps(ops, (m) => { console.log('  • ' + m) })
           console.log('seed-demo done')
         } finally {
           await connection.close()
