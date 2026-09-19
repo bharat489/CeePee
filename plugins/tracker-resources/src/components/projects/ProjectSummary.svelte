@@ -20,6 +20,8 @@
   link goes somewhere in this project.
 -->
 <script lang="ts">
+  // measured width of this page (not the viewport): an open sidebar narrows it too
+  let rootWidth = 0
   import activity, { type DocUpdateMessage } from '@hcengineering/activity'
   import contact, { formatName, type Employee, type Person } from '@hcengineering/contact'
   import { Avatar, getPersonRefByPersonIdStore } from '@hcengineering/contact-resources'
@@ -172,7 +174,7 @@
 
 <svelte:window on:click={closeFilter} />
 
-<div class="sm">
+<div class="sm" class:sm--narrow={rootWidth > 0 && rootWidth < 960} class:sm--tiny={rootWidth > 0 && rootWidth < 480} bind:clientWidth={rootWidth}>
   <div class="sm__filters">
     <div class="sm__avatars">
       <button class="av av--all" class:av--on={who.size === 0} title="Everyone" on:click={() => { who = new Set() }}>{@html icon('people')}</button>
@@ -410,4 +412,7 @@
   .epic__key { color: var(--j-sub); }
   .stack { display: flex; width: 100%; height: 1.5rem; border-radius: 3px; background: var(--j-track); overflow: hidden; }
   .stack__seg { display: flex; align-items: center; justify-content: flex-start; padding-left: 0.5rem; color: #fff; font-size: 0.8125rem; font-weight: 600; white-space: nowrap; overflow: hidden; transition: width 0.4s ease; }
+  .sm--narrow .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sm--narrow .row2 { grid-template-columns: 1fr; }
+  .sm--tiny .kpis { grid-template-columns: 1fr; }
 </style>

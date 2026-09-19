@@ -90,6 +90,25 @@ const STOP = new Set('the a an and or of to in on for is are was were be been wi
 function prio (p: IssuePriority): number {
   return p === IssuePriority.NoPriority ? 99 : p
 }
+// chat and comment bodies are stored as JSON markup; pull out the text
+function plainText (body: string | undefined | null): string {
+  if (body === undefined || body === null) return ''
+  const t = String(body).trim()
+  if (t.startsWith('{')) {
+    try {
+      const out: string[] = []
+      const walk = (n: any): void => {
+        if (n === null || typeof n !== 'object') return
+        if (typeof n.text === 'string') out.push(n.text)
+        if (Array.isArray(n.content)) { n.content.forEach(walk); if (n.type === 'paragraph') out.push(' ') }
+        if (n.type === 'reference' && typeof n.attrs?.label === 'string') out.push('@' + n.attrs.label)
+      }
+      walk(JSON.parse(t))
+      return out.join('').replace(/s+/g, ' ').trim()
+    } catch {}
+  }
+  return stripHtml(t)
+}
 function stripHtml (s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim()
 }
@@ -345,7 +364,7 @@ const INTENTS: Array<{ id: string, re: RegExp, run: Handler }> = [
         kids.length > 0 ? `Sub-issues: ${kids.filter((k) => done.includes(k.status)).length}/${kids.length} done` : '',
         blockers > 0 ? `Blocked by ${blockers} item(s)` : '',
         issue.estimation > 0 ? `Estimate ${issue.estimation}h, logged ${issue.reportedTime ?? 0}h` : '',
-        comments.length > 0 ? `\nLatest comments:\n${comments.reverse().map((c) => `• ${stripHtml(c.message).slice(0, 160)}`).join('\n')}` : '\nNo comments yet.'
+        comments.length > 0 ? `\nLatest comments:\n${comments.reverse().map((c) => `• ${plainText(c.message).slice(0, 160)}`).join('\n')}` : '\nNo comments yet.'
       ].filter((l) => l !== '').join('\n')
       return { title: `${issue.identifier} at a glance`, text, copyText: text, issues: [issue, ...kids.slice(0, 10)], source: 'local' }
     }

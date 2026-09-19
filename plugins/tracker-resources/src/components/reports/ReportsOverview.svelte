@@ -20,6 +20,8 @@
   cumulative flow, control chart …) sit below, one click away.
 -->
 <script lang="ts">
+  // measured width of this page (not the viewport): an open sidebar narrows it too
+  let rootWidth = 0
   import activity from '@hcengineering/activity'
   import contact, { formatName, type Person } from '@hcengineering/contact'
   import { SortingOrder, type Ref } from '@hcengineering/core'
@@ -161,7 +163,7 @@
   $: charts = [{ id: 'created', t: 'Work item creation trend', pts: created, kind: 'bar', y: 'Count of work items', x: 'Work item creation date' }, { id: 'cycle', t: 'Work item cycle time', pts: cycle, kind: 'line', y: 'Average issue cycle time (days)', x: 'Work item completed date' }, { id: 'lead', t: 'Work item lead time', pts: lead, kind: 'line', y: 'Average issue lead time (days)', x: 'Work item completed date' }, { id: 'done', t: 'Work item completion trend', pts: completed, kind: 'bar', y: 'Count of work items', x: 'Work item completed date' }]
 </script>
 
-<div class="ro">
+<div class="ro" class:ro--narrow={rootWidth > 0 && rootWidth < 1024} class:ro--tiny={rootWidth > 0 && rootWidth < 480} bind:clientWidth={rootWidth}>
   <div class="kpis">
     {#each kpis as k (k.l)}
       <div class="kpi"><span class="kpi__ic kpi__ic--{k.tone}">{@html icon(k.ic)}</span><div class="kpi__t"><b>{k.n} work item{k.n === 1 ? '' : 's'}</b><span>{k.l}</span></div></div>
@@ -285,4 +287,8 @@
   .classic__btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.5rem; border: none; background: transparent; color: var(--j-sub); font: inherit; font-size: 0.875rem; font-weight: 500; text-align: left; cursor: pointer; &:hover { color: var(--j-link); } }
   .ph-chev { display: inline-flex; transition: transform 0.15s ease; transform: rotate(-90deg); :global(svg) { width: 1rem; height: 1rem; } &--open { transform: none; } }
   .classic__body { min-height: 30rem; }
+  .ro--narrow .row3 { grid-template-columns: 1fr; }
+  .ro--narrow .row2 { grid-template-columns: 1fr; }
+  .ro--narrow .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ro--tiny .kpis { grid-template-columns: 1fr; }
 </style>

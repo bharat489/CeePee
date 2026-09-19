@@ -23,6 +23,8 @@
   refreshes every minute.
 -->
 <script lang="ts">
+  // measured width of this page (not the viewport): an open sidebar narrows it too
+  let rootWidth = 0
   import { getCurrentEmployee } from '@hcengineering/contact'
   import core, { generateId, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
@@ -316,7 +318,7 @@
 
 <svelte:window on:click={closeMenus} />
 
-<div class="dash" class:dash--wall={wall}>
+<div class="dash" class:dash--wall={wall} class:dash--narrow={rootWidth > 0 && rootWidth < 900} bind:clientWidth={rootWidth}>
   <header class="dh">
     <div class="dh__l">
       <span class="dh__crumb">Dashboards</span>
@@ -483,4 +485,7 @@
   .input { padding: 0.4rem 0.5rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); color: var(--j-text); font: inherit; font-size: 0.875rem; font-weight: 400; &:focus { outline: none; border-color: var(--j-link); } &--mono { font-family: var(--mono-font, ui-monospace, Menlo, monospace); font-size: 0.8125rem; } }
   .drawer__search { width: 100%; }
   .hint { font-size: 0.75rem; color: var(--j-sub); }
+  .dash--narrow .grid { grid-template-columns: 1fr; }
+  .dash--narrow .dash__body { flex-direction: column; }
+  .dash--narrow .drawer { width: 100%; position: static; max-height: none; }
 </style>
