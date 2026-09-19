@@ -34,7 +34,7 @@ export interface AiOptions {
   maxTokens?: number
   /** 0 = deterministic; defaults to 0.3 */
   temperature?: number
-  /** milliseconds before giving up; defaults to 90 s (small models on CPU are slow) */
+  /** milliseconds before giving up; defaults to 4 minutes (a cold model on a CPU can take a minute just to load) */
   timeoutMs?: number
 }
 
@@ -59,7 +59,7 @@ export async function aiChat (messages: AiMessage[], opts: AiOptions = {}): Prom
   const cfg = aiConfig()
   if (cfg.url === '') throw new AiError('No model is configured. Set AI_CHAT_URL to an OpenAI-compatible endpoint such as Ollama.', 'not-configured')
   const ctrl = typeof AbortController === 'function' ? new AbortController() : undefined
-  const timer = setTimeout(() => ctrl?.abort(), opts.timeoutMs ?? 90_000)
+  const timer = setTimeout(() => ctrl?.abort(), opts.timeoutMs ?? 240_000)
   try {
     let res: Response
     try {

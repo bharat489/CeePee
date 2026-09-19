@@ -348,6 +348,10 @@ services:
     environment:
       - OLLAMA_ORIGINS=*
       - OLLAMA_KEEP_ALIVE=30m
+      # small servers: one model at a time, and give a cold load on a busy CPU time to finish
+      - OLLAMA_LOAD_TIMEOUT=15m
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
       - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
     entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 4; ollama pull \"$$AI_CHAT_MODEL\" || true; wait"]
 
