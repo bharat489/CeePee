@@ -521,7 +521,7 @@
   {#if params.filter}<span class="filt">filter: {params.filter}</span>{/if}
   {#if kpi !== undefined}<div class="kpi"><span class="kpi__v">{kpi.value}</span><span class="kpi__s">{kpi.sub}</span></div>{/if}
 
-  {#if ['mine', 'workload', 'hours', 'labels', 'csat', 'heatmap', 'time-in-status', 'goals'].includes(type)}
+  {#if ['mine', 'workload', 'hours', 'labels', 'csat', 'heatmap', 'time-in-status', 'goals'].includes(type) && !(type === 'mine' && total === 0 && !busy)}
     <div class="bars">
       {#each groups as g (g.label)}
         <div class="bar-row"><span class="bar-row__label" class:bar-row__label--wide={['workload', 'hours', 'labels', 'time-in-status', 'goals'].includes(type)}>{g.label}</span><span class="track"><span class="fill" class:fill--blue={type === 'workload' || type === 'heatmap'} style="width: {(g.n / maxN) * 100}%" /></span><span class="bar-row__n">{g.n}{type === 'hours' ? 'h' : type === 'time-in-status' ? 'd' : type === 'goals' ? '%' : ''}</span></div>
@@ -732,7 +732,7 @@
   .stats__n { width: 2.6rem; text-align: right; font-weight: 600; color: var(--theme-caption-color); font-variant-numeric: tabular-nums; }
   .stats__pct { width: 2.6rem; text-align: right; color: var(--theme-trans-color); font-variant-numeric: tabular-nums; }
   .tbl--filter { width: 100%; }
-  .th--l, .td--l { text-align: left; }
+  .tbl--filter .th--l, .tbl--filter .td--l { text-align: left; }
   .th--c, .td--c { text-align: center; }
   .th--grow { width: 40%; }
   .tr { cursor: pointer; &:hover .td { background: var(--theme-button-hovered); } }

@@ -225,4 +225,15 @@
   .ph__title .ph__menu { left: 0; right: auto; }
   .ph__menu-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.7rem; border: none; border-radius: 0.25rem; background: transparent; color: var(--j-text); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; &:hover { background: var(--j-hover); } &--on { color: var(--j-link); background: var(--j-active-bg); } }
   .ph__body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; > :global(*) { flex: 1; min-height: 0; } }
+  // phones: name on its own line, tools underneath, members hidden, tabs scroll
+  @media (max-width: 48rem) {
+    .ph__head { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.6rem 1rem 0; }
+    .ph__crumb { display: none; }
+    .ph__title { flex-wrap: wrap; }
+    .ph__name { flex: 1 1 100%; order: -1; font-size: 1.25rem; white-space: normal; }
+    .ph__members { display: none; }
+    .ph__actions { padding-top: 0; justify-content: flex-end; }
+    .ph__tabs { padding: 0 0.5rem; }
+    .ph__tab { margin-right: 0.5rem; }
+  }
 </style>
