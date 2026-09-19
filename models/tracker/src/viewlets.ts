@@ -843,6 +843,8 @@ export function defineViewlets (builder: Builder): void {
       descriptor: tracker.viewlet.Kanban,
       viewOptions: {
         ...issuesOptions(true),
+        // Jira shows every status column even when empty; so does the board
+        other: issuesOptions(true).other.map((o) => (o.key === 'shouldShowAll' ? ({ ...o, defaultValue: true } as typeof o) : o)),
         groupDepth: 1
       },
       configOptions: {
@@ -881,9 +883,9 @@ export function defineViewlets (builder: Builder): void {
         { key: 'kind', presenter: task.component.TaskTypeListPresenter, label: task.string.TaskType, props: { kind: 'list', size: 'small', justify: 'center' } },
         { key: '', presenter: tracker.component.IssuePresenter, label: tracker.string.Identifier, sortingKey: 'number' },
         { key: '', presenter: tracker.component.TitlePresenter, label: tracker.string.Title, sortingKey: 'title', props: {} },
-        { key: '', presenter: tracker.component.StatusEditor, label: tracker.string.Status, sortingKey: 'status', props: { kind: 'list', size: 'small', justify: 'center' } },
+        { key: '', presenter: tracker.component.StatusEditor, label: tracker.string.Status, sortingKey: 'status', props: { kind: 'list', size: 'small', shouldShowLabel: true } },
         'assignee',
-        { key: '', presenter: tracker.component.PriorityEditor, label: tracker.string.Priority, sortingKey: 'priority', props: { type: 'priority', kind: 'list', size: 'small' } },
+        { key: '', presenter: tracker.component.PriorityEditor, label: tracker.string.Priority, sortingKey: 'priority', props: { type: 'priority', kind: 'list', size: 'small', shouldShowLabel: true } },
         'dueDate',
         { key: 'labels', presenter: tags.component.LabelsPresenter, label: tracker.string.Labels, sortingKey: 'labels', props: { kind: 'list', full: false } },
         'estimation',
