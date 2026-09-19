@@ -73,6 +73,12 @@ export function createModel (builder: Builder): void {
     txMatch: { objectClass: { $in: [tracker.class.Issue, 'chunter:class:ChatMessage' as any, tracker.class.AutomationHeartbeat, tracker.class.AutomationRule, tracker.class.AutomationJob] } }
   })
 
+  // User groups keep the spaces they are applied to in sync.
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnUserGroups,
+    txMatch: { objectClass: 'contact:class:UserGroup' as any }
+  })
+
   // Customer emails: request received (issue created with portalEmail) and team replied (customer-visible reply).
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnCustomerMail,

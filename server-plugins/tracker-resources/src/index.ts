@@ -16,6 +16,7 @@
 import { OnIssueAutomation } from './automation'
 import { OnIssueWebhook } from './webhooks'
 import { OnAutomationRules, holds, perform } from './rules'
+import { OnUserGroups } from './groups'
 import { AccountRole as WorkspaceRole, hasAccountRole } from '@hcengineering/core'
 import { type StatusProps, type TransitionRule } from '@hcengineering/task'
 import { OnIssuePermissions, OnNotificationScheme } from './permissions'
@@ -1035,6 +1036,7 @@ export default async () => ({
     OnIssueWebhook,
     OnIssueAutomation,
     OnAutomationRules,
+    OnUserGroups,
     OnIssuePermissions,
     OnNotificationScheme,
     OnIssueStatusGuard,

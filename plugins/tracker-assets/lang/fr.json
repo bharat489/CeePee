@@ -587,7 +587,27 @@
     "Docs": "Documents",
     "CreateDocsSpace": "Créer un espace de documents",
     "NewPage": "Nouvelle page",
-    "Refresh": "Actualiser"
+    "Refresh": "Actualiser",
+    "Administration": "Administration",
+    "NewGroup": "New group",
+    "SendInvites": "Send invites",
+    "ApplyChanges": "Apply",
+    "CreateIssuePermission": "Create issues",
+    "CreateIssuePermissionDescription": "Create issues in the project",
+    "EditIssuePermission": "Edit issues",
+    "EditIssuePermissionDescription": "Change any field of an issue, including status and assignee",
+    "DeleteIssuePermission": "Delete issues",
+    "DeleteIssuePermissionDescription": "Delete issues in the project",
+    "CommentPermission": "Comment",
+    "CommentPermissionDescription": "Add comments to issues",
+    "ManageSprintsPermission": "Manage sprints",
+    "ManageSprintsPermissionDescription": "Create, start, complete and delete sprints",
+    "ManageComponentsPermission": "Manage components",
+    "ManageComponentsPermissionDescription": "Create, edit and delete components",
+    "ManageMilestonesPermission": "Manage milestones",
+    "ManageMilestonesPermissionDescription": "Create, edit and delete milestones",
+    "ManageAutomationPermission": "Manage automation",
+    "ManageAutomationPermissionDescription": "Create, edit, enable and disable automation rules"
   },
   "status": {}
 }

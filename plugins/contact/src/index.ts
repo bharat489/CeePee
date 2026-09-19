@@ -222,6 +222,22 @@ export interface Translation extends Preference {
  * Persistent user status in workspace (e.g. vacation, short note).
  * @public
  */
+/**
+ * A named set of people. Applied to spaces (projects, teamspaces, channels) it keeps
+ * their membership in sync; used for role assignment and page permissions. @public
+ */
+export interface UserGroup extends Doc {
+  name: string
+  description?: string
+  color?: number
+  members: AccountUuid[]
+  /** spaces whose membership follows this group (kept in sync by the server) */
+  spaces: Ref<Space>[]
+  /** server bookkeeping: what the group applied per space, so it only removes what it added */
+  applied?: Record<string, AccountUuid[]>
+  managers?: AccountUuid[]
+}
+
 export interface WorkspaceMemberStatus extends Doc {
   space: Ref<Space>
   user: AccountUuid
@@ -249,7 +265,8 @@ export const contactPlugin = plugin(contactId, {
     UserProfile: '' as Ref<MasterTag>,
     UserRole: '' as Ref<Class<UserRole>>,
     Translation: '' as Ref<Class<Translation>>,
-    WorkspaceMemberStatus: '' as Ref<Class<WorkspaceMemberStatus>>
+    WorkspaceMemberStatus: '' as Ref<Class<WorkspaceMemberStatus>>,
+    UserGroup: '' as Ref<Class<UserGroup>>
   },
   mixin: {
     Employee: '' as Ref<Class<Employee>>

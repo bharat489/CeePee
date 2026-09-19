@@ -35,7 +35,8 @@ import {
   type Status,
   type SocialIdentityProvider,
   type Translation,
-  type WorkspaceMemberStatus
+  type WorkspaceMemberStatus,
+  type UserGroup
 } from '@hcengineering/contact'
 import {
   AccountRole,
@@ -58,6 +59,7 @@ import {
 } from '@hcengineering/core'
 import { createSystemType } from '@hcengineering/model-card'
 import {
+  ArrOf,
   Collection as CollectionType,
   Hidden,
   Index,
@@ -308,6 +310,28 @@ export class TTranslation extends TPreference implements Translation {
   dontTranslate!: string[]
 }
 
+@Model(contact.class.UserGroup, core.class.Doc, DOMAIN_CONTACT)
+@UX(getEmbeddedLabel('User group'))
+export class TUserGroup extends TDoc implements UserGroup {
+  @Prop(TypeString(), core.string.Name)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), core.string.Description)
+    description?: string
+
+  color?: number
+
+  @Prop(ArrOf(TypeAccountUuid()), core.string.Members)
+    members!: AccountUuid[]
+
+  @Prop(ArrOf(TypeRef(core.class.Space)), core.string.Spaces)
+    spaces!: Ref<Space>[]
+
+  applied?: Record<string, AccountUuid[]>
+  managers?: AccountUuid[]
+}
+
 @Model(contact.class.WorkspaceMemberStatus, core.class.Doc, DOMAIN_CONTACT)
 @UX(contact.string.WorkspaceStatusNote, contact.icon.User)
 export class TWorkspaceMemberStatus extends TDoc implements WorkspaceMemberStatus {
@@ -343,7 +367,8 @@ export function createModel (builder: Builder): void {
     TPersonSpace,
     TUserRole,
     TTranslation,
-    TWorkspaceMemberStatus
+    TWorkspaceMemberStatus,
+    TUserGroup
   )
 
   builder.mixin(contact.class.PersonSpace, core.class.Class, core.mixin.TxAccessLevel, {

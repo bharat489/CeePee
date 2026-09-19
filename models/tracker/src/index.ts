@@ -827,6 +827,17 @@ export function createModel (builder: Builder): void {
     role: AccountRole.Maintainer
   })
 
+  // Admin Center: overview, users, groups, roles & permissions, security, automation
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'administration',
+    label: tracker.string.Administration,
+    icon: setting.icon.Setting,
+    component: tracker.component.AdminCenter,
+    extraComponents: { navigation: tracker.component.AdminNav },
+    order: 1001,
+    role: AccountRole.Maintainer
+  })
+
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
     name: 'org-console',
     label: tracker.string.OrgConsole,
@@ -1262,7 +1273,18 @@ function defineSpaceType (builder: Builder): void {
       availablePermissions: [
         core.permission.UpdateSpace,
         core.permission.ArchiveSpace,
-        core.permission.ForbidDeleteObject
+        core.permission.ForbidDeleteObject,
+        core.permission.CreateObject,
+        core.permission.UpdateObject,
+        core.permission.DeleteObject,
+        tracker.permission.CreateIssue,
+        tracker.permission.EditIssue,
+        tracker.permission.DeleteIssue,
+        tracker.permission.Comment,
+        tracker.permission.ManageSprints,
+        tracker.permission.ManageComponents,
+        tracker.permission.ManageMilestones,
+        tracker.permission.ManageAutomation
       ],
       allowedClassic: true,
       allowedTaskTypeDescriptors: [tracker.descriptors.Issue]

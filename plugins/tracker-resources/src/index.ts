@@ -126,6 +126,8 @@ import Ideas from './components/ideas/Ideas.svelte'
 import Appearance from './components/appearance/Appearance.svelte'
 import EmailTemplates from './components/settings/EmailTemplates.svelte'
 import OrgConsole from './components/org/OrgConsole.svelte'
+import AdminCenter from './components/admin/AdminCenter.svelte'
+import AdminNav from './components/admin/AdminNav.svelte'
 import SharePopup from './components/share/SharePopup.svelte'
 import PersonListTypeEditor from './components/fields/PersonListTypeEditor.svelte'
 import PersonListEditor from './components/fields/PersonListEditor.svelte'
@@ -514,6 +516,8 @@ export default async (): Promise<Resources> => ({
     Appearance,
     EmailTemplates,
     OrgConsole,
+    AdminCenter,
+    AdminNav,
     SharePopup,
     PersonListTypeEditor,
     PersonListEditor,

@@ -1498,6 +1498,8 @@ const pluginState = plugin(trackerId, {
     Appearance: '' as AnyComponent,
     EmailTemplates: '' as AnyComponent,
     OrgConsole: '' as AnyComponent,
+    AdminCenter: '' as AnyComponent,
+    AdminNav: '' as AnyComponent,
     SharePopup: '' as AnyComponent,
     PersonListTypeEditor: '' as AnyComponent,
     PersonListEditor: '' as AnyComponent,
@@ -1788,6 +1790,26 @@ const pluginState = plugin(trackerId, {
     Vibe: '' as IntlString,
     EmailTemplates: '' as IntlString,
     OrgConsole: '' as IntlString,
+    Administration: '' as IntlString,
+    NewGroup: '' as IntlString,
+    SendInvites: '' as IntlString,
+    ApplyChanges: '' as IntlString,
+    CreateIssuePermission: '' as IntlString,
+    CreateIssuePermissionDescription: '' as IntlString,
+    EditIssuePermission: '' as IntlString,
+    EditIssuePermissionDescription: '' as IntlString,
+    DeleteIssuePermission: '' as IntlString,
+    DeleteIssuePermissionDescription: '' as IntlString,
+    CommentPermission: '' as IntlString,
+    CommentPermissionDescription: '' as IntlString,
+    ManageSprintsPermission: '' as IntlString,
+    ManageSprintsPermissionDescription: '' as IntlString,
+    ManageComponentsPermission: '' as IntlString,
+    ManageComponentsPermissionDescription: '' as IntlString,
+    ManageMilestonesPermission: '' as IntlString,
+    ManageMilestonesPermissionDescription: '' as IntlString,
+    ManageAutomationPermission: '' as IntlString,
+    ManageAutomationPermissionDescription: '' as IntlString,
     ShareIssue: '' as IntlString,
     StopSharing: '' as IntlString,
     PersonList: '' as IntlString,
@@ -2010,7 +2032,15 @@ const pluginState = plugin(trackerId, {
     Initiative: '' as Ref<TaskType>
   },
   permission: {
-    ForbidCreateProject: '' as Ref<Permission>
+    ForbidCreateProject: '' as Ref<Permission>,
+    CreateIssue: '' as Ref<Permission>,
+    EditIssue: '' as Ref<Permission>,
+    DeleteIssue: '' as Ref<Permission>,
+    Comment: '' as Ref<Permission>,
+    ManageSprints: '' as Ref<Permission>,
+    ManageComponents: '' as Ref<Permission>,
+    ManageMilestones: '' as Ref<Permission>,
+    ManageAutomation: '' as Ref<Permission>
   }
 })
 export default pluginState

@@ -167,7 +167,10 @@ function defineTeamspace (builder: Builder): void {
       availablePermissions: [
         core.permission.UpdateSpace,
         core.permission.ArchiveSpace,
-        core.permission.ForbidDeleteObject
+        core.permission.ForbidDeleteObject,
+        core.permission.CreateObject,
+        core.permission.UpdateObject,
+        core.permission.DeleteObject
       ]
     },
     document.descriptor.TeamspaceType
