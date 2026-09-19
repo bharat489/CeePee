@@ -195,9 +195,14 @@ const INTENTS: Array<{ id: string, re: RegExp, run: Handler }> = [
       const { open, name } = cats(ctx)
       const who = scopePerson(ctx, q)
       const everyone = /\b(team|everyone|anyone|all|we)\b/i.test(q)
-      const base: Record<string, any> = { status: { $in: open }, $or: [{ dueDate: { $lt: Date.now() } }, { slaDue: { $lt: Date.now() } }] }
+      // the database adapter has no $or: overdue by due date and by SLA are two queries, merged
+      const base: Record<string, any> = { status: { $in: open } }
       if (!everyone) base.assignee = who?._id ?? ctx.me
-      const list = await ctx.client.findAll(tracker.class.Issue, base, { limit: 100 })
+      const now = Date.now()
+      const byDue = await ctx.client.findAll(tracker.class.Issue, { ...base, dueDate: { $lt: now } }, { limit: 100 })
+      const bySla = await ctx.client.findAll(tracker.class.Issue, { ...base, slaDue: { $lt: now } }, { limit: 100 })
+      const seen = new Set<string>()
+      const list = [...byDue, ...bySla].filter((i) => { if (seen.has(i._id)) return false; seen.add(i._id); return true })
       const sorted = list.sort((a, b) => (a.dueDate ?? a.slaDue ?? 0) - (b.dueDate ?? b.slaDue ?? 0))
       const label = everyone ? 'the team' : who !== undefined && who._id !== ctx.me ? formatName(who.name) : 'you'
       return {
