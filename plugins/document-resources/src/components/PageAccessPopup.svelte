@@ -25,7 +25,7 @@
   import { AccountArrayEditor } from '@hcengineering/contact-resources'
   import core, { type AccountUuid, type Doc, type Ref } from '@hcengineering/core'
   import { type Document, type PageAccess } from '@hcengineering/document'
-  import { createQuery, getClient } from '@hcengineering/presentation'
+  import presentation, { createQuery, getClient } from '@hcengineering/presentation'
   import { Button } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
 
@@ -128,8 +128,8 @@
   {/if}
 
   <div class="actions">
-    <Button kind={'ghost'} label={document.string.Cancel} on:click={() => { dispatch('close') }} />
-    <Button kind={'primary'} label={document.string.Save} loading={busy} on:click={() => { void save() }} />
+    <Button kind={'ghost'} label={presentation.string.Cancel} on:click={() => { dispatch('close') }} />
+    <Button kind={'primary'} label={presentation.string.Save} loading={busy} on:click={() => { void save() }} />
   </div>
 </div>
 
