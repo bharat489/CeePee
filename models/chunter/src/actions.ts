@@ -122,6 +122,20 @@ function defineMessageActions (builder: Builder): void {
   createAction(
     builder,
     {
+      action: chunter.actionImpl.ForwardMessage,
+      label: chunter.string.Forward,
+      icon: chunter.icon.Thread,
+      input: 'focus',
+      category: chunter.category.Chunter,
+      target: chunter.class.ChatMessage,
+      context: { mode: ['context', 'browser'], group: 'copy' }
+    },
+    chunter.action.Forward
+  )
+
+  createAction(
+    builder,
+    {
       action: chunter.actionImpl.SummarizeMessages,
       label: chunter.string.SummarizeMessages,
       icon: view.icon.Feather,

@@ -18,6 +18,7 @@
   sharing at any time; the link dies immediately.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type Issue } from '@hcengineering/tracker'
   import { Button, Label } from '@hcengineering/ui'
@@ -32,7 +33,7 @@
   const q = createQuery()
   let live: Issue | undefined
   $: q.query(tracker.class.Issue, { _id: issue._id }, (r) => { live = r[0] })
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
   $: token = live?.shareToken ?? undefined
   $: url = token !== undefined && token !== '' ? `${integrationsUrl}/share/${token}` : ''
   let copied = false

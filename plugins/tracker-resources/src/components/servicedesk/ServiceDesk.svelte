@@ -18,6 +18,7 @@
   type, so everything else -- SLA, automation, reports -- already applies.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import { SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import task from '@hcengineering/task'
@@ -57,7 +58,7 @@ import contact, { formatName, type Employee, type Person } from '@hcengineering/
   $: oq.query(tracker.class.CustomerOrg, { space: currentSpace }, (r) => { orgs = r }, { sort: { name: SortingOrder.Ascending } })
   eq.query(contact.mixin.Employee, { active: true }, (r) => { employees = r })
   $: nameOf = new Map(employees.map((e) => [e._id as Ref<Person>, formatName(e.name)]))
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
 
   // ---- SLA calendar --------------------------------------------------------------
   const DEFAULT_CAL: SlaCalendar = { timezoneOffset: -new Date().getTimezoneOffset(), workdays: [1, 2, 3, 4, 5], startHour: 9, endHour: 18, holidays: [] }

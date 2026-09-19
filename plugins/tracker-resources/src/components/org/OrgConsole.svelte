@@ -19,6 +19,7 @@
   never per-person activity.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import contact, { getCurrentEmployee, type Employee } from '@hcengineering/contact'
   import core, { AccountRole, getCurrentAccount, hasAccountRole, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
@@ -84,7 +85,7 @@
   $: void load(projects)
 
   // ---- integrations health ------------------------------------------------------
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
   let health: Record<string, unknown> | undefined
   let healthErr = ''
   onMount(async () => {

@@ -54,6 +54,42 @@
   import { createEventDispatcher, onDestroy, tick } from 'svelte'
   import attachment from '../plugin'
   import AttachmentPresenter from './AttachmentPresenter.svelte'
+  import AttachMenu from './AttachMenu.svelte'
+  import VoiceRecorder from './VoiceRecorder.svelte'
+  import GifPopup from './GifPopup.svelte'
+  import GifIcon from './icons/GifIcon.svelte'
+  import MicIcon from './icons/MicIcon.svelte'
+  import { showPopup } from '@hcengineering/ui'
+
+  // ---- messenger-style attach: photo/video, document, camera, voice note, GIF/stickers ----
+  let accept: string | undefined
+  let capture: 'environment' | undefined
+  let recording = false
+  async function chooseFiles (kind: 'photo' | 'document' | 'camera'): Promise<void> {
+    accept = kind === 'photo' ? 'image/*,video/*' : kind === 'camera' ? 'image/*' : undefined
+    capture = kind === 'camera' ? 'environment' : undefined
+    await tick()
+    inputFile.click()
+  }
+  function openAttachMenu (element: HTMLElement | EventTarget | undefined): void {
+    dispatch('focus')
+    showPopup(AttachMenu, {}, element as HTMLElement, (kind: 'photo' | 'document' | 'camera' | 'voice' | undefined) => {
+      if (kind === 'voice') recording = true
+      else if (kind !== undefined) void chooseFiles(kind)
+    })
+  }
+  function openGifs (element: HTMLElement | EventTarget | undefined, editorHandler: any): void {
+    dispatch('focus')
+    showPopup(GifPopup, {}, element as HTMLElement, (r: { kind: 'gif', file: File } | { kind: 'sticker', emoji: string } | { kind: 'upload' } | undefined) => {
+      if (r === undefined) return
+      if (r.kind === 'gif') void createAttachment(r.file)
+      else if (r.kind === 'upload') void chooseFiles('photo')
+      else if (r.kind === 'sticker') {
+        editorHandler?.insertText?.(r.emoji)
+        setTimeout(() => { refInput.submit() }, 60)
+      }
+    })
+  }
 
   export let objectId: Ref<Doc>
   export let space: Ref<Space>
@@ -474,6 +510,8 @@
     type="file"
     name="file"
     id="file"
+    accept={accept}
+    capture={capture}
     style="display: none"
     on:change={fileSelected}
   />
@@ -484,6 +522,9 @@
     on:dragleave={() => {}}
     on:drop|preventDefault|stopPropagation={fileDrop}
   >
+    {#if recording}
+      <VoiceRecorder on:done={(e) => { recording = false; void createAttachment(e.detail) }} on:cancel={() => { recording = false }} />
+    {/if}
     <ReferenceInput
       {focusIndex}
       bind:this={refInput}
@@ -501,11 +542,23 @@
         {
           label: textEditor.string.Attach,
           icon: AttachIcon,
+          action: openAttachMenu,
+          order: 1001
+        },
+        {
+          label: attachment.string.Gif,
+          icon: GifIcon,
+          action: openGifs,
+          order: 1002
+        },
+        {
+          label: attachment.string.VoiceMessage,
+          icon: MicIcon,
           action: () => {
             dispatch('focus')
-            inputFile.click()
+            recording = true
           },
-          order: 1001
+          order: 1003
         },
         ...uploadActions
       ]}

@@ -186,6 +186,9 @@ export interface Config {
   // Could be defined for dev environment
   FRONT_URL?: string
   PREVIEW_URL?: string
+  INTEGRATIONS_URL?: string
+  GIF_PROVIDER?: string
+  GIF_API_KEY?: string
   STATS_URL?: string
   PRESENCE_URL?: string
   USE_BINARY_PROTOCOL?: boolean
@@ -487,6 +490,9 @@ export async function configurePlatform() {
 
   setMetadata(presentation.metadata.FrontUrl, config.FRONT_URL)
   setMetadata(presentation.metadata.PreviewUrl, config.PREVIEW_URL)
+  setMetadata(tracker.metadata.IntegrationsUrl, config.INTEGRATIONS_URL)
+  ;(window as any).CEEPEE_INTEGRATIONS_URL = config.INTEGRATIONS_URL ?? ''
+  ;(window as any).CEEPEE_GIF = { provider: config.GIF_PROVIDER ?? 'tenor', key: config.GIF_API_KEY ?? '' }
   setMetadata(presentation.metadata.StatsUrl, config.STATS_URL)
   setMetadata(presentation.metadata.LinkPreviewUrl, config.LINK_PREVIEW_URL)
   setMetadata(presentation.metadata.MailUrl, config.MAIL_URL)

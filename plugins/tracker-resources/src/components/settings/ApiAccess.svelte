@@ -19,6 +19,7 @@
   endpoints. Tokens are signed JWTs: rotate the server secret to revoke all.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import { getMetadata } from '@hcengineering/platform'
   import presentation from '@hcengineering/presentation'
   import { Label } from '@hcengineering/ui'
@@ -29,7 +30,7 @@
   const workspace = getMetadata(presentation.metadata.WorkspaceUuid) ?? ''
   const endpoint = (getMetadata(presentation.metadata.Endpoint) ?? '').replace(/^ws/, 'http').replace(/\/$/, '')
   const front = typeof window !== 'undefined' ? window.location.origin : ''
-  const integrations = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrations = typeof window !== 'undefined' ? `${getIntegrationsUrl()}` : ''
   let reveal = false
   let copied = ''
   async function copy (what: string, text: string): Promise<void> {

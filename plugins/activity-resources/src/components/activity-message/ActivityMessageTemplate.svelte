@@ -66,6 +66,8 @@
   export let onClick: (() => void) | undefined = undefined
   export let onReply: ((message: ActivityMessage) => void) | undefined = undefined
   export let embeddedActions: boolean = false
+  /** the current person wrote it: chat views put it on the right */
+  export let own: boolean = false
 
   export let socialIcon: Asset | undefined = undefined
 
@@ -185,6 +187,8 @@
       class:actionsOpened={isActionsOpened}
       class:filledHover={hoverStyles === 'filledHover'}
       class:stale
+      class:own={own}
+      class:pending
       on:click={onClick}
       on:contextmenu={handleContextMenu}
       on:animationend={handleAnimationEnd}

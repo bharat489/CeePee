@@ -20,6 +20,7 @@
   portal where customers vote and suggest.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import contact, { formatName, getCurrentEmployee, type Employee, type Person } from '@hcengineering/contact'
   import { getCurrentAccount, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
@@ -51,7 +52,7 @@
   $: xq.query(tracker.class.Issue, { space: currentSpace, kind: tracker.taskTypes.Epic }, (r) => { epics = r }, { limit: 500 })
   $: pq.query(tracker.class.Project, { _id: currentSpace }, (r) => { project = r[0] })
   $: nameOf = new Map(employees.map((e) => [e._id as Ref<Person>, formatName(e.name)]))
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
 
   const STATUSES: Array<{ v: IdeaStatus, l: string }> = [{ v: 'new', l: 'New' }, { v: 'exploring', l: 'Exploring' }, { v: 'validated', l: 'Validated' }, { v: 'planned', l: 'Planned' }, { v: 'shipped', l: 'Shipped' }, { v: 'declined', l: 'Declined' }]
   const SCORES: Array<{ k: 'impact' | 'effort' | 'confidence', l: string }> = [{ k: 'impact', l: 'Impact' }, { k: 'effort', l: 'Effort' }, { k: 'confidence', l: 'Confidence' }]

@@ -13,7 +13,7 @@
     "DirectMessage": "Личное сообщение",
     "EditUpdate": "Сохранить...",
     "EditCancel": "Отменить",
-    "Comments" : "Комментарии",
+    "Comments": "Комментарии",
     "About": "Информация",
     "Members": "Участники",
     "NoMembers": "Нет участников",
@@ -133,6 +133,8 @@
     "OpenChatInSidebar": "Открыть чат в боковой панели",
     "ResolveThread": "Пометить завершенным",
     "NoThreadsYet": "Пока нет обсуждений.",
-    "SummarizeMessages": "Подвести итоги обсуждения"
+    "SummarizeMessages": "Подвести итоги обсуждения",
+    "Forward": "Переслать…",
+    "ForwardTo": "Переслать в"
   }
 }

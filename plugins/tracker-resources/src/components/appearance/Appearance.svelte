@@ -22,13 +22,19 @@
   import { type Readable } from 'svelte/store'
 
   import tracker from '../../plugin'
-  import { getCorners, getMotion, getVibe, setCorners, setMotion, setVibe, VIBES, type Corners, type Motion, type Vibe } from '../../vibe'
+  import { getCorners, getMotion, getVibe, getWallpaper, setCorners, setMotion, setVibe, setWallpaper, VIBES, type Corners, type Motion, type Vibe, type Wallpaper } from '../../vibe'
 
   const themeCtx = getContext<{ currentTheme: Readable<string>, setTheme: (t: string) => void } | undefined>('theme')
   const fontCtx = getContext<{ currentFontSize: Readable<string>, setFontSize: (f: string) => void } | undefined>('fontsize')
   let vibe: Vibe = getVibe()
   let corners: Corners = getCorners()
   let motion: Motion = getMotion()
+  let wall: Wallpaper = getWallpaper()
+  const WALLS: Array<{ id: Wallpaper, l: string, hint: string }> = [{ id: 'doodle', l: 'Doodles', hint: 'hearts, stars, orbits' }, { id: 'aurora', l: 'Aurora', hint: 'soft colour clouds' }, { id: 'grid', l: 'Grid', hint: 'quiet graph paper' }, { id: 'none', l: 'Plain', hint: 'nothing behind the bubbles' }]
+  function pickWall (w: Wallpaper): void {
+    wall = w
+    setWallpaper(w)
+  }
   let theme = 'theme-system'
   let font = 'normal-font'
   themeCtx?.currentTheme.subscribe((t) => { theme = t })
@@ -88,6 +94,10 @@
         <div class="opts">{#each THEMES as t (t.id)}<button class="opt" class:opt--on={theme === t.id} disabled={themeCtx === undefined} on:click={() => { themeCtx?.setTheme(t.id) }}><b>{t.l}</b></button>{/each}</div>
       </section>
       <section class="card motion-rise" style="--i: 4">
+        <span class="card__title">Chat wallpaper</span>
+        <div class="opts">{#each WALLS as w (w.id)}<button class="opt" class:opt--on={wall === w.id} on:click={() => { pickWall(w.id) }}><b>{w.l}</b><span>{w.hint}</span></button>{/each}</div>
+      </section>
+      <section class="card motion-rise" style="--i: 5">
         <span class="card__title">Density</span>
         <div class="opts">{#each FONTS as f (f.id)}<button class="opt" class:opt--on={font === f.id} disabled={fontCtx === undefined} on:click={() => { fontCtx?.setFontSize(f.id) }}><b>{f.l}</b></button>{/each}</div>
       </section>

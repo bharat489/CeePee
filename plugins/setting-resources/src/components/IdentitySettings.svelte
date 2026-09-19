@@ -46,6 +46,8 @@
   ]
   $: live = new Set(providers.map((p) => p.name.toLowerCase()))
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  // the integrations service's public base: from the front config, else this host on port 8095
+  const integrationsBase = (typeof window !== 'undefined' && (window as any).CEEPEE_INTEGRATIONS_URL) || `${origin.replace(/:\d+$/, '')}:8095`
 </script>
 
 <div class="hulyComponent">
@@ -77,7 +79,7 @@
 
     <section class="card motion-rise" style="--i: 2">
       <span class="card__title">Provisioning (SCIM 2.0)</span>
-      <p class="muted">The integrations service exposes <code>{origin.replace(/:\d+$/, '')}:8095/scim/v2</code>. In Okta, Entra ID or OneLogin, add a SCIM application with that base URL and the <code>SCIM_TOKEN</code> from the service's environment. Creating a user sends an auto-join invite with the role mapped from their group (<code>SCIM_ROLE_MAP</code>, e.g. <code>Admins=OWNER,Leads=MAINTAINER</code>); deactivating demotes them to read-only and keeps their history.</p>
+      <p class="muted">The integrations service exposes <code>{integrationsBase}/scim/v2</code>. In Okta, Entra ID or OneLogin, add a SCIM application with that base URL and the <code>SCIM_TOKEN</code> from the service's environment. Creating a user sends an auto-join invite with the role mapped from their group (<code>SCIM_ROLE_MAP</code>, e.g. <code>Admins=OWNER,Leads=MAINTAINER</code>); deactivating demotes them to read-only and keeps their history.</p>
     </section>
 
     <section class="card motion-rise" style="--i: 3">

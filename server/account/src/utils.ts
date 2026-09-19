@@ -1266,8 +1266,8 @@ export async function sendEmailConfirmation (
 ): Promise<void> {
   const mailURL = getMetadata(accountPlugin.metadata.MAIL_URL)
   if (mailURL === undefined || mailURL === '') {
-    ctx.error('Please provide MAIL_URL to enable email confirmations.')
-    throw new PlatformError(new Status(Severity.ERROR, platform.status.InternalServerError, {}))
+    ctx.warn('MAIL_URL is not set; email confirmations are off')
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.MailNotConfigured, {}))
   }
 
   const mailAuth = getMetadata(accountPlugin.metadata.MAIL_AUTH_TOKEN)
@@ -1434,7 +1434,7 @@ export function getMailUrl (): { mailURL: string, mailAuth: string | undefined }
   const mailURL = getMetadata(accountPlugin.metadata.MAIL_URL)
 
   if (mailURL === undefined || mailURL === '') {
-    throw new Error('Please provide email service url')
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.MailNotConfigured, {}))
   }
   const mailAuth = getMetadata(accountPlugin.metadata.MAIL_AUTH_TOKEN)
 

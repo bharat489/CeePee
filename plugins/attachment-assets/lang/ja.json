@@ -54,6 +54,8 @@
     "RemovedAttachment": "添付ファイルを削除しました",
     "ContentType": "コンテンツタイプ",
     "OpenInWindow": "新しいウィンドウで開く",
-    "Embeddings": "埋め込みデータ"
+    "Embeddings": "埋め込みデータ",
+    "Gif": "GIF",
+    "VoiceMessage": "ボイスメッセージ"
   }
 }

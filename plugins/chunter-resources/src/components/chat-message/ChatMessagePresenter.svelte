@@ -221,6 +221,13 @@
     : undefined
 
   let displayText: Markup = value?.message ?? EmptyMarkup
+  // a message that is only emoji (a sticker) is shown big, without a bubble
+  const isJumbo = (html: string): boolean => {
+    const text = html.replace(/<[^>]+>/g, '').replace(/&nbsp;|\s/g, '')
+    if (text === '' || text.length > 24) return false
+    return /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Emoji_Component}|\u200d|\ufe0f)+$/u.test(text)
+  }
+  $: jumbo = isJumbo(displayText)
 
   $: if (value && $shownTranslatedMessagesStore.has(value._id)) {
     displayText = $translatedMessagesStore.get(value._id) ?? value?.message ?? EmptyMarkup
@@ -240,6 +247,7 @@
   {/await}
 {:else if value && !inline}
   <ActivityMessageTemplate
+    own={isOwn}
     message={value}
     {viewlet}
     {parentMessage}
@@ -277,7 +285,7 @@
       {#if !isEditing}
         {#if withShowMore}
           <ShowMore limit={compact ? 80 : undefined}>
-            <div class="clear-mins" {...!pending && { 'data-delivered': true }}>
+            <div class="clear-mins" class:jumbo {...!pending && { 'data-delivered': true }}>
               <MessageViewer message={displayText} />
               {#if (value.attachments ?? 0) > 0}
                 <div class="mt-2" />
@@ -286,7 +294,7 @@
             </div>
           </ShowMore>
         {:else}
-          <div class="clear-mins" {...!pending && { 'data-delivered': true }}>
+          <div class="clear-mins" class:jumbo {...!pending && { 'data-delivered': true }}>
             <MessageViewer message={displayText} />
             {#if (value.attachments ?? 0) > 0}
               <div class="mt-2" />

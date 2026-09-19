@@ -133,6 +133,8 @@
     "OpenChatInSidebar": "サイドバーでチャットを開く",
     "ResolveThread": "解決",
     "NoThreadsYet": "まだスレッドはありません。",
-    "SummarizeMessages": "内容を要約"
+    "SummarizeMessages": "内容を要約",
+    "Forward": "転送…",
+    "ForwardTo": "転送先"
   }
 }

@@ -35,7 +35,7 @@ import {
   type Permission,
   type AccountUuid
 } from '@hcengineering/core'
-import { Asset, IntlString, Plugin, Resource, plugin } from '@hcengineering/platform'
+import { Asset, IntlString, Metadata, Plugin, Resource, getMetadata, plugin } from '@hcengineering/platform'
 import { CommonInboxNotification } from '@hcengineering/notification'
 import { Preference } from '@hcengineering/preference'
 import { TagCategory, TagElement, TagReference } from '@hcengineering/tags'
@@ -1331,6 +1331,10 @@ export const trackerId = 'tracker' as Plugin
 export * from './analytics'
 
 const pluginState = plugin(trackerId, {
+  metadata: {
+    /** Public base URL of the integrations service (portal, share links, collector, API). */
+    IntegrationsUrl: '' as Metadata<string>
+  },
   class: {
     Project: '' as Ref<Class<Project>>,
     Issue: '' as Ref<Class<Issue>>,
@@ -1986,3 +1990,11 @@ export function createStatesData (data: TaskStatusFactory[]): Omit<Data<Status>,
 
 export * from './query/parse'
 export * from './query/run'
+
+/** Public base of the integrations service: from the front's INTEGRATIONS_URL config, else this host on port 8095. */
+export function getIntegrationsUrl (): string {
+  const configured = getMetadata('tracker:metadata:IntegrationsUrl' as Metadata<string>)
+  if (configured !== undefined && configured !== '') return configured.replace(/\/$/, '')
+  if (typeof window === 'undefined') return ''
+  return `${window.location.protocol}//${window.location.hostname}:8095`
+}

@@ -124,7 +124,7 @@
   />
 
   <div class="popupPanel-body" class:asideShown={withAside && isAsideShown}>
-    <div class="popupPanel-body__main">
+    <div class="popupPanel-body__main chat-bubbles">
       {#key object._id}
         {#if !readonly && shouldShowJoinOverlay(object)}
           <div class="body h-full w-full clear-mins flex-center">

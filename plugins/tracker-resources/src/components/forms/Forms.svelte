@@ -20,6 +20,7 @@
   in the app (shareable link) or published on the public portal.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import { SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type FormField, type IssueForm, type Project, type RequestType } from '@hcengineering/tracker'
@@ -41,7 +42,7 @@
   $: fq.query(tracker.class.IssueForm, { space: currentSpace }, (r) => { forms = r }, { sort: { name: SortingOrder.Ascending } })
   $: pq.query(tracker.class.Project, { _id: currentSpace }, (r) => { project = r[0] })
   $: rq.query(tracker.class.RequestType, { space: currentSpace }, (r) => { requestTypes = r })
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
 
   const TYPES: Array<{ id: FormField['type'], label: string }> = [
     { id: 'text', label: 'Short text' }, { id: 'textarea', label: 'Long text' }, { id: 'select', label: 'Dropdown' }, { id: 'multiselect', label: 'Multiple choice' },

@@ -23,6 +23,15 @@
 
   import ActivityMessageAction from './ActivityMessageAction.svelte'
   import { savedMessagesStore } from '../activity'
+  import { updateDocReactions } from '../utils'
+
+  // one-tap reactions, the messenger way
+  const QUICK = ['👍', '❤️', '😂', '🎉', '🙏']
+  async function quick (emoji: string): Promise<void> {
+    if (message === undefined) return
+    const reactions = await client.findAll(activity.class.Reaction, { attachedTo: message._id })
+    await updateDocReactions(reactions, message, emoji)
+  }
 
   export let message: ActivityMessage | undefined
   export let actions: Action[] = []
@@ -100,6 +109,7 @@
 
 {#if message}
   <div class="activityMessage-actionPopup">
+    <span class="chat-quick">{#each QUICK as e (e)}<button title={e} on:click|stopPropagation={() => { void quick(e) }}>{e}</button>{/each}</span>
     {#each providedInlineActions as inline}
       {#if inline.icon}
         <ActivityMessageAction

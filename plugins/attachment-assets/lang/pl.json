@@ -54,6 +54,8 @@
     "RemovedAttachment": "Usunięty załącznik",
     "ContentType": "Typ zawartości",
     "OpenInWindow": "Otwórz w oknie",
-    "Embeddings": "Osadzenia"
+    "Embeddings": "Osadzenia",
+    "Gif": "GIF",
+    "VoiceMessage": "Wiadomość głosowa"
   }
 }

@@ -21,6 +21,7 @@
   depth-limited to two.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import contact, { formatName, type Person } from '@hcengineering/contact'
   import core, { generateId, SortingOrder, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
@@ -103,7 +104,7 @@
   const PRIOS = [IssuePriority.Urgent, IssuePriority.High, IssuePriority.Medium, IssuePriority.Low, IssuePriority.NoPriority]
   const prio: Record<IssuePriority, string> = { [IssuePriority.Urgent]: 'Urgent', [IssuePriority.High]: 'High', [IssuePriority.Medium]: 'Medium', [IssuePriority.Low]: 'Low', [IssuePriority.NoPriority]: 'None' }
   const KINDS = [{ id: tracker.taskTypes.Issue, label: 'Issue' }, { id: tracker.taskTypes.Epic, label: 'Epic' }, { id: tracker.taskTypes.Initiative, label: 'Initiative' }]
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
 
   // ---- editor -------------------------------------------------------------
   let editing: AutomationRule | undefined | null = null

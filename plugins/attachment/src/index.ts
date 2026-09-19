@@ -123,6 +123,8 @@ export default plugin(attachmentId, {
     FileBrowserTypeFilterPDFs: '' as IntlString,
     DeleteFile: '' as IntlString,
     Attachments: '' as IntlString,
+    Gif: '' as IntlString,
+    VoiceMessage: '' as IntlString,
     FileBrowser: '' as IntlString,
     OpenInWindow: '' as IntlString,
     Embeddings: '' as IntlString

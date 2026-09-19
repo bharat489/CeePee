@@ -56,6 +56,7 @@ export default mergeIds(chunterId, chunter, {
     RemoveChannel: '' as ViewAction
   },
   string: {
+    ForwardTo: '' as IntlString,
     Channel: '' as IntlString,
     DirectMessage: '' as IntlString,
     DirectMessages: '' as IntlString,

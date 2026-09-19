@@ -13,7 +13,7 @@
     "DirectMessage": "Direct message",
     "EditUpdate": "Save...",
     "EditCancel": "Cancel",
-    "Comments" : "Comments",
+    "Comments": "Comments",
     "About": "About",
     "Members": "Members",
     "NoMembers": "No members",
@@ -133,6 +133,8 @@
     "OpenChatInSidebar": "Open chat in sidebar",
     "ResolveThread": "Resolve",
     "NoThreadsYet": "There are no threads yet.",
-    "SummarizeMessages": "Summarize discussion"
+    "SummarizeMessages": "Summarize discussion",
+    "Forward": "Forward…",
+    "ForwardTo": "Forward to"
   }
 }

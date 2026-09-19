@@ -40,29 +40,35 @@ services:
   rating_cockroach:
     profiles: ["full"]
   account:
-    links: !override []
     environment:
       - MAIL_URL=${MAIL_URL:-}
+      - STATS_URL=
+    links: !override []
   workspace_cockroach:
+    environment:
+      - MAIL_URL=${MAIL_URL:-}
+      - STATS_URL=
     links: !override
       - cockroach
       - minio
-    environment:
-      - MAIL_URL=${MAIL_URL:-}
   collaborator:
+    environment:
+      - STATS_URL=
     links: !override
       - minio
       - transactor_cockroach
   front:
-    links: !override []
     environment:
       # VAPID public key; browsers subscribe to push with it (see dev/.env)
       - PUSH_PUBLIC_KEY=${PUSH_PUBLIC_KEY:-}
+      - STATS_URL=
+      - PREVIEW_URL=
+      - LINK_PREVIEW_URL=
+      - PUBLIC_INTEGRATIONS_URL=${PUBLIC_INTEGRATIONS_URL:-http://huly.local:8095}
+      - GIF_PROVIDER=${GIF_PROVIDER:-tenor}
+      - GIF_API_KEY=${GIF_API_KEY:-}
+    links: !override []
   transactor_cockroach:
-    links: !override
-      - cockroach
-      - minio
-      - account
     environment:
       - MAIL_URL=${MAIL_URL:-}
       - MAIL_API_KEY=${MAIL_API_KEY:-}
@@ -72,10 +78,19 @@ services:
       # web push: the transactor hands push payloads to the notification service below
       - WEB_PUSH_URL=${WEB_PUSH_URL:-http://notification:8091}
       - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
+      - STATS_URL=
+    links: !override
+      - cockroach
+      - minio
+      - account
   export:
+    environment:
+      - STATS_URL=
     links: !override
       - minio
   datalake:
+    environment:
+      - STATS_URL=
     depends_on: !override
       minio:
         condition: service_healthy

@@ -54,6 +54,8 @@
     "RemovedAttachment": "Ek kaldırıldı",
     "ContentType": "İçerik türü",
     "OpenInWindow": "Pencerede aç",
-    "Embeddings": "Gömülü içerikler"
+    "Embeddings": "Gömülü içerikler",
+    "Gif": "GIF",
+    "VoiceMessage": "Sesli mesaj"
   }
 }

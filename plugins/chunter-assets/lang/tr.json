@@ -133,6 +133,8 @@
     "OpenChatInSidebar": "Sohbeti kenar çubuğunda aç",
     "ResolveThread": "Çöz",
     "NoThreadsYet": "Henüz başlık yok.",
-    "SummarizeMessages": "Tartışmayı özetle"
+    "SummarizeMessages": "Tartışmayı özetle",
+    "Forward": "İlet…",
+    "ForwardTo": "Şuraya ilet"
   }
 }

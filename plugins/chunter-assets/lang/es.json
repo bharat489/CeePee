@@ -132,6 +132,8 @@
     "ViewingArchivedChannel": "Estás viendo un canal archivado",
     "OpenChatInSidebar": "Abrir chat en la barra lateral",
     "NoThreadsYet": "No hay hilos todavía.",
-    "SummarizeMessages": "Resumir la discusión"
+    "SummarizeMessages": "Resumir la discusión",
+    "Forward": "Reenviar…",
+    "ForwardTo": "Reenviar a"
   }
 }

@@ -13,7 +13,7 @@
     "DirectMessage": "直连消息",
     "EditUpdate": "保存...",
     "EditCancel": "取消",
-    "Comments" : "评论",
+    "Comments": "评论",
     "About": "关于",
     "Members": "成员",
     "NoMembers": "无成员",
@@ -132,6 +132,8 @@
     "ViewingArchivedChannel": "你正在查看已归档频道",
     "OpenChatInSidebar": "在侧边栏中打开聊天",
     "NoThreadsYet": "还没有线程。",
-    "SummarizeMessages": "总结讨论"
+    "SummarizeMessages": "总结讨论",
+    "Forward": "转发…",
+    "ForwardTo": "转发到"
   }
 }

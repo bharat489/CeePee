@@ -24,6 +24,7 @@
   cannot be fetched from a CSV). History is not in the export.
 -->
 <script lang="ts">
+  import { getIntegrationsUrl } from '@hcengineering/tracker'
   import contact, { formatName, type Person } from '@hcengineering/contact'
   import core, { generateId, makeCollabId, SocialIdType, SortingOrder, type DocData, type Ref } from '@hcengineering/core'
   import { createMarkup, createQuery, getClient } from '@hcengineering/presentation'
@@ -218,7 +219,7 @@
   $: analyze(csvText)
 
   // ---- Jira Cloud REST API import (via the integrations service) ------------------
-  const integrationsUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8095` : ''
+  const integrationsUrl = getIntegrationsUrl()
   let apiBase = ''
   let apiEmail = ''
   let apiToken = ''

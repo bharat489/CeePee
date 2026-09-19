@@ -151,6 +151,7 @@ export async function deleteChatMessage (message: ChatMessage): Promise<void> {
   await client.remove(message)
 }
 
+import { forwardMessage } from './forward'
 export { replyToThread } from './navigation'
 
 export default async (): Promise<Resources> => ({
@@ -231,6 +232,7 @@ export default async (): Promise<Resources> => ({
     TranslateMessage: translateMessage,
     SummarizeMessages: summarizeMessages,
     ShowOriginalMessage: showOriginalMessage,
-    StartConversation: startConversationAction
+    StartConversation: startConversationAction,
+    ForwardMessage: forwardMessage
   }
 })

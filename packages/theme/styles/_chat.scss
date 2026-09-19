@@ -1,0 +1,425 @@
+//
+// Copyright © 2026 Qicky Globaltech Private Limited
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// ---------------------------------------------------------------------------
+// Chat, the messenger way. Channel and direct-message views carry the
+// `chat-bubbles` class on their body; inside it every message becomes a
+// bubble: yours on the right in the vibe tint, theirs on the left on a
+// surface, each with a tail, the time tucked into the bottom corner, ticks on
+// yours, a wallpaper behind everything, big emoji when a message is only
+// emoji, and a pill-shaped composer with a gradient send button. Threads on
+// issues and documents keep the classic feed.
+// ---------------------------------------------------------------------------
+
+html {
+  --chat-in: var(--theme-popup-color);
+  --chat-out: color-mix(in srgb, var(--vibe-a) 34%, var(--theme-bg-color));
+  --chat-doodle: rgba(255, 255, 255, 0.55);
+}
+html.theme-light {
+  --chat-in: #ffffff;
+  --chat-out: color-mix(in srgb, var(--vibe-a) 16%, #ffffff);
+  --chat-doodle: rgba(20, 20, 40, 0.5);
+}
+
+// ---- wallpaper --------------------------------------------------------------
+.chat-bubbles {
+  position: relative;
+  background-color: var(--theme-bg-color);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.16;
+    background-repeat: repeat;
+    background-size: 360px 360px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M40 60c0-8 8-14 18-14s18 6 18 14-8 22-18 30c-10-8-18-22-18-30z'/><circle cx='120' cy='40' r='14'/><path d='M112 40h16M120 32v16'/><path d='M190 30l6 14 15 1-12 10 4 15-13-8-13 8 4-15-12-10 15-1z'/><rect x='250' y='28' width='60' height='40' rx='12'/><path d='M262 44h36M262 54h20'/><path d='M60 150c0-10 10-18 22-18s22 8 22 18-10 18-22 18l-12 10v-12c-6-3-10-9-10-16z'/><circle cx='170' cy='150' r='22'/><ellipse cx='170' cy='150' rx='34' ry='11' transform='rotate(-25 170 150)'/><path d='M250 130l30 30M280 130l-30 30'/><path d='M320 150c-8 0-14 6-14 14s6 14 14 14'/><path d='M40 250l12 12 24-24'/><circle cx='120' cy='260' r='18'/><path d='M112 256a8 8 0 0 0 16 0M113 252h2M126 252h2'/><path d='M200 240l20 40h-40z'/><path d='M270 260c8-14 30-14 38 0'/><path d='M270 270h38'/><path d='M60 330l8-20 8 20M52 322h32'/><rect x='150' y='310' width='44' height='30' rx='6'/><path d='M158 324h28'/><circle cx='260' cy='330' r='10'/><circle cx='300' cy='330' r='6'/><circle cx='330' cy='330' r='3'/></svg>");
+  }
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+html.theme-light .chat-bubbles::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360' fill='none' stroke='%23202040' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M40 60c0-8 8-14 18-14s18 6 18 14-8 22-18 30c-10-8-18-22-18-30z'/><circle cx='120' cy='40' r='14'/><path d='M112 40h16M120 32v16'/><path d='M190 30l6 14 15 1-12 10 4 15-13-8-13 8 4-15-12-10 15-1z'/><rect x='250' y='28' width='60' height='40' rx='12'/><path d='M262 44h36M262 54h20'/><path d='M60 150c0-10 10-18 22-18s22 8 22 18-10 18-22 18l-12 10v-12c-6-3-10-9-10-16z'/><circle cx='170' cy='150' r='22'/><ellipse cx='170' cy='150' rx='34' ry='11' transform='rotate(-25 170 150)'/><path d='M250 130l30 30M280 130l-30 30'/><path d='M320 150c-8 0-14 6-14 14s6 14 14 14'/><path d='M40 250l12 12 24-24'/><circle cx='120' cy='260' r='18'/><path d='M112 256a8 8 0 0 0 16 0M113 252h2M126 252h2'/><path d='M200 240l20 40h-40z'/><path d='M270 260c8-14 30-14 38 0'/><path d='M270 270h38'/><path d='M60 330l8-20 8 20M52 322h32'/><rect x='150' y='310' width='44' height='30' rx='6'/><path d='M158 324h28'/><circle cx='260' cy='330' r='10'/><circle cx='300' cy='330' r='6'/><circle cx='330' cy='330' r='3'/></svg>");
+  opacity: 0.12;
+}
+html[data-chatwall='aurora'] .chat-bubbles::before {
+  background-image: radial-gradient(40% 35% at 20% 25%, color-mix(in srgb, var(--vibe-a) 45%, transparent), transparent 70%), radial-gradient(35% 40% at 80% 70%, color-mix(in srgb, var(--vibe-b) 40%, transparent), transparent 70%), radial-gradient(30% 30% at 60% 15%, color-mix(in srgb, var(--vibe-c) 35%, transparent), transparent 70%);
+  background-size: 100% 100%;
+  filter: blur(40px);
+  opacity: 0.45;
+}
+html[data-chatwall='grid'] .chat-bubbles::before {
+  background-image: linear-gradient(var(--chat-doodle) 1px, transparent 1px), linear-gradient(90deg, var(--chat-doodle) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.12;
+}
+html[data-chatwall='none'] .chat-bubbles::before {
+  display: none;
+}
+
+// ---- bubbles ------------------------------------------------------------------
+.chat-bubbles .activityMessage:not(.embedded) {
+  position: relative;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.12rem 1rem;
+  background: transparent !important;
+
+  .message-content {
+    position: relative;
+    width: auto;
+    max-width: min(74%, 46rem);
+    padding: 0.4rem 0.75rem 1rem;
+    border-radius: 1.05rem;
+    border-bottom-left-radius: 0.25rem;
+    background: var(--chat-in);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+    animation: bubbleIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: -0.42rem;
+      bottom: 0;
+      width: 0.9rem;
+      height: 0.9rem;
+      background: inherit;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+  }
+  .header {
+    margin-bottom: 0.05rem;
+    .username {
+      font-weight: 600;
+      color: var(--accent-brand-ink);
+    }
+    // the time sits in the bottom corner of the bubble
+    > .text-sm.lower {
+      position: absolute;
+      right: 0.6rem;
+      bottom: 0.22rem;
+      font-size: 0.65rem;
+      opacity: 0.65;
+    }
+  }
+  // short (grouped) messages have no header: the time rides next to the bubble
+  > .time {
+    order: 2;
+    width: auto;
+    margin: 0 0.15rem 0.3rem;
+    font-size: 0.65rem;
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  &:hover > .time {
+    opacity: 0.65;
+  }
+
+  &.own {
+    flex-direction: row-reverse;
+    .avatar,
+    .header .username {
+      display: none;
+    }
+    .message-content {
+      background: var(--chat-out);
+      border-radius: 1.05rem;
+      border-bottom-right-radius: 0.25rem;
+      padding-right: 0.75rem;
+      &::before {
+        left: auto;
+        right: -0.42rem;
+        clip-path: polygon(0 0, 100% 100%, 0 100%);
+      }
+      // delivery ticks
+      &::after {
+        content: '✓✓';
+        position: absolute;
+        right: 0.55rem;
+        bottom: 0.18rem;
+        font-size: 0.7rem;
+        letter-spacing: -0.12em;
+        color: var(--accent-brand);
+      }
+    }
+    .header > .text-sm.lower {
+      right: 1.75rem;
+    }
+    &.pending .message-content::after {
+      content: '✓';
+      color: var(--theme-trans-color);
+    }
+  }
+
+  // the hover toolbar hugs the bubble instead of the row edge
+  .actions {
+    top: -0.9rem;
+  }
+
+  // reactions hang under the bubble
+  .footer.contrast {
+    margin-top: 0.1rem;
+    padding: 0;
+  }
+
+  // only-emoji messages: no bubble, big glyphs
+  .message-content:has(.jumbo) {
+    background: transparent !important;
+    box-shadow: none;
+    padding: 0 0.2rem 0.95rem;
+    &::before {
+      display: none;
+    }
+    .jumbo {
+      font-size: 2.9rem;
+      line-height: 1.15;
+      p {
+        font-size: inherit;
+        line-height: inherit;
+      }
+    }
+  }
+}
+.chat-bubbles .activityMessage:not(.embedded):not(.own) .header > .text-sm.lower {
+  color: var(--theme-content-color);
+}
+
+// image attachments inside bubbles
+.chat-bubbles .gallery .container {
+  border-radius: 0.8rem !important;
+  overflow: hidden;
+}
+
+// reactions pop
+.hulyReactions-button {
+  animation: reactPop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.45) both;
+}
+.chat-bubbles .hulyReactions-button {
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+// date chips
+.chat-bubbles .dateSelectorButton,
+.chat-bubbles .dateSelector button {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-popup-color) 88%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-size: 0.7rem;
+}
+
+// ---- composer -------------------------------------------------------------------
+.chat-bubbles .ref-input {
+  margin: 0.4rem 0.75rem 0.75rem !important;
+}
+.chat-bubbles .ref-container {
+  border-radius: 1.5rem !important;
+  border: 1px solid var(--theme-divider-color) !important;
+  background: var(--theme-popup-color);
+  box-shadow: 0 12px 30px -18px rgba(0, 0, 0, 0.6);
+  transition: box-shadow var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  &.focusable:focus-within {
+    border-color: var(--accent-brand-ring) !important;
+    box-shadow: 0 0 0 3px var(--accent-brand-soft), 0 12px 30px -18px rgba(0, 0, 0, 0.6);
+  }
+  .buttons-panel {
+    padding: 0.25rem 0.5rem 0.4rem;
+  }
+  .buttons-panel .buttons-group:last-child .antiButton:last-child {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50% !important;
+    border-color: transparent !important;
+    background-image: var(--accent-gradient);
+    color: #fff !important;
+    box-shadow: var(--accent-glow);
+    transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
+    &:hover:not(:disabled) {
+      transform: scale(1.08);
+      filter: brightness(1.08);
+    }
+    &:disabled {
+      background-image: none;
+      background-color: var(--theme-button-pressed);
+      color: var(--theme-trans-color) !important;
+      box-shadow: none;
+    }
+  }
+}
+
+// quick reactions in the hover toolbar
+.chat-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.05rem;
+  margin-right: 0.25rem;
+  padding-right: 0.25rem;
+  border-right: 1px solid var(--theme-divider-color);
+  button {
+    border: none;
+    background: transparent;
+    padding: 0.1rem 0.2rem;
+    border-radius: 0.4rem;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+    &:hover {
+      transform: scale(1.35);
+    }
+  }
+}
+
+// voice note recorder
+.chat-voice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0.75rem 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 1.2rem;
+  background: var(--theme-popup-color);
+  border: 1px solid var(--accent-brand-ring);
+  box-shadow: 0 0 0 3px var(--accent-brand-soft);
+  font-size: 0.8125rem;
+  color: var(--theme-caption-color);
+  .dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: recPulse 1s ease-in-out infinite;
+  }
+  .bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 1.1rem;
+    i {
+      display: block;
+      width: 3px;
+      border-radius: 2px;
+      background: var(--accent-brand);
+      animation: recBar 0.9s ease-in-out infinite;
+    }
+  }
+  .grow {
+    flex: 1;
+  }
+  button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--theme-button-pressed);
+    color: var(--theme-caption-color);
+    &.send {
+      background-image: var(--accent-gradient);
+      color: #fff;
+    }
+  }
+}
+
+// attach menu popup
+.chat-attach {
+  display: flex;
+  flex-direction: column;
+  min-width: 13rem;
+  padding: 0.4rem;
+  border-radius: 1rem;
+  background: var(--theme-popup-color);
+  box-shadow: var(--theme-popup-shadow);
+  button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border: none;
+    border-radius: 0.7rem;
+    background: transparent;
+    color: var(--theme-caption-color);
+    font: inherit;
+    font-size: 0.8125rem;
+    text-align: left;
+    cursor: pointer;
+    &:hover {
+      background: var(--theme-button-hovered);
+    }
+    .ic {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 1rem;
+    }
+  }
+}
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes reactPop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes recPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+@keyframes recBar {
+  0%,
+  100% {
+    height: 30%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubbles .activityMessage .message-content,
+  .hulyReactions-button {
+    animation: none;
+  }
+}

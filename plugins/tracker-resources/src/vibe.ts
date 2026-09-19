@@ -20,6 +20,7 @@
 export type Vibe = 'aurora' | 'ocean' | 'sunset' | 'lime' | 'mono'
 export type Corners = 'rounded' | 'pill' | 'sharp'
 export type Motion = 'full' | 'reduced'
+export type Wallpaper = 'doodle' | 'aurora' | 'grid' | 'none'
 
 export const VIBES: Array<{ id: Vibe, name: string, tagline: string, colors: [string, string, string] }> = [
   { id: 'aurora', name: 'Aurora', tagline: 'Violet to pink to orange. Loud and warm.', colors: ['#7c3aed', '#ec4899', '#f97316'] },
@@ -32,6 +33,7 @@ export const VIBES: Array<{ id: Vibe, name: string, tagline: string, colors: [st
 const K_VIBE = 'ceepee.vibe'
 const K_CORNERS = 'ceepee.corners'
 const K_MOTION = 'ceepee.motion'
+const K_WALL = 'ceepee.chatWallpaper'
 
 function read (key: string, fallback: string): string {
   try {
@@ -48,6 +50,7 @@ function write (key: string, value: string): void {
 
 export const getVibe = (): Vibe => (VIBES.some((v) => v.id === read(K_VIBE, 'aurora')) ? (read(K_VIBE, 'aurora') as Vibe) : 'aurora')
 export const getCorners = (): Corners => (['rounded', 'pill', 'sharp'].includes(read(K_CORNERS, 'rounded')) ? (read(K_CORNERS, 'rounded') as Corners) : 'rounded')
+export const getWallpaper = (): Wallpaper => (['doodle', 'aurora', 'grid', 'none'].includes(read(K_WALL, 'doodle')) ? (read(K_WALL, 'doodle') as Wallpaper) : 'doodle')
 export const getMotion = (): Motion => (read(K_MOTION, 'full') === 'reduced' ? 'reduced' : 'full')
 
 export function applyStoredVibe (): void {
@@ -56,6 +59,7 @@ export function applyStoredVibe (): void {
   el.dataset.vibe = getVibe()
   el.dataset.corners = getCorners()
   el.dataset.motion = getMotion()
+  el.dataset.chatwall = getWallpaper()
 }
 export function setVibe (v: Vibe): void {
   write(K_VIBE, v)
@@ -67,5 +71,9 @@ export function setCorners (c: Corners): void {
 }
 export function setMotion (m: Motion): void {
   write(K_MOTION, m)
+  applyStoredVibe()
+}
+export function setWallpaper (w: Wallpaper): void {
+  write(K_WALL, w)
   applyStoredVibe()
 }
