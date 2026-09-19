@@ -55,7 +55,8 @@
   }
   let state: Saved = load()
   $: dismissed = state.dismissed === true
-  $: collapsed = state.collapsed === true
+  // starts as a small pill, like Jira; opens when clicked and remembers the choice
+  $: collapsed = state.collapsed !== false
   const visited = (id: string, s: Saved): boolean => s.visited?.includes(id) === true
 
   // ---- what the workspace already has ------------------------------------

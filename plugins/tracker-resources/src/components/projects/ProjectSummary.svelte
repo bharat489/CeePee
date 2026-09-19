@@ -326,12 +326,14 @@
   .menu__t { padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--j-sub); }
   .menu__row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer; &:hover { background: var(--j-hover); } }
   .menu__clear { padding: 0.35rem 0.5rem; text-align: left; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 70rem) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .kpi { display: flex; align-items: center; gap: 0.9rem; padding: 1.1rem 1.25rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); }
   .kpi__ic { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.25rem; background: #f1f2f4; color: #44546f; :global(svg) { width: 1.1rem; height: 1.1rem; } &--green { background: #dcfff1; color: #1f845a; } }
   :global(.theme-dark) .kpi__ic { background: #2c333a; color: #b6c2cf; &--green { background: #164b35; color: #7ee2b8; } }
   .kpi__t { display: flex; flex-direction: column; b { font-size: 1rem; font-weight: 600; color: var(--j-text); } span { font-size: 0.8125rem; color: var(--j-sub); } }
-  .row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr)); gap: 1rem; }
+  .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+  @media (max-width: 56rem) { .row2 { grid-template-columns: 1fr; } }
   .card { display: flex; flex-direction: column; gap: 0.35rem; padding: 1.25rem 1.5rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); min-width: 0; &--auto { align-items: center; text-align: center; } }
   .card__t { margin: 0; font-size: 1rem; font-weight: 600; color: var(--j-text); }
   .card__s { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--j-sub); }

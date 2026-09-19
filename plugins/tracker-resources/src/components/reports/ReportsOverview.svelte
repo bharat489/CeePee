@@ -249,13 +249,16 @@
   .ro { --j-text: #172b4d; --j-sub: #626f86; --j-link: #0c66e4; --j-border: rgba(9, 30, 66, 0.14); --j-surface: #fff; --j-track: #dcdfe4; --j-grid: #dcdfe4;
     display: flex; flex-direction: column; gap: 1rem; padding: 1rem 1.5rem 2rem; overflow: auto; color: var(--j-text); }
   :global(.theme-dark) .ro { --j-text: #b6c2cf; --j-sub: #8c9bab; --j-link: #579dff; --j-border: #38414a; --j-surface: #22272b; --j-track: #38414a; --j-grid: #38414a; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 70rem) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .kpi { display: flex; align-items: center; gap: 0.9rem; padding: 1.1rem 1.25rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); }
   .kpi__ic { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.25rem; background: #f1f2f4; color: #44546f; :global(svg) { width: 1.1rem; height: 1.1rem; } &--green { background: #dcfff1; color: #1f845a; } &--red { background: #ffeceb; color: #c9372c; } }
   :global(.theme-dark) .kpi__ic { background: #2c333a; color: #b6c2cf; &--green { background: #164b35; color: #7ee2b8; } &--red { background: #5d1f1a; color: #fd9891; } }
   .kpi__t { display: flex; flex-direction: column; b { font-size: 1rem; font-weight: 600; color: var(--j-text); } span { font-size: 0.8125rem; color: var(--j-sub); } }
-  .row3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; }
-  .row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; }
+  .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 64rem) { .row3 { grid-template-columns: 1fr; } }
+  .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 56rem) { .row2 { grid-template-columns: 1fr; } }
   .card { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.25rem 1.5rem; border: 1px solid var(--j-border); border-radius: 0.25rem; background: var(--j-surface); min-width: 0; &--chart { padding-bottom: 0.75rem; } &--classic { padding: 0.5rem 0.75rem; } }
   .card__t { margin: 0; font-size: 1rem; font-weight: 600; color: var(--j-text); }
   .donut { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
