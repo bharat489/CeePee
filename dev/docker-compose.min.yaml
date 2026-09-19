@@ -79,7 +79,8 @@ services:
   livekit:
     image: livekit/livekit-server:v1.8
     container_name: livekit
-    command: --dev --bind 0.0.0.0
+    # advertise the host address for media: inside Docker Desktop the container IP is unreachable from the browser
+    command: --dev --bind 0.0.0.0 --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
     restart: unless-stopped
     ports:
       - 7880:7880
