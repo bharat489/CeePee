@@ -23,7 +23,7 @@ import { trackerId } from '@hcengineering/tracker'
 import tracker from '@hcengineering/tracker-resources/src/plugin'
 import type { AnyComponent } from '@hcengineering/ui/src/types'
 import { type Action, type ViewAction, type Viewlet, type ViewletViewAction } from '@hcengineering/view'
-import { type Application } from '@hcengineering/workbench'
+import { type Application, type Widget } from '@hcengineering/workbench'
 
 export default mergeIds(trackerId, tracker, {
   string: {
@@ -79,6 +79,7 @@ export default mergeIds(trackerId, tracker, {
   },
   ids: {
     TrackerNotificationGroup: '' as Ref<NotificationGroup>,
+    AssistantWidget: '' as Ref<Widget>,
     AssigneeNotification: '' as Ref<NotificationType>,
     // Notification on Dependency-Shift.
     DependencyShiftedNotification: '' as Ref<NotificationType>,

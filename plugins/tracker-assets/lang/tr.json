@@ -577,7 +577,15 @@
     "AutoSchedule": "Otomatik planla",
     "FieldPermissions": "Alan izinleri",
     "EmbedOnSite": "Sitenize gömün",
-    "PublicLink": "Herkese açık bağlantı oluştur"
+    "PublicLink": "Herkese açık bağlantı oluştur",
+    "ProjectHome": "Proje ana sayfası",
+    "Summary": "Özet",
+    "Calendar": "Takvim",
+    "Timeline": "Zaman çizelgesi",
+    "Docs": "Belgeler",
+    "CreateDocsSpace": "Belge alanı oluştur",
+    "NewPage": "Yeni sayfa",
+    "Refresh": "Yenile"
   },
   "status": {}
 }

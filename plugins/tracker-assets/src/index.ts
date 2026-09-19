@@ -32,6 +32,7 @@ loadMetadata(tracker.icon, {
   NewIssue: `${icons}#new-issue`,
   Magnifier: `${icons}#magnifier`,
   Home: `${icons}#home`,
+  Assistant: `${icons}#assistant`,
   RedCircle: `${icons}#red-circle`,
   Labels: `${icons}#labels`,
   DueDate: `${icons}#dueDate`, // TODO: add icon

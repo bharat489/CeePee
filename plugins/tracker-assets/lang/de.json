@@ -817,7 +817,15 @@
     "AutoSchedule": "Automatisch planen",
     "FieldPermissions": "Feldberechtigungen",
     "EmbedOnSite": "Auf Ihrer Website einbetten",
-    "PublicLink": "Öffentlichen Link erstellen"
+    "PublicLink": "Öffentlichen Link erstellen",
+    "ProjectHome": "Projektstartseite",
+    "Summary": "Zusammenfassung",
+    "Calendar": "Kalender",
+    "Timeline": "Zeitleiste",
+    "Docs": "Dokumente",
+    "CreateDocsSpace": "Dokumentenbereich erstellen",
+    "NewPage": "Neue Seite",
+    "Refresh": "Aktualisieren"
   },
   "status": {}
 }

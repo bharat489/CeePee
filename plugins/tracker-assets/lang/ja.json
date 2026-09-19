@@ -579,7 +579,15 @@
     "AutoSchedule": "自動スケジュール",
     "FieldPermissions": "フィールド権限",
     "EmbedOnSite": "サイトに埋め込む",
-    "PublicLink": "公開リンクを作成"
+    "PublicLink": "公開リンクを作成",
+    "ProjectHome": "プロジェクトホーム",
+    "Summary": "概要",
+    "Calendar": "カレンダー",
+    "Timeline": "タイムライン",
+    "Docs": "ドキュメント",
+    "CreateDocsSpace": "ドキュメントスペースを作成",
+    "NewPage": "新しいページ",
+    "Refresh": "更新"
   },
   "status": {}
 }

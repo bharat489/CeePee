@@ -115,3 +115,6 @@ dev/tool/history.json
 ws-tests/docker-compose.override.yml
 .cursor/*
 CLAUDE.md
+# CeePee production deploy kit is tracked (the upstream rule above ignores any "deploy"); the filled .env never is
+!/deploy/
+/deploy/.env

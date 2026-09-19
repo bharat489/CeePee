@@ -67,6 +67,9 @@ services:
       - PUBLIC_INTEGRATIONS_URL=${PUBLIC_INTEGRATIONS_URL:-http://huly.local:8095}
       - GIF_PROVIDER=${GIF_PROVIDER:-tenor}
       - GIF_API_KEY=${GIF_API_KEY:-}
+      # free AI for Ask CeePee: an OpenAI-compatible chat endpoint such as Ollama (http://host.docker.internal:11434)
+      - AI_CHAT_URL=${AI_CHAT_URL:-}
+      - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
     links: !override []
   transactor_cockroach:
     environment:

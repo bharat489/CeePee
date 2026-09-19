@@ -579,7 +579,15 @@
     "AutoSchedule": "自动排期",
     "FieldPermissions": "字段权限",
     "EmbedOnSite": "嵌入到您的网站",
-    "PublicLink": "创建公开链接"
+    "PublicLink": "创建公开链接",
+    "ProjectHome": "项目主页",
+    "Summary": "概览",
+    "Calendar": "日历",
+    "Timeline": "时间线",
+    "Docs": "文档",
+    "CreateDocsSpace": "创建文档空间",
+    "NewPage": "新页面",
+    "Refresh": "刷新"
   },
   "status": {}
 }

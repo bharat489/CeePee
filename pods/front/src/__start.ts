@@ -41,6 +41,8 @@ startFront(metricsContext, {
   INTEGRATIONS_URL: process.env.PUBLIC_INTEGRATIONS_URL ?? '',
   GIF_PROVIDER: process.env.GIF_PROVIDER ?? 'tenor',
   GIF_API_KEY: process.env.GIF_API_KEY ?? '',
+  AI_CHAT_URL: process.env.AI_CHAT_URL ?? '',
+  AI_CHAT_MODEL: process.env.AI_CHAT_MODEL ?? '',
   DESKTOP_UPDATES_URL: process.env.DESKTOP_UPDATES_URL,
   DESKTOP_UPDATES_CHANNEL: process.env.DESKTOP_UPDATES_CHANNEL,
   DESKTOP_UPDATES_CHANNELS: process.env.DESKTOP_UPDATES_CHANNELS,

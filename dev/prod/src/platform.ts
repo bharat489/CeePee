@@ -189,6 +189,8 @@ export interface Config {
   INTEGRATIONS_URL?: string
   GIF_PROVIDER?: string
   GIF_API_KEY?: string
+  AI_CHAT_URL?: string
+  AI_CHAT_MODEL?: string
   STATS_URL?: string
   PRESENCE_URL?: string
   USE_BINARY_PROTOCOL?: boolean
@@ -493,6 +495,7 @@ export async function configurePlatform() {
   setMetadata(tracker.metadata.IntegrationsUrl, config.INTEGRATIONS_URL)
   ;(window as any).CEEPEE_INTEGRATIONS_URL = config.INTEGRATIONS_URL ?? ''
   ;(window as any).CEEPEE_GIF = { provider: config.GIF_PROVIDER ?? 'tenor', key: config.GIF_API_KEY ?? '' }
+  ;(window as any).CEEPEE_AI = { url: config.AI_CHAT_URL ?? '', model: config.AI_CHAT_MODEL ?? '' }
   setMetadata(presentation.metadata.StatsUrl, config.STATS_URL)
   setMetadata(presentation.metadata.LinkPreviewUrl, config.LINK_PREVIEW_URL)
   setMetadata(presentation.metadata.MailUrl, config.MAIL_URL)

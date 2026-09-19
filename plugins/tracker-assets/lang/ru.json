@@ -817,7 +817,15 @@
     "AutoSchedule": "Автопланирование",
     "FieldPermissions": "Права на поля",
     "EmbedOnSite": "Встроить на сайт",
-    "PublicLink": "Создать публичную ссылку"
+    "PublicLink": "Создать публичную ссылку",
+    "ProjectHome": "Главная проекта",
+    "Summary": "Сводка",
+    "Calendar": "Календарь",
+    "Timeline": "Таймлайн",
+    "Docs": "Документы",
+    "CreateDocsSpace": "Создать пространство документов",
+    "NewPage": "Новая страница",
+    "Refresh": "Обновить"
   },
   "status": {}
 }

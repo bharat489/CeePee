@@ -139,6 +139,8 @@ import { bulkChange, archiveIssue, unarchiveIssue } from './bulk'
 import { cloneWithSubIssues } from './cloneIssue'
 import { releaseNotes } from './releaseNotes'
 import Assistant from './components/assistant/Assistant.svelte'
+import AssistantPanel from './components/assistant/AssistantPanel.svelte'
+import ProjectHome from './components/projects/ProjectHome.svelte'
 import CreateDecisionPopup from './components/decisions/CreateDecisionPopup.svelte'
 import AddDepartmentPopup from './components/departments/AddDepartmentPopup.svelte'
 import DepartmentRolesSetting from './components/departments/DepartmentRolesSetting.svelte'
@@ -517,6 +519,8 @@ export default async (): Promise<Resources> => ({
     PersonListEditor,
     PersonListPresenter,
     Assistant,
+    AssistantPanel,
+    ProjectHome,
     NopeComponent,
     DepartmentSegments,
     AddDepartmentPopup,

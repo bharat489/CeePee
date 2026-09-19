@@ -26,11 +26,11 @@
   the same workflow.
 -->
 <script lang="ts">
-  import core, { AccountRole, type Ref } from '@hcengineering/core'
+  import core, { AccountRole, type Ref, type StatusCategory } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import task, { type LinkedCondition, type StatusProps, type TaskType, type TransitionRule } from '@hcengineering/task'
+  import task, { findStatusAttr, type LinkedCondition, type StatusProps, type TaskType, type TransitionRule } from '@hcengineering/task'
   import { type IssueStatus, type Project, type WorkflowScheme } from '@hcengineering/tracker'
-  import { Button, Label } from '@hcengineering/ui'
+  import { Button, Label, showPopup } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
 
@@ -84,7 +84,7 @@
     return { s, x: 30 + col * COLW, y: 46 + idx * ROWH }
   })
   $: W = Math.max(30 + COLS.length * COLW, ...nodes.map((n) => n.x + NW + 40))
-  $: H = Math.max(46 + Math.max(1, ...COLS.map((_, k) => ordered.filter((o) => colOf(o) === k).length)) * ROWH + 20, ...nodes.map((n) => n.y + NH + 40))
+  $: H = Math.max(46 + Math.max(1, ...COLS.map((_, k) => ordered.filter((o) => colOf(o) === k).length)) * ROWH + 60, ...nodes.map((n) => n.y + NH + 40))
   $: edges = nodes.flatMap((a) => (transitions[a.s._id] === undefined ? [] : nodes.filter((b) => b !== a && transitions[a.s._id].includes(b.s._id)).map((b) => ({ from: a, to: b }))))
   const ruleFor = (list: TransitionRule[], from: Ref<IssueStatus>, to: Ref<IssueStatus>): TransitionRule | undefined => list.find((r) => r.to === to && r.from === from) ?? list.find((r) => r.to === to && r.from === '*')
 
@@ -127,6 +127,68 @@
   async function autoLayout (): Promise<void> {
     if (type === undefined) return
     await client.update(type, { workflowLayout: {} })
+  }
+
+  // ---- palette: create a status straight into a category column ---------------
+  function addStatus (category: Ref<StatusCategory>): void {
+    if (type === undefined || project === undefined) return
+    const projectType = client.getModel().findAllSync(task.class.ProjectType, { _id: project.type })[0]
+    if (projectType === undefined) return
+    showPopup(
+      task.component.CreateStatePopup,
+      {
+        status: undefined,
+        taskType: type,
+        _class: type.statusClass,
+        category,
+        type: projectType,
+        ofAttribute: findStatusAttr(client.getHierarchy(), type.ofClass)._id,
+        icon: undefined,
+        color: 0,
+        icons: [],
+        readonly: false
+      },
+      'top'
+    )
+  }
+
+  // ---- drag from a status's handle onto another status to allow that move ------
+  let linking: { from: Ref<IssueStatus>, x: number, y: number } | undefined
+  let linkPos: { x: number, y: number } | undefined
+  function startLink (n: Node, e: PointerEvent): void {
+    e.stopPropagation()
+    const p = posOf(n)
+    linking = { from: n.s._id, x: p.x + NW, y: p.y + NH / 2 }
+    linkPos = svgPoint(e)
+  }
+  function moveLink (e: PointerEvent): void {
+    if (linking !== undefined) linkPos = svgPoint(e)
+  }
+  async function endLink (): Promise<void> {
+    if (linking === undefined) return
+    const l = linking
+    const p = linkPos
+    linking = undefined
+    linkPos = undefined
+    if (p === undefined || type === undefined) return
+    const target = nodes.find((n) => {
+      const q = posOf(n)
+      return p.x >= q.x && p.x <= q.x + NW && p.y >= q.y && p.y <= q.y + NH
+    })
+    if (target === undefined || target.s._id === l.from) return
+    suppressClick = true
+    setTimeout(() => { suppressClick = false }, 80)
+    const cur = transitions[l.from] ?? ordered.filter((o) => o._id !== l.from).map((o) => o._id)
+    if (cur.includes(target.s._id)) {
+      // already allowed: open its rule instead
+      editEdge(l.from, target.s._id)
+      return
+    }
+    await client.update(type, { transitions: { ...transitions, [l.from]: [...cur, target.s._id] } } as any)
+  }
+  const linkPath = (l: { x: number, y: number }, p: { x: number, y: number }): string => {
+    const c = Math.max(30, Math.abs(p.x - l.x) / 2)
+    return `M${l.x},${l.y} C${l.x + c},${l.y} ${p.x - c},${p.y} ${p.x},${p.y}`
   }
 
   function path (a: Node, b: Node): string {
@@ -348,7 +410,7 @@
   <header class="wf__head">
     <span class="wf__title"><Label label={tracker.string.Workflow} /></span>
     <select class="select" bind:value={typeId}>{#each types as t (t._id)}<option value={t._id}>{t.name}</option>{/each}</select>
-    <span class="muted">{picked !== undefined ? `From ${nameOf(picked)}: click a status to allow or forbid the move, or click it again to cancel.` : 'Drag statuses to arrange them. Click a status, then another, to toggle that transition. Click an arrow to edit its rule.'}</span>
+    <span class="muted">{picked !== undefined ? `From ${nameOf(picked)}: click a status to allow or forbid the move, or click it again to cancel.` : 'Drag statuses to arrange them. Drag from a status\'s ○ handle onto another status to allow that move, or click one then the other. Click an arrow to edit its rule. "+ Add status" creates one in that column.'}</span>
     <span class="grow" />
     <button class="lnk" on:click={() => { void autoLayout() }}>auto layout</button>
     <Button kind={'ghost'} label={tracker.string.SaveScheme} on:click={() => { savingScheme = !savingScheme }} />
@@ -364,12 +426,18 @@
   <section class="card">
     <div class="tl-wrap">
       <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <svg bind:this={svgEl} viewBox="0 0 {W} {H}" class="diagram" class:diagram--drag={dragging !== undefined} style="min-width: {W}px" on:pointermove={moveDrag} on:pointerup={() => { void endDrag() }} on:pointerleave={() => { void endDrag() }}>
+      <svg bind:this={svgEl} viewBox="0 0 {W} {H}" class="diagram" class:diagram--drag={dragging !== undefined} style="min-width: {W}px" on:pointermove={(e) => { moveDrag(e); moveLink(e) }} on:pointerup={() => { void endDrag(); void endLink() }} on:pointerleave={() => { void endDrag(); linking = undefined; linkPos = undefined }}>
         <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead" /></marker></defs>
         {#each COLS as c, k}
           <text x={30 + k * COLW} y="22" class="col">{c.label}</text>
           <line x1={30 + k * COLW - 20} x2={30 + k * COLW - 20} y1="30" y2={H} class="colline" />
+          {@const yAdd = 46 + ordered.filter((o) => colOf(o) === k).length * ROWH}
+          <g class="addbtn" role="button" tabindex="0" on:click={() => { addStatus(c.cat) }} on:keydown={(ev) => { if (ev.key === 'Enter') addStatus(c.cat) }}>
+            <rect x={30 + k * COLW} y={yAdd} width={NW} height="28" rx="8" class="addbtn__box" />
+            <text x={30 + k * COLW + NW / 2} y={yAdd + 18} class="addbtn__label" text-anchor="middle">+ Add status</text>
+          </g>
         {/each}
+        {#if linking !== undefined && linkPos !== undefined}<path d={linkPath(linking, linkPos)} class="edge edge--temp" marker-end="url(#arrow)" />{/if}
         {#each edges as e (e.from.s._id + e.to.s._id)}
           {@const r = ruleFor(rules, e.from.s._id, e.to.s._id)}
           <path d={path(e.from, e.to)} class="edge" class:edge--rule={r !== undefined} marker-end="url(#arrow)" role="button" tabindex="0" on:click={() => { editEdge(e.from.s._id, e.to.s._id) }} on:keydown={(ev) => { if (ev.key === 'Enter') editEdge(e.from.s._id, e.to.s._id) }}><title>{e.from.s.name} → {e.to.s.name}{r !== undefined ? ' · has a rule' : ''}</title></path>
@@ -383,6 +451,7 @@
             <text x={p.x + 12} y={p.y + 25} class="node__label">{n.s.name.length > 16 ? n.s.name.slice(0, 15) + '…' : n.s.name}</text>
             {#if propGlyphs(sp) !== ''}<text x={p.x + NW - 8} y={p.y + 14} class="node__glyph" text-anchor="end">{propGlyphs(sp)}</text>{/if}
             {#if transitions[n.s._id] === undefined}<text x={p.x + NW - 10} y={p.y + 33} class="node__any" text-anchor="end">→ any</text>{/if}
+            <circle cx={p.x + NW} cy={p.y + NH / 2} r="6" class="port" on:pointerdown={(ev) => { startLink(n, ev) }} on:click={(ev) => { ev.stopPropagation() }}><title>Drag onto another status to allow that move</title></circle>
           </g>
         {/each}
       </svg>
@@ -405,7 +474,7 @@
           {#if transitions[s._id] === undefined}<button class="lnk" on:click={() => { void restrict(s) }}>restrict</button>{:else}<button class="lnk" on:click={() => { void allowAny(s) }}>allow any</button>{/if}
         </div>
       {/each}
-      <p class="muted">Statuses themselves are managed in the project's status settings; this page decides how work moves between them and what each status enforces.</p>
+      <p class="muted">"+ Add status" in a column creates a status there; rename or recolour one from the project's status settings. This page decides how work moves between statuses and what each status enforces.</p>
     </section>
 
     <section class="card">
@@ -529,6 +598,12 @@
   .node__label { fill: var(--theme-caption-color); font-size: 13px; font-weight: 600; pointer-events: none; }
   .node__any { fill: var(--theme-trans-color); font-size: 10px; pointer-events: none; }
   .node__glyph { font-size: 10px; pointer-events: none; }
+  .port { fill: var(--theme-panel-color); stroke: var(--accent-brand); stroke-width: 2; cursor: crosshair; opacity: 0; transition: opacity 0.15s ease; &:hover { fill: var(--accent-brand); opacity: 1; } }
+  .node:hover .port { opacity: 1; }
+  .edge--temp { stroke: var(--accent-brand); stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
+  .addbtn { cursor: pointer; outline: none; &:hover .addbtn__box, &:focus .addbtn__box { stroke: var(--accent-brand); fill: var(--accent-brand-soft); } &:hover .addbtn__label { fill: var(--accent-brand-ink); } }
+  .addbtn__box { fill: transparent; stroke: var(--theme-divider-color); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .addbtn__label { fill: var(--theme-dark-color); font-size: 11px; font-weight: 600; pointer-events: none; }
   .legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--theme-dark-color); span { display: inline-flex; align-items: center; gap: 0.35rem; } }
   .sw { display: inline-block; width: 1.2rem; height: 2px; &--edge { background: var(--theme-trans-color); } &--rule { background: var(--accent-brand-ink, #6a8a00); height: 3px; } }
   .dot { display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.35rem; border-radius: 50%; }

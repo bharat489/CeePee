@@ -1432,6 +1432,8 @@ const pluginState = plugin(trackerId, {
     ProjectDecisions: '' as AnyComponent,
     ProjectSprints: '' as AnyComponent,
     Assistant: '' as AnyComponent,
+    AssistantPanel: '' as AnyComponent,
+    ProjectHome: '' as AnyComponent,
     SprintPresenter: '' as AnyComponent,
     ProjectBacklog: '' as AnyComponent,
     ProjectReports: '' as AnyComponent,
@@ -1535,6 +1537,7 @@ const pluginState = plugin(trackerId, {
 
     // Project icons
     Home: '' as Asset,
+    Assistant: '' as Asset,
     RedCircle: '' as Asset
   },
   category: {
@@ -1596,6 +1599,14 @@ const pluginState = plugin(trackerId, {
     Epics: '' as IntlString,
     Assistant: '' as IntlString,
     AskAssistant: '' as IntlString,
+    ProjectHome: '' as IntlString,
+    Summary: '' as IntlString,
+    Calendar: '' as IntlString,
+    Timeline: '' as IntlString,
+    Docs: '' as IntlString,
+    CreateDocsSpace: '' as IntlString,
+    NewPage: '' as IntlString,
+    Refresh: '' as IntlString,
     StoryPoints: '' as IntlString,
     Points: '' as IntlString,
     Backlog: '' as IntlString,

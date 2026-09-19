@@ -23,11 +23,12 @@
 -->
 <script lang="ts">
   import contact from '@hcengineering/contact'
-  import { createQuery } from '@hcengineering/presentation'
+  import { createQuery, getClient } from '@hcengineering/presentation'
   import { settingId } from '@hcengineering/setting'
   import { trackerId, type Project } from '@hcengineering/tracker'
   import { getCurrentLocation, navigate, showPopup, type AnyComponent } from '@hcengineering/ui'
-  import { workbenchId } from '@hcengineering/workbench'
+  import workbench, { workbenchId } from '@hcengineering/workbench'
+  import { openWidget } from '@hcengineering/workbench-resources'
 
   import tracker from '../../plugin'
 
@@ -198,7 +199,9 @@
       cta: 'Ask now',
       done: visited('assistant', state),
       go: () => {
-        showPopup('tracker:component:Assistant' as AnyComponent, {}, 'top')
+        const widget = getClient().getModel().findAllSync(workbench.class.Widget, { _id: 'tracker:ids:AssistantWidget' as any })[0]
+        if (widget !== undefined) openWidget(widget, undefined, { active: true, openedByUser: true })
+        else showPopup('tracker:component:Assistant' as AnyComponent, {}, 'top')
       }
     }
   ]

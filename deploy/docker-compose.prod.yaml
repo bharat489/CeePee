@@ -1,0 +1,289 @@
+# CeePee production stack: one VM, Caddy in front with automatic HTTPS, everything else internal.
+# Usage (on the server, in this folder with a filled .env):
+#   docker compose -f docker-compose.prod.yaml pull
+#   docker compose -f docker-compose.prod.yaml up -d
+# Services excluded on purpose (not needed for a small team): stats, elastic/fulltext, preview,
+# link-preview, print, sign, kvs, pulse, backup-api, rating, github, ai. Add them later if wanted.
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+  caddy:
+    <<: *common
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - API_DOMAIN=${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - front
+      - account
+      - integrations
+
+  cockroach:
+    <<: *common
+    image: cockroachdb/cockroach:latest-v24.3
+    command: start-single-node --insecure
+    volumes:
+      - cockroach_data:/cockroach/cockroach-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    <<: *common
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9092
+      - --overprovisioned
+      - --smp 1
+      - --memory 512M
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+
+  minio:
+    <<: *common
+    image: minio/minio
+    command: server /data --address ":9000"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  account:
+    <<: *common
+    image: ${IMAGE_PREFIX}/account:${IMAGE_TAG}
+    environment:
+      - ACCOUNT_PORT=3000
+      - SERVER_SECRET=${SERVER_SECRET}
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - TRANSACTOR_URL=wss://${DOMAIN}/_transactor;;cockroach,
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - QUEUE_CONFIG=redpanda:9092
+      - FRONT_URL=https://${DOMAIN}
+      - ACCOUNTS_URL=https://${DOMAIN}/_accounts
+      - MAIL_URL=${MAIL_URL:-}
+      - STATS_URL=
+      - REGION_INFO=cockroach|CockroachDB
+    depends_on:
+      cockroach:
+        condition: service_healthy
+
+  workspace_cockroach:
+    <<: *common
+    image: ${IMAGE_PREFIX}/workspace:${IMAGE_TAG}
+    environment:
+      - SERVER_SECRET=${SERVER_SECRET}
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - ACCOUNTS_DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - BACKUP_STORAGE=minio|minio?accessKey=${MINIO_ROOT_USER}&secretKey=${MINIO_ROOT_PASSWORD}
+      - QUEUE_CONFIG=redpanda:9092
+      - ACCOUNTS_URL=http://account:3000
+      - MAIL_URL=${MAIL_URL:-}
+      - STATS_URL=
+      - REGION=cockroach
+      - WS_OPERATION=all+backup
+    depends_on:
+      - account
+
+  transactor_cockroach:
+    <<: *common
+    image: ${IMAGE_PREFIX}/transactor:${IMAGE_TAG}
+    environment:
+      - SERVER_PORT=3332
+      - SERVER_SECRET=${SERVER_SECRET}
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - QUEUE_CONFIG=redpanda:9092
+      - FRONT_URL=https://${DOMAIN}
+      - PUBLIC_FRONT_URL=https://${DOMAIN}
+      - ACCOUNTS_URL=http://account:3000
+      - FILES_URL=https://${DOMAIN}/_datalake/blob/:workspace/:blobId/:filename
+      - MAIL_URL=${MAIL_URL:-}
+      - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN}
+      - WEB_PUSH_URL=http://notification:8091
+      - PUBLIC_INTEGRATIONS_URL=https://${API_DOMAIN}
+      - STATS_URL=
+      - FULLTEXT_URL=
+      - REGION=cockroach
+    depends_on:
+      - account
+      - datalake
+
+  collaborator:
+    <<: *common
+    image: ${IMAGE_PREFIX}/collaborator:${IMAGE_TAG}
+    environment:
+      - COLLABORATOR_PORT=3078
+      - SECRET=${SERVER_SECRET}
+      - ACCOUNTS_URL=http://account:3000
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - STATS_URL=
+    depends_on:
+      - account
+
+  datalake:
+    <<: *common
+    image: ${IMAGE_PREFIX}/datalake:${IMAGE_TAG}
+    environment:
+      - PORT=4030
+      - SECRET=${SERVER_SECRET}
+      - ACCOUNTS_URL=http://account:3000
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - QUEUE_CONFIG=redpanda:9092
+      - BUCKETS=blobs,eu|http://minio:9000?accessKey=${MINIO_ROOT_USER}&secretKey=${MINIO_ROOT_PASSWORD}
+      - STATS_URL=
+    depends_on:
+      minio:
+        condition: service_healthy
+      cockroach:
+        condition: service_healthy
+
+  front:
+    <<: *common
+    image: ${IMAGE_PREFIX}/front:${IMAGE_TAG}
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_SECRET=${SERVER_SECRET}
+      - ACCOUNTS_URL=https://${DOMAIN}/_accounts
+      - UPLOAD_URL=/files
+      - FILES_URL=https://${DOMAIN}/_datalake/blob/:workspace/:blobId/:filename
+      - COLLABORATOR_URL=wss://${DOMAIN}/_collaborator
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - PUSH_PUBLIC_KEY=${PUSH_PUBLIC_KEY}
+      - PUBLIC_INTEGRATIONS_URL=https://${API_DOMAIN}
+      - GIF_PROVIDER=${GIF_PROVIDER:-tenor}
+      - GIF_API_KEY=${GIF_API_KEY:-}
+      - AI_CHAT_URL=${AI_CHAT_URL:-}
+      - AI_CHAT_MODEL=${AI_CHAT_MODEL:-llama3.2}
+      - STATS_URL=
+      - PREVIEW_URL=
+      - LINK_PREVIEW_URL=
+      - BRANDING_URL=
+    depends_on:
+      - account
+      - transactor_cockroach
+
+  integrations:
+    <<: *common
+    image: ${IMAGE_PREFIX}/integrations:${IMAGE_TAG}
+    environment:
+      - PORT=8095
+      - FRONT_URL=http://front:8080
+      - ACCOUNTS_URL=http://account:3000
+      - PUBLIC_FRONT_URL=https://${DOMAIN}
+      - PUBLIC_INTEGRATIONS_URL=https://${API_DOMAIN}
+      - WORKSPACE=${INTEGRATIONS_WORKSPACE}
+      - INTEGRATIONS_EMAIL=${INTEGRATIONS_EMAIL}
+      - INTEGRATIONS_PASSWORD=${INTEGRATIONS_PASSWORD}
+      - INBOUND_TOKEN=${INBOUND_TOKEN}
+      - SCIM_TOKEN=${SCIM_TOKEN}
+      - MAIL_URL=${MAIL_URL:-}
+      - HEARTBEAT_MINUTES=${HEARTBEAT_MINUTES:-5}
+      - PORTAL_ENABLED=true
+      - PORTAL_NAME=${PORTAL_NAME:-Help centre}
+      - PORTAL_COLOR=${PORTAL_COLOR:-#a855f7}
+      - PORTAL_PROJECT=${PORTAL_PROJECT:-}
+      - PORTAL_LANG=${PORTAL_LANG:-en}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - TEAMS_WEBHOOK_SECRET=${TEAMS_WEBHOOK_SECRET:-}
+    depends_on:
+      - front
+      - account
+
+  # one-shot admin tool: docker compose --profile tool run --rm tool upgrade-workspace <ws> -f
+  tool:
+    image: ${IMAGE_PREFIX}/tool:${IMAGE_TAG}
+    profiles: ["tool"]
+    environment:
+      - SERVER_SECRET=${SERVER_SECRET}
+      - ACCOUNTS_URL=http://account:3000
+      - TRANSACTOR_URL=ws://transactor_cockroach:3332
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - ACCOUNT_DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - QUEUE_CONFIG=redpanda:9092
+      - REGION_INFO=cockroach|CockroachDB
+      - FULLTEXT_URL=
+    depends_on:
+      - account
+
+  notification:
+    <<: *common
+    image: ${IMAGE_PREFIX}/notification:${IMAGE_TAG}
+    environment:
+      - PORT=8091
+      - SOURCE=ceepee
+      - AUTH_TOKEN=${PUSH_AUTH_TOKEN}
+      - PUSH_PUBLIC_KEY=${PUSH_PUBLIC_KEY}
+      - PUSH_PRIVATE_KEY=${PUSH_PRIVATE_KEY}
+      - PUSH_SUBJECT=${PUSH_SUBJECT}
+
+  mail:
+    <<: *common
+    image: hardcoreeng/mail
+    profiles: ["mail"]
+    environment:
+      - PORT=8097
+      - SOURCE=${MAIL_SOURCE}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS_MODE=${SMTP_TLS_MODE:-upgrade}
+
+  # Nightly database dump kept 7 days; copy the folder off the box with rclone (see README).
+  backup:
+    <<: *common
+    image: cockroachdb/cockroach:latest-v24.3
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          ts=$$(date +%Y%m%d-%H%M)
+          ./cockroach sql --insecure --host=cockroach -e "BACKUP DATABASE defaultdb INTO 'nodelocal://1/ceepee-$$ts'" && echo "backup ceepee-$$ts done"
+          find /cr/extern -maxdepth 1 -name 'ceepee-*' -mtime +7 -exec rm -rf {} + 2>/dev/null
+          sleep 86400
+        done
+    volumes:
+      # nodelocal://1 is the database node's extern folder; sharing the volume lets this job prune old backups
+      - cockroach_data:/cr
+    depends_on:
+      - cockroach
+
+volumes:
+  caddy_data:
+  caddy_config:
+  cockroach_data:
+  redpanda_data:
+  minio_data:
+

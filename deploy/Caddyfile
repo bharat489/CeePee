@@ -1,0 +1,47 @@
+# CeePee production reverse proxy. Caddy fetches and renews HTTPS certificates itself.
+# Replace the two hostnames (or set DOMAIN / API_DOMAIN in .env and run deploy.sh, which substitutes them).
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# account service (sign in, invites, workspaces)
+	handle_path /_accounts/* {
+		reverse_proxy account:3000
+	}
+	# transactor (websocket)
+	handle_path /_transactor/* {
+		reverse_proxy transactor_cockroach:3332
+	}
+	# collaborative editing (websocket)
+	handle_path /_collaborator/* {
+		reverse_proxy collaborator:3078
+	}
+	# files
+	handle_path /_datalake/* {
+		reverse_proxy datalake:4030
+	}
+	# everything else is the web app
+	handle {
+		reverse_proxy front:8080
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	request_body {
+		max_size 512MB
+	}
+}
+
+# integrations service on its own host: public portal, share links, collector, inbound webhooks, SCIM, bots.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy integrations:8095
+	header -Server
+	request_body {
+		max_size 64MB
+	}
+}

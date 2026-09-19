@@ -579,7 +579,15 @@
     "AutoSchedule": "Agendar automaticamente",
     "FieldPermissions": "Permissões por campo",
     "EmbedOnSite": "Incorporar no seu site",
-    "PublicLink": "Criar ligação pública"
+    "PublicLink": "Criar ligação pública",
+    "ProjectHome": "Início do projeto",
+    "Summary": "Resumo",
+    "Calendar": "Calendário",
+    "Timeline": "Cronologia",
+    "Docs": "Documentos",
+    "CreateDocsSpace": "Criar espaço de documentos",
+    "NewPage": "Nova página",
+    "Refresh": "Atualizar"
   },
   "status": {}
 }

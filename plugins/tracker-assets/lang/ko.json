@@ -579,7 +579,15 @@
     "AutoSchedule": "자동 일정",
     "FieldPermissions": "필드 권한",
     "EmbedOnSite": "사이트에 삽입",
-    "PublicLink": "공개 링크 만들기"
+    "PublicLink": "공개 링크 만들기",
+    "ProjectHome": "프로젝트 홈",
+    "Summary": "요약",
+    "Calendar": "캘린더",
+    "Timeline": "타임라인",
+    "Docs": "문서",
+    "CreateDocsSpace": "문서 공간 만들기",
+    "NewPage": "새 페이지",
+    "Refresh": "새로 고침"
   },
   "status": {}
 }

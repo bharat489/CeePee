@@ -23,6 +23,7 @@ import presentation from '@hcengineering/model-presentation'
 import task from '@hcengineering/model-task'
 import view from '@hcengineering/model-view'
 import workbench from '@hcengineering/model-workbench'
+import { WidgetType } from '@hcengineering/workbench'
 import converter from '@hcengineering/converter'
 import notification from '@hcengineering/notification'
 import setting from '@hcengineering/setting'
@@ -515,6 +516,12 @@ function defineApplication (
             icon: tracker.icon.Home,
             specials: [
               {
+                id: 'home',
+                label: tracker.string.ProjectHome,
+                icon: tracker.icon.Home,
+                component: tracker.component.ProjectHome
+              },
+              {
                 id: opt.issuesId,
                 label: tracker.string.Issues,
                 icon: tracker.icon.Issues,
@@ -795,6 +802,19 @@ export function createModel (builder: Builder): void {
   builder.mixin(tracker.class.TypePersonList, core.class.Class, view.mixin.AttributePresenter, {
     presenter: tracker.component.PersonListPresenter
   })
+
+  // Ask CeePee lives in the sidebar rail, the way Jira keeps Rovo one click away
+  builder.createDoc(
+    workbench.class.Widget,
+    core.space.Model,
+    {
+      label: tracker.string.AskAssistant,
+      type: WidgetType.Fixed,
+      icon: tracker.icon.Assistant,
+      component: tracker.component.AssistantPanel
+    },
+    tracker.ids.AssistantWidget
+  )
 
   builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
     name: 'audit',

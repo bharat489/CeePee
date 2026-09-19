@@ -119,7 +119,7 @@
   import SpaceView from './SpaceView.svelte'
   import TopMenu from './icons/TopMenu.svelte'
   import WidgetsBar from './sidebar/Sidebar.svelte'
-  import { sidebarStore, SidebarVariant, syncSidebarState } from '../sidebar'
+  import { openWidget, sidebarStore, SidebarVariant, syncSidebarState } from '../sidebar'
   import {
     getTabDataByLocation,
     getTabLocation,
@@ -834,6 +834,13 @@
   // workbench never imports the tracker package.
   let assistantOpen = false
   function openAssistant (): void {
+    // the tracker registers "Ask CeePee" as a sidebar widget; open that, and
+    // fall back to the floating panel when the model has no widget (old data)
+    const widget = client.getModel().findAllSync(workbench.class.Widget, { _id: 'tracker:ids:AssistantWidget' as any })[0]
+    if (widget !== undefined) {
+      openWidget(widget, undefined, { active: true, openedByUser: true })
+      return
+    }
     if (assistantOpen) return
     assistantOpen = true
     showPopup('tracker:component:Assistant' as AnyComponent, {}, 'top', () => {

@@ -571,7 +571,15 @@
     "AutoSchedule": "Automaticky naplánovat",
     "FieldPermissions": "Oprávnění k polím",
     "EmbedOnSite": "Vložit na váš web",
-    "PublicLink": "Vytvořit veřejný odkaz"
+    "PublicLink": "Vytvořit veřejný odkaz",
+    "ProjectHome": "Domov projektu",
+    "Summary": "Přehled",
+    "Calendar": "Kalendář",
+    "Timeline": "Časová osa",
+    "Docs": "Dokumenty",
+    "CreateDocsSpace": "Vytvořit prostor dokumentů",
+    "NewPage": "Nová stránka",
+    "Refresh": "Obnovit"
   },
   "status": {}
 }

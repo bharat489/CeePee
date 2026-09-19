@@ -25,7 +25,7 @@
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
-  import { IssuePriority, MilestoneStatus, type Decision, type Goal, type Idea, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
+  import { IssuePriority, MilestoneStatus, type Component as IssueComponent, type Decision, type Goal, type Idea, type Issue, type IssueStatus, type Milestone, type Project, type Sprint, type TimeSpendReport } from '@hcengineering/tracker'
   import { showPanel } from '@hcengineering/ui'
   import view from '@hcengineering/view'
 
@@ -52,6 +52,36 @@
   $: statusName = new Map(statuses.map((s) => [s._id, s.name]))
   $: projectName = new Map(projects.map((p) => [p._id, p.identifier]))
   $: category = new Map(statuses.map((s) => [s._id, s.category]))
+  const sprintQuery = createQuery()
+  const componentQuery = createQuery()
+  const milestoneQuery = createQuery()
+  let sprints: Sprint[] = []
+  let components: IssueComponent[] = []
+  let milestones: Milestone[] = []
+  sprintQuery.query(tracker.class.Sprint, {}, (r) => { sprints = r })
+  componentQuery.query(tracker.class.Component, {}, (r) => { components = r })
+  milestoneQuery.query(tracker.class.Milestone, {}, (r) => { milestones = r })
+  $: sprintName = new Map(sprints.map((x) => [x._id, x.name]))
+  $: componentName = new Map(components.map((x) => [x._id, x.label]))
+  $: milestoneName = new Map(milestones.map((x) => [x._id, x.label]))
+  // epic of an issue = the nearest ancestor whose type is Epic
+  let epicNames = new Map<Ref<Issue>, string>()
+  async function resolveEpics (list: Issue[]): Promise<void> {
+    const ids = Array.from(new Set(list.flatMap((i) => i.parents.map((p) => p.parentId)))).filter((id) => !epicNames.has(id))
+    if (ids.length === 0) return
+    const epics = await client.findAll(tracker.class.Issue, { _id: { $in: ids }, kind: tracker.taskTypes.Epic })
+    const next = new Map(epicNames)
+    for (const e of epics) next.set(e._id, e.title)
+    epicNames = next
+  }
+  const epicOf = (i: Issue): string | undefined => {
+    for (const p of i.parents) {
+      const n = epicNames.get(p.parentId)
+      if (n !== undefined) return n
+    }
+    return undefined
+  }
+  const kindOf = (i: Issue): 'epic' | 'initiative' | 'sub' | 'issue' => (i.kind === tracker.taskTypes.Epic ? 'epic' : i.kind === tracker.taskTypes.Initiative ? 'initiative' : i.parents.length > 0 ? 'sub' : 'issue')
 
   let names = new Map<Ref<Person>, string>()
   async function resolveNames (ids: Array<Ref<Person> | null | undefined>): Promise<void> {
@@ -110,6 +140,14 @@
         const c = category.get(i.status)
         return c === task.statusCategory.Won || c === task.statusCategory.Lost ? 'Done' : c === task.statusCategory.Active ? 'In progress' : 'To do'
       }
+      case 'sprint':
+        return i.sprint != null ? sprintName.get(i.sprint) ?? '—' : 'No sprint'
+      case 'component':
+        return i.component != null ? componentName.get(i.component) ?? '—' : 'No component'
+      case 'milestone':
+        return i.milestone != null ? milestoneName.get(i.milestone) ?? '—' : 'No milestone'
+      case 'epic':
+        return epicOf(i) ?? 'No epic'
       default:
         return '—'
     }
@@ -183,6 +221,26 @@
           const m = new Map<string, number>()
           for (const i of list) m.set(fieldOf(i, field), (m.get(fieldOf(i, field)) ?? 0) + 1)
           groups = Array.from(m.entries()).map(([label, n], k) => ({ label, n, color: PALETTE[k % PALETTE.length] })).sort((a, b) => b.n - a.n)
+          break
+        }
+        case 'stats': {
+          const field: string = params.field ?? 'status'
+          const list = await baseIssues(params.includeDone === true ? {} : { status: { $in: openIds } })
+          await resolveNames(list.map((i) => i.assignee))
+          if (field === 'epic') await resolveEpics(list)
+          const m = new Map<string, number>()
+          for (const i of list) m.set(fieldOf(i, field), (m.get(fieldOf(i, field)) ?? 0) + 1)
+          groups = Array.from(m.entries()).map(([label, n], k) => ({ label, n, color: PALETTE[k % PALETTE.length] })).sort((a, b) => b.n - a.n)
+          break
+        }
+        case 'filter': {
+          const text = String(params.text ?? '')
+          const limit: number = params.limit ?? 20
+          const r = text.trim() === '' ? { issues: (await baseIssues({ status: { $in: openIds } }, 500)).slice(0, limit), errors: [] as string[] } : await runQuery(text, limit)
+          rows = r.issues.slice(0, limit)
+          errors = r.errors
+          await resolveNames(rows.map((i) => i.assignee))
+          await resolveEpics(rows)
           break
         }
         case 'two-dim': {
@@ -524,11 +582,69 @@
     </div>
   {/if}
 
-  {#if (type === 'cvr' || type === 'avg-age') && series !== undefined}
+  {#if type === 'stats'}
+    {@const view = params.view ?? 'bar'}
+    <div class="stats">
+      {#each groups as g (g.label)}
+        {@const pct = total === 0 ? 0 : Math.round((g.n / total) * 100)}
+        <div class="stats__row">
+          <span class="stats__label"><i class="sw" style="background: {g.color}" />{g.label}</span>
+          {#if view === 'bar'}<span class="track track--wide"><span class="fill" style="width: {(g.n / maxN) * 100}%; background: {g.color}" /></span>{/if}
+          <span class="stats__n">{view === 'percentage' ? `${pct}%` : g.n}</span>
+          {#if view === 'bar'}<span class="stats__pct">{pct}%</span>{/if}
+        </div>
+      {/each}
+      {#if groups.length > 0}<div class="stats__row stats__row--total"><span class="stats__label">Total</span><span class="stats__n">{total}</span></div>{/if}
+      {#if groups.length === 0 && !busy}<p class="muted">Nothing here.</p>{/if}
+    </div>
+  {/if}
+
+  {#if type === 'filter'}
+    <div class="tbl-wrap">
+      <table class="tbl tbl--filter">
+        <thead><tr><th class="th th--l">Epic</th><th class="th th--c">T</th><th class="th th--l">Key</th><th class="th th--l th--grow">Summary</th><th class="th th--l">Assignee</th><th class="th th--l">Due</th><th class="th th--l">Sprint</th></tr></thead>
+        <tbody>
+          {#each rows as i (i._id)}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+            <tr class="tr" on:click={() => { open(i) }}>
+              <td class="td td--l td--dim">{epicOf(i) ?? ''}</td>
+              <td class="td td--c"><span class="tico tico--{kindOf(i)}" title={kindOf(i)}>{kindOf(i) === 'epic' ? '⚡' : kindOf(i) === 'initiative' ? '◆' : kindOf(i) === 'sub' ? '↳' : '▣'}</span></td>
+              <td class="td td--l td--key">{i.identifier}</td>
+              <td class="td td--l td--summary">{i.title}</td>
+              <td class="td td--l">{i.assignee != null ? names.get(i.assignee) ?? '' : 'Unassigned'}</td>
+              <td class="td td--l" class:td--late={i.dueDate != null && i.dueDate < Date.now()}>{i.dueDate != null ? new Date(i.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</td>
+              <td class="td td--l td--dim">{i.sprint != null ? sprintName.get(i.sprint) ?? '' : ''}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      {#if rows.length === 0 && !busy && errors.length === 0}<p class="muted">Nothing matches.</p>{/if}
+      {#if rows.length > 0}<span class="muted">{rows.length} of {params.limit ?? 20} max · click a row to open it</span>{/if}
+    </div>
+  {/if}
+
+  {#if type === 'avg-age' && series !== undefined}
+    {@const n = series.days.length}
+    {@const max = Math.max(1, ...series.a)}
+    {@const slot = 290 / Math.max(1, n)}
+    <svg viewBox="0 0 320 122" class="bar-chart" role="img">
+      {#each [0, 0.5, 1] as fr}
+        <line x1="28" x2="318" y1={100 - fr * 88} y2={100 - fr * 88} class="gl" />
+        <text x="25" y={103 - fr * 88} class="ax" text-anchor="end">{Math.round(max * fr)}d</text>
+      {/each}
+      {#each series.a as v, k}
+        <rect x={28 + (k + 0.15) * slot} y={100 - (v / max) * 88} width={Math.max(1, slot * 0.7)} height={(v / max) * 88} rx="1" class="barv" class:barv--last={k === n - 1}><title>{new Date(series.days[k]).toLocaleDateString()}: {v} days</title></rect>
+      {/each}
+      <text x="28" y="116" class="ax">{new Date(series.days[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>
+      <text x="318" y="116" class="ax" text-anchor="end">{new Date(series.days[n - 1]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>
+    </svg>
+  {/if}
+
+  {#if type === 'cvr' && series !== undefined}
     {@const n = series.days.length}
     {@const max = Math.max(1, ...series.a, ...(series.b ?? []))}
     <svg viewBox="0 0 300 100" class="line-chart" role="img">
-      <path d={linePath(series.a, n, max)} class="ln" class:ln--red={type === 'cvr'} class:ln--lime={type === 'avg-age'} />
+      <path d={linePath(series.a, n, max)} class="ln" class:ln--red={type === 'cvr'} />
       {#if series.b !== undefined}<path d={linePath(series.b, n, max)} class="ln ln--lime" />{/if}
     </svg>
     {#if type === 'cvr'}<div class="legend"><span><i class="sw sw--red" />created {series.a.reduce((a, b) => a + b, 0)}</span><span><i class="sw sw--lime" />resolved {(series.b ?? []).reduce((a, b) => a + b, 0)}</span></div>{/if}
@@ -596,6 +712,25 @@
   .pie__legend { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.75rem; color: var(--theme-content-color); li { display: flex; align-items: center; gap: 0.4rem; } .muted { margin: 0 0 0 auto; } }
   .sw { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; flex-shrink: 0; &--red { background: #e0475b; } &--lime { background: var(--accent-brand); } }
   .line-chart { width: 100%; height: auto; }
+  .bar-chart { width: 100%; height: auto; }
+  .gl { stroke: var(--theme-divider-color); stroke-width: 1; }
+  .ax { fill: var(--theme-trans-color); font-size: 8px; }
+  .barv { fill: var(--primary-button-default); opacity: 0.85; &--last { fill: var(--accent-brand); opacity: 1; } &:hover { opacity: 1; } }
+  .stats { display: flex; flex-direction: column; gap: 0.3rem; }
+  .stats__row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--theme-content-color); &--total { margin-top: 0.2rem; padding-top: 0.3rem; border-top: 1px solid var(--theme-divider-color); font-weight: 600; color: var(--theme-caption-color); } }
+  .stats__label { display: inline-flex; align-items: center; gap: 0.4rem; width: 9rem; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stats__n { width: 2.6rem; text-align: right; font-weight: 600; color: var(--theme-caption-color); font-variant-numeric: tabular-nums; }
+  .stats__pct { width: 2.6rem; text-align: right; color: var(--theme-trans-color); font-variant-numeric: tabular-nums; }
+  .tbl--filter { width: 100%; }
+  .th--l, .td--l { text-align: left; }
+  .th--c, .td--c { text-align: center; }
+  .th--grow { width: 40%; }
+  .tr { cursor: pointer; &:hover .td { background: var(--theme-button-hovered); } }
+  .td--dim { color: var(--theme-trans-color); max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+  .td--key { font-weight: 600; color: var(--accent-brand-ink); }
+  .td--summary { white-space: normal; color: var(--theme-caption-color); }
+  .td--late { color: var(--negative-button-default); font-weight: 600; }
+  .tico { display: inline-flex; align-items: center; justify-content: center; width: 1.1rem; height: 1.1rem; border-radius: 0.25rem; font-size: 0.65rem; color: #fff; &--issue { background: #3b82f6; } &--sub { background: #6366f1; } &--epic { background: #a855f7; } &--initiative { background: #f97316; } }
   .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke: var(--theme-content-color); &--red { stroke: #e0475b; } &--lime { stroke: var(--accent-brand); } &--grey { stroke: var(--theme-trans-color); stroke-dasharray: 4 4; } }
   .legend { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--theme-dark-color); span { display: inline-flex; align-items: center; gap: 0.3rem; } }
   .tbl-wrap { overflow-x: auto; }
