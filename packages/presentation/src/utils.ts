@@ -903,6 +903,10 @@ export function setPresentationCookie (token: string, workspaceUuid: WorkspaceUu
 
     const normalized = path.startsWith('/') ? path : `/${path}`
     document.cookie = `${cookieName}=${cookieValue}; path=${normalized}`
+    // front-served image previews (/files/<workspace>?file=…&size=…) check the same cookie on their own
+    // path; without it every avatar and thumbnail answers 401 whenever the storage lives elsewhere (datalake)
+    const front = `/files/${workspaceUuid}`
+    if (normalized !== front) document.cookie = `${cookieName}=${cookieValue}; path=${front}`
   }
 }
 

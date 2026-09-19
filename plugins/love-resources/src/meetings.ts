@@ -85,6 +85,40 @@ export async function joinMeeting (room: Room): Promise<void> {
   await connectToMeeting(room)
 }
 
+/**
+ * Join a room's call without leaving the current page (chat huddles). Presence,
+ * the LiveKit connection and the meeting minutes are handled exactly as for a
+ * normal join; only the navigation to the Office app is skipped, so the call
+ * lives in the sidebar widget next to the conversation.
+ */
+export async function joinMeetingHere (room: Room): Promise<void> {
+  if (room.access === RoomAccess.DND) return
+  if (getCurrentAccount().role === AccountRole.ReadOnlyGuest) return
+  if (currentMeetingRoom === room._id) return
+  const isGuest = getCurrentAccount().role === AccountRole.Guest
+  if (room.access === RoomAccess.Knock || isOffice(room) || isGuest) {
+    sendJoinRequest(room._id)
+    return
+  }
+  if (currentMeetingRoom !== undefined) {
+    await leaveMeeting()
+  }
+  const client = getClient()
+  const meeting = await client.findOne(love.class.MeetingMinutes, { attachedTo: room._id, status: MeetingStatus.Active })
+  if (meeting === undefined) {
+    await createMeetingDocument(room)
+  }
+  currentMeetingRoom = room._id
+  await moveToMeetingRoom(room)
+  try {
+    const token = await loveClient.getRoomToken(room)
+    await liveKitClient.connect(getLiveKitEndpoint(), token, room.type === RoomType.Video)
+  } catch (err) {
+    console.error(err)
+    await leaveMeeting()
+  }
+}
+
 export async function joinOrCreateMeetingByInvite (roomId: Ref<Room>): Promise<void> {
   if (currentMeetingRoom === roomId) return
 
