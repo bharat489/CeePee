@@ -37,4 +37,9 @@ export function createModel (builder: Builder): void {
       objectClass: core.class.Attribute
     }
   })
+
+  // rollups: relation changes, related-field edits, new rollup attributes, orphaned relations
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverView.trigger.OnRollup
+  })
 }

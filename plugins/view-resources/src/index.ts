@@ -58,6 +58,7 @@ import MarkupPresenter from './components/MarkupPresenter.svelte'
 import Menu from './components/Menu.svelte'
 import NumberEditor from './components/NumberEditor.svelte'
 import NumberPresenter from './components/NumberPresenter.svelte'
+import RollupPresenter from './components/RollupPresenter.svelte'
 import ObjectIcon from './components/ObjectIcon.svelte'
 import ObjectMention from './components/ObjectMention.svelte'
 import ObjectPresenter from './components/ObjectPresenter.svelte'
@@ -257,6 +258,7 @@ export {
   Menu,
   NumberEditor,
   NumberPresenter,
+  RollupPresenter,
   ObjectIcon,
   ObjectMention,
   SortableDocList,
@@ -304,6 +306,7 @@ export default async (): Promise<Resources> => ({
     HyperlinkEditorPopup,
     NumberEditor,
     NumberPresenter,
+  RollupPresenter,
     BooleanPresenter,
     BooleanEditor,
     TimestampPresenter,

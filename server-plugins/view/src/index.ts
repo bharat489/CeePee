@@ -35,6 +35,7 @@ export default plugin(serverViewId, {
     ServerLinkIdProvider: '' as Ref<Mixin<ServerLinkIdProvider>>
   },
   trigger: {
-    OnCustomAttributeRemove: '' as Resource<TriggerFunc>
+    OnCustomAttributeRemove: '' as Resource<TriggerFunc>,
+    OnRollup: '' as Resource<TriggerFunc>
   }
 })

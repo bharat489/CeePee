@@ -69,6 +69,7 @@
         "BlobContentType": "콘텐츠 타입",
         "Relation": "관계",
         "Relations": "관계",
+        "Rollup": "Rollup",
         "AddRelation": "관계 추가",
         "PersonId": "인물",
         "AccountId": "계정",

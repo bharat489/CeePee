@@ -1325,7 +1325,7 @@ export class TSessionManager implements SessionManager {
       sendPong: () => {
         ws.sendPong()
       },
-      socialStringsToUsers: this.getActiveSocialStringsToUsersMap(service.workspace.uuid),
+      socialStringsToUsers: this.getActiveSocialStringsToUsersMap(service.workspace.uuid, service),
       sendError: (reqId, msg, error: Status) =>
         sendResponse(sendCtx, service, ws, {
           id: reqId,

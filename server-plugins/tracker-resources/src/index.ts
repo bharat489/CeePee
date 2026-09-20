@@ -893,7 +893,8 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
     if (next === undefined) {
       // ---- locked statuses: only the status may change while an issue sits in one
       if (utx._class !== core.class.TxUpdateDoc || utx.objectClass !== tracker.class.Issue) continue
-      const keys = Object.keys(utx.operations ?? {}).filter((k) => !k.startsWith('$') && !['modifiedOn', 'modifiedBy'].includes(k))
+      const attrs = control.hierarchy.getAllAttributes(tracker.class.Issue)
+      const keys = Object.keys(utx.operations ?? {}).filter((k) => !k.startsWith('$') && !['modifiedOn', 'modifiedBy'].includes(k) && attrs.get(k)?.readonly !== true)
       if (keys.length === 0) continue
       const lockedIssue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: utx.objectId }, { limit: 1 }))[0]
       if (lockedIssue === undefined) continue

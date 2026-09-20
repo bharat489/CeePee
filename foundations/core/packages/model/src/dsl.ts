@@ -56,6 +56,7 @@ import core, {
   type TypeNumber as TypeNumberType,
   generateId
 } from '@hcengineering/core'
+import type { TypeRollup as TypeRollupType } from '@hcengineering/core'
 import type { Asset, IntlString } from '@hcengineering/platform'
 import toposort from 'toposort'
 
@@ -397,6 +398,13 @@ export function TypeString (): Type<string> {
  */
 export function TypeRelation (): Type<string> {
   return { _class: core.class.TypeRelation, label: core.string.Relation, icon: core.icon.TypeRef }
+}
+
+/**
+ * @public
+ */
+export function TypeRollup (spec: Omit<TypeRollupType, '_class' | 'label' | 'icon'>): TypeRollupType {
+  return { _class: core.class.TypeRollup, label: core.string.Rollup, icon: core.icon.TypeRef, ...spec }
 }
 
 /**

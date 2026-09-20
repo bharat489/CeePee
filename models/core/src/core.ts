@@ -59,6 +59,7 @@ import {
   type Timestamp,
   type TransientConfiguration,
   type Type,
+  type TypeRollup,
   type TypeAny,
   type Version,
   type VersionableClass
@@ -317,6 +318,15 @@ export class TCollection extends TType implements Collection<AttachedDoc> {
 @Model(core.class.ArrOf, core.class.Type)
 export class TArrOf extends TType implements ArrOf<Doc> {
   of!: Type<Doc>
+}
+
+@UX(core.string.Rollup)
+@Model(core.class.TypeRollup, core.class.Type)
+export class TTypeRollup extends TType implements TypeRollup {
+  association!: Ref<Association>
+  direction!: 'A' | 'B'
+  field!: string
+  aggregate!: TypeRollup['aggregate']
 }
 
 @UX(core.string.Boolean)

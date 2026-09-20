@@ -44,12 +44,17 @@ export interface ApprovalRequest extends AttachedDoc {
 }
 
 /** The transition rule that gates moving `issue` to `next`, when it asks for approval. */
-export async function approvalRuleFor (issue: Pick<Issue, 'kind' | 'status'>, next: Ref<IssueStatus>): Promise<TransitionRule | undefined> {
+export function approvalRuleForSync (issue: Pick<Issue, 'kind' | 'status'>, next: Ref<IssueStatus>): TransitionRule | undefined {
   const client = getClient()
-  const type = await client.findOne(task.class.TaskType, { _id: issue.kind })
+  // task types are model documents, so the lookup needs no round trip
+  const type = client.getModel().findAllSync(task.class.TaskType, { _id: issue.kind })[0]
   const rules = ((type as any)?.transitionRules as TransitionRule[] | undefined) ?? []
   const rule = rules.find((r) => r.to === next && (r.from === '*' || r.from === issue.status))
   return (rule?.approval?.approvers?.length ?? 0) > 0 ? rule : undefined
+}
+
+export async function approvalRuleFor (issue: Pick<Issue, 'kind' | 'status'>, next: Ref<IssueStatus>): Promise<TransitionRule | undefined> {
+  return approvalRuleForSync(issue, next)
 }
 
 /** A request already waiting for this exact move, if any. */

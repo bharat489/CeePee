@@ -61,6 +61,7 @@ import EnumTypeEditor from './components/typeEditors/EnumTypeEditor.svelte'
 import HyperlinkTypeEditor from './components/typeEditors/HyperlinkTypeEditor.svelte'
 import NumberTypeEditor from './components/typeEditors/NumberTypeEditor.svelte'
 import RefEditor from './components/typeEditors/RefEditor.svelte'
+import RollupTypeEditor from './components/typeEditors/RollupTypeEditor.svelte'
 import IdentifierTypeEditor from './components/typeEditors/IdentifierTypeEditor.svelte'
 import RelationSetting from './components/RelationSetting.svelte'
 import RoleAssignmentEditor from './components/typeEditors/RoleAssignmentEditor.svelte'
@@ -140,6 +141,7 @@ export default async (): Promise<Resources> => ({
     NumberTypeEditor,
     IdentifierTypeEditor,
     RefEditor,
+    RollupTypeEditor,
     RelationSetting,
     DateTypeEditor,
     EnumTypeEditor,

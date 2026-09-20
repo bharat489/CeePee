@@ -17,6 +17,8 @@ import core, { AnyAttribute, Hierarchy, Tx, TxRemoveDoc } from '@hcengineering/c
 import type { TriggerControl } from '@hcengineering/server-core'
 import view from '@hcengineering/view'
 
+import { OnRollup } from './rollups'
+
 /**
  * @public
  */
@@ -60,6 +62,7 @@ function checkTx (ptx: TxRemoveDoc<AnyAttribute>, hierarchy: Hierarchy): boolean
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   trigger: {
-    OnCustomAttributeRemove
+    OnCustomAttributeRemove,
+    OnRollup
   }
 })

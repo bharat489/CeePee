@@ -557,6 +557,7 @@ export function createModel (builder: Builder): void {
   )
   classPresenter(builder, core.class.TypeIntlString, view.component.IntlStringPresenter)
   classPresenter(builder, core.class.TypeNumber, view.component.NumberPresenter, view.component.NumberEditor)
+  classPresenter(builder, core.class.TypeRollup, view.component.RollupPresenter, view.component.RollupPresenter)
   classPresenter(builder, core.class.TypeIdentifier, view.component.IdPresenter, view.component.IdPresenter)
   classPresenter(
     builder,

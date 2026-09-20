@@ -193,6 +193,7 @@ const view = plugin(viewId, {
     PersonIdPresenter: '' as AnyComponent,
     PersonIdFilter: '' as AnyComponent,
     RolePresenter: '' as AnyComponent,
+    RollupPresenter: '' as AnyComponent,
     ReadOnlyNotification: '' as AnyComponent,
     ForbiddenNotification: '' as AnyComponent,
     DatePresenter: '' as AnyComponent,

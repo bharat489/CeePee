@@ -69,6 +69,7 @@
     "BlobContentType": "Zawartość",
     "Relation": "Skojarzenie",
     "Relations": "Skojarzenia",
+    "Rollup": "Rollup",
     "AddRelation": "Dodaj skojarzenie",
     "PersonId": "Osoba",
     "AccountId": "Konto",

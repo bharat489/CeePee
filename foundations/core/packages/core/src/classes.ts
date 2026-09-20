@@ -400,6 +400,22 @@ export interface ArrOf<T extends PropertyType> extends Type<T[]> {
 }
 
 /**
+ * A value folded from the documents on the other side of a relation: how many there
+ * are, or the sum, average, minimum, maximum, list or distinct count of one of their
+ * fields. The server keeps it current on the holding document, so it sorts, filters
+ * and displays like any other attribute.
+ * @public
+ */
+export interface TypeRollup extends Type<any> {
+  association: Ref<Association>
+  /** The side the holder is on: 'A' rolls up the docB documents, 'B' the docA documents. */
+  direction: 'A' | 'B'
+  /** Field read on each related document; ignored by `count`. */
+  field: string
+  aggregate: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'list' | 'unique' | 'checked' | 'percent'
+}
+
+/**
  * @public
  */
 export interface EnumOf extends Type<string> {

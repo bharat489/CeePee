@@ -595,6 +595,10 @@ export function createModel (builder: Builder): void {
     editor: setting.component.RefEditor
   })
 
+  builder.mixin(core.class.TypeRollup, core.class.Class, view.mixin.ObjectEditor, {
+    editor: setting.component.RollupTypeEditor
+  })
+
   builder.mixin(core.class.EnumOf, core.class.Class, view.mixin.ObjectEditor, {
     editor: setting.component.EnumTypeEditor
   })

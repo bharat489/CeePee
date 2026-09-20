@@ -376,6 +376,9 @@ export async function perform (a: AutomationAction, issue: Issue, project: Proje
       const type = (await control.findAll(control.ctx, task.class.TaskType, { _id: issue.kind }, { limit: 1 }))[0] as (TaskType & { transitions?: Record<string, string[]> }) | undefined
       const allowed = type?.transitions?.[issue.status]
       if (allowed !== undefined && !(allowed as string[]).includes(v)) return []
+      const gated = (((type as any)?.transitionRules as Array<{ from: string, to: string, approval?: { approvers?: string[] } }> | undefined) ?? [])
+        .some((r) => r.to === v && (r.from === '*' || r.from === issue.status) && (r.approval?.approvers?.length ?? 0) > 0)
+      if (gated) return []
       return [update({ status: v as Ref<IssueStatus> })]
     }
     case 'set-priority': {

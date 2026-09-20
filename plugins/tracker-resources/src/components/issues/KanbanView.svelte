@@ -33,7 +33,7 @@
   import tags from '@hcengineering/tags'
   import { DocWithRank, getStates } from '@hcengineering/task'
   import { getTaskKanbanResultQuery, typeStore, updateTaskKanbanCategories } from '@hcengineering/task-resources'
-  import { Issue, IssuesGrouping, IssuesOrdering, Project } from '@hcengineering/tracker'
+  import { type IssueStatus, Issue, IssuesGrouping, IssuesOrdering, Project } from '@hcengineering/tracker'
   import {
     Button,
     ColorDefinition,
@@ -85,6 +85,7 @@
   }
 
   import tracker from '../../plugin'
+  import { approvalRuleForSync, requestApproval } from '../../approvals'
   import SetWipLimitPopup from './SetWipLimitPopup.svelte'
   import { activeProjects } from '../../utils'
   import QuickFilterBar from './QuickFilterBar.svelte'
@@ -285,6 +286,15 @@
       typeof category === 'object' ? category.values.find((it) => it.space === doc.space)?._id : category
     if (groupValue === undefined) {
       return undefined
+    }
+    // a column behind an approval gate: file the request, leave the card where it is
+    if (groupByKey === 'status' && doc._class === tracker.class.Issue) {
+      const issue = doc as Issue
+      const gate = issue.status !== groupValue ? approvalRuleForSync(issue, groupValue as Ref<IssueStatus>) : undefined
+      if (gate !== undefined) {
+        void requestApproval(issue, groupValue as Ref<IssueStatus>, gate)
+        return undefined
+      }
     }
     return {
       [groupByKey]: groupValue,

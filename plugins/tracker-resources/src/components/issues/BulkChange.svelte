@@ -29,6 +29,7 @@
   import { createEventDispatcher } from 'svelte'
 
   import tracker from '../../plugin'
+  import { approvalRuleForSync, requestApproval } from '../../approvals'
   import { moveIssueToSpace } from '../../utils'
 
   export let docs: Issue[]
@@ -122,7 +123,11 @@
           try {
             switch (op) {
               case 'transition':
-                if (toStatus !== '' && i.status !== toStatus) await client.update(i, { status: toStatus })
+                if (toStatus !== '' && i.status !== toStatus) {
+                  const gate = approvalRuleForSync(i, toStatus)
+                  if (gate !== undefined) await requestApproval(i, toStatus, gate)
+                  else await client.update(i, { status: toStatus })
+                }
                 break
               case 'edit': {
                 const ops: Partial<Issue> = {}

@@ -69,6 +69,7 @@
     "BlobContentType": "Content type",
     "Relation": "Relation",
     "Relations": "Relations",
+    "Rollup": "Rollup",
     "AddRelation": "Add relation",
     "PersonId": "Person",
     "AccountId": "Account",

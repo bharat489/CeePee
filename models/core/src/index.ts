@@ -28,6 +28,7 @@ import { TBenchmarkDoc } from './benchmark'
 import core from './component'
 import {
   TArrOf,
+  TTypeRollup,
   TAssociation,
   TAttachedDoc,
   TAttribute,
@@ -148,6 +149,7 @@ export function createModel (builder: Builder): void {
     TTypeAccountUuid,
     TTypeCollaborativeDoc,
     TArrOf,
+  TTypeRollup,
     TRefTo,
     TTypeDate,
     TTypeFileSize,
