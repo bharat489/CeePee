@@ -33,6 +33,9 @@
   import { Button, Label, showPopup } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
+  import PersonListEditor from '../fields/PersonListEditor.svelte'
+  import { type Employee } from '@hcengineering/contact'
+  const approverRefs = (d: { approval?: { approvers: string[] } }): Ref<Employee>[] => (d.approval?.approvers ?? []) as Ref<Employee>[]
 
   export let currentSpace: Ref<Project>
 
@@ -311,6 +314,7 @@
     draft.requiredFields = draft.requiredFields ?? []
     draft.validators = draft.validators ?? []
     draft.postFunctions = draft.postFunctions ?? []
+    draft.approval = draft.approval ?? { approvers: [], all: false }
     draft.linked = draft.linked ?? []
     editing = { from, to }
     propsFor = undefined
@@ -332,7 +336,8 @@
       ...((draft.validators ?? []).filter((v) => v.field !== '').length > 0 ? { validators: (draft.validators ?? []).filter((v) => v.field !== '') } : {}),
       ...((draft.linked ?? []).length > 0 ? { linked: draft.linked } : {}),
       ...((draft.postFunctions ?? []).filter((p) => p.type !== '').length > 0 ? { postFunctions: (draft.postFunctions ?? []).filter((p) => p.type !== '') } : {}),
-      ...(draft.minRole !== undefined && draft.minRole !== '' ? { minRole: draft.minRole } : {})
+      ...(draft.minRole !== undefined && draft.minRole !== '' ? { minRole: draft.minRole } : {}),
+      ...((draft.approval?.approvers ?? []).length > 0 ? { approval: { approvers: draft.approval?.approvers ?? [], all: draft.approval?.all === true } } : {})
     }
     const others = rules.filter((r) => !(r.from === editing?.from && r.to === editing?.to))
     const hasContent = Object.keys(clean).length > 2
@@ -345,7 +350,7 @@
     editing = undefined
   }
   const nameOf = (id: Ref<IssueStatus> | '*'): string => (id === '*' ? 'any status' : statuses.find((s) => s._id === id)?.name ?? '?')
-  const ruleSummary = (r: TransitionRule): string => [r.name, (r.screen ?? []).length > 0 ? `${(r.screen ?? []).length} screen field${(r.screen ?? []).length === 1 ? '' : 's'}` : '', (r.requiredFields ?? []).length > 0 ? `${(r.requiredFields ?? []).length} required` : '', (r.validators ?? []).length > 0 ? `${(r.validators ?? []).length} validator${(r.validators ?? []).length === 1 ? '' : 's'}` : '', (r.linked ?? []).length > 0 ? `${(r.linked ?? []).length} linked condition${(r.linked ?? []).length === 1 ? '' : 's'}` : '', (r.postFunctions ?? []).length > 0 ? `${(r.postFunctions ?? []).length} post-function${(r.postFunctions ?? []).length === 1 ? '' : 's'}` : '', r.minRole !== undefined && r.minRole !== '' ? `role ≥ ${r.minRole}` : ''].filter((x) => x !== undefined && x !== '').join(' · ')
+  const ruleSummary = (r: TransitionRule): string => [r.name, (r.screen ?? []).length > 0 ? `${(r.screen ?? []).length} screen field${(r.screen ?? []).length === 1 ? '' : 's'}` : '', (r.requiredFields ?? []).length > 0 ? `${(r.requiredFields ?? []).length} required` : '', (r.validators ?? []).length > 0 ? `${(r.validators ?? []).length} validator${(r.validators ?? []).length === 1 ? '' : 's'}` : '', (r.linked ?? []).length > 0 ? `${(r.linked ?? []).length} linked condition${(r.linked ?? []).length === 1 ? '' : 's'}` : '', (r.postFunctions ?? []).length > 0 ? `${(r.postFunctions ?? []).length} post-function${(r.postFunctions ?? []).length === 1 ? '' : 's'}` : '', r.minRole !== undefined && r.minRole !== '' ? `role ≥ ${r.minRole}` : '', (r.approval?.approvers ?? []).length > 0 ? `approval by ${r.approval?.all === true ? 'all of' : 'any of'} ${(r.approval?.approvers ?? []).length}` : ''].filter((x) => x !== undefined && x !== '').join(' · ')
   let anyTarget: Ref<IssueStatus> | '' = ''
 
   // ---- schemes: a named workflow, keyed by status names so it ports between projects ----
@@ -548,6 +553,12 @@
       </div>
       <div class="box"><b>Linked-issue conditions</b><span class="muted">The move is refused unless every checked condition holds for the issue's sub-issues, blockers and parent.</span>
         <div class="chips">{#each LINKED as l (l.v)}<label class="chip" class:chip--on={(draft.linked ?? []).includes(l.v)}><input type="checkbox" checked={(draft.linked ?? []).includes(l.v)} on:change={() => { draft.linked = toggleLinked(draft.linked ?? [], l.v) }} />{l.l}</label>{/each}</div>
+      </div>
+      <div class="box"><b>Approval</b><span class="muted">Sign-off before the move. The person moving the issue files a request; approvers decide from their inbox or the issue. Nothing moves until it is approved.</span>
+        <div class="vrow">
+          <PersonListEditor value={approverRefs(draft)} onChange={(v) => { draft.approval = { approvers: v ?? [], all: draft.approval?.all === true } }} />
+          <label class="chip" class:chip--on={draft.approval?.all === true}><input type="checkbox" checked={draft.approval?.all === true} on:change={(e) => { draft.approval = { approvers: draft.approval?.approvers ?? [], all: e.currentTarget.checked } }} />everyone must approve</label>
+        </div>
       </div>
       <div class="box"><b>Validators</b><span class="muted">Conditions on the issue that must hold.</span>
         {#each draft.validators ?? [] as v, k}

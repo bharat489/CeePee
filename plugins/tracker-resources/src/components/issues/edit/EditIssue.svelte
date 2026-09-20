@@ -60,6 +60,7 @@
   import SubIssues from './SubIssues.svelte'
   import DepartmentSegments from '../../departments/DepartmentSegments.svelte'
   import Decisions from '../../decisions/Decisions.svelte'
+  import IssueApprovals from './IssueApprovals.svelte'
 
   export let _id: Ref<Issue> | string
   export let _class: Ref<Class<Issue>>
@@ -413,6 +414,7 @@
     <div class="mt-6">
       {#key issue.space}
         <Decisions space={issue.space} />
+        <IssueApprovals {issue} />
       {/key}
     </div>
 

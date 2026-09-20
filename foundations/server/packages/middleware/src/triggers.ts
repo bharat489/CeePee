@@ -97,16 +97,23 @@ export class TriggersMiddleware extends BaseMiddleware implements Middleware {
 
   async tx (ctx: MeasureContext<SessionData>, tx: Tx[]): Promise<TxMiddlewareResult> {
     await this.triggers.tx(tx)
-    const result = await this.provideTx(ctx, tx)
 
     const ftx = filterBroadcastOnly(tx, this.context.hierarchy)
+    // guards see the world before the batch lands and may throw to reject the whole batch
+    const guarded = ftx.length > 0 ? await this.processGuards(ctx, ftx) : []
+
+    const result = await this.provideTx(ctx, tx)
+
     if (ftx.length > 0) {
-      await this.processDerived(ctx, ftx)
+      await this.processDerived(ctx, ftx, guarded)
     }
     return result
   }
 
-  private async processDerived (ctx: MeasureContext<SessionData>, txes: Tx[]): Promise<void> {
+  private buildControl (ctx: MeasureContext<SessionData>): {
+    findAll: SessionFindAll
+    triggerControl: Omit<TriggerControl, 'txFactory' | 'ctx' | 'txes'>
+  } {
     const findAll: SessionFindAll = async (ctx, _class, query, options) => {
       const _ctx: MeasureContext = (options as ServerFindOptions<Doc>)?.ctx ?? ctx
       delete (options as ServerFindOptions<Doc>)?.ctx
@@ -123,10 +130,6 @@ export class TriggersMiddleware extends BaseMiddleware implements Middleware {
         results.total
       )
     }
-
-    const removed = await ctx.with('process-remove', {}, (ctx) => this.processRemove(ctx, txes, findAll))
-    const collections = await ctx.with('process-collection', {}, (ctx) => this.processCollection(ctx, txes, findAll))
-    const moves = await ctx.with('process-move', {}, (ctx) => this.processMove(ctx, txes, findAll))
 
     const triggerControl: Omit<TriggerControl, 'txFactory' | 'ctx' | 'txes'> = {
       removedMap: ctx.contextData.removedMap,
@@ -169,9 +172,25 @@ export class TriggersMiddleware extends BaseMiddleware implements Middleware {
       }
     }
 
+    return { findAll, triggerControl }
+  }
+
+  @withContext('process-guards')
+  private async processGuards (ctx: MeasureContext<SessionData>, txes: Tx[]): Promise<Tx[]> {
+    const { findAll, triggerControl } = this.buildControl(ctx)
+    return await this.triggers.apply(ctx, txes, { ...triggerControl, ctx, findAll, txes: [...txes] }, 'guard')
+  }
+
+  private async processDerived (ctx: MeasureContext<SessionData>, txes: Tx[], pre: Tx[]): Promise<void> {
+    const { findAll, triggerControl } = this.buildControl(ctx)
+
+    const removed = await ctx.with('process-remove', {}, (ctx) => this.processRemove(ctx, txes, findAll))
+    const collections = await ctx.with('process-collection', {}, (ctx) => this.processCollection(ctx, txes, findAll))
+    const moves = await ctx.with('process-move', {}, (ctx) => this.processMove(ctx, txes, findAll))
+
     const triggers = await this.processSyncTriggers(ctx, txes, triggerControl, findAll)
 
-    const derived = [...removed, ...collections, ...moves, ...triggers]
+    const derived = [...pre, ...removed, ...collections, ...moves, ...triggers]
 
     if (derived.length > 0) {
       await this.processDerivedTxes(ctx, derived)

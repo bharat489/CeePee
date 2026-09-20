@@ -103,10 +103,10 @@ export function createModel (builder: Builder): void {
 
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTracker.trigger.OnIssueStatusGuard,
+    isGuard: true,
     txMatch: {
       _class: core.class.TxUpdateDoc,
-      objectClass: tracker.class.Issue,
-      'operations.status': { $exists: true }
+      objectClass: tracker.class.Issue
     }
   })
 

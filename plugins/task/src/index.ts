@@ -133,6 +133,12 @@ export interface TransitionRule {
   minRole?: string
   /** Conditions on sub-tasks, blockers and the parent. */
   linked?: LinkedCondition[]
+  /**
+   * Sign-off required before the move happens: the client files an approval request
+   * to these people (person refs) and the server applies the move when enough have
+   * approved. `all` asks for every approver instead of any one of them.
+   */
+  approval?: { approvers: string[], all?: boolean }
 }
 
 /** What holds true while a task sits in a status. @public */

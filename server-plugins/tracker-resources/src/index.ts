@@ -17,6 +17,7 @@ import { OnIssueAutomation } from './automation'
 import { OnIssueWebhook } from './webhooks'
 import { OnAutomationRules, holds, perform } from './rules'
 import { OnUserGroups } from './groups'
+import { approvedRequestFor, needsApproval } from './approvals'
 import { AccountRole as WorkspaceRole, hasAccountRole } from '@hcengineering/core'
 import { type StatusProps, type TransitionRule } from '@hcengineering/task'
 import { OnIssuePermissions, OnNotificationScheme } from './permissions'
@@ -28,6 +29,7 @@ import core, {
   AccountUuid,
   concatLink,
   Data,
+  type Class,
   Doc,
   DocumentUpdate,
   generateId,
@@ -930,6 +932,13 @@ export async function OnIssueStatusGuard (txes: Tx[], control: TriggerControl): 
       }
       if (rule.minRole !== undefined && rule.minRole !== '' && account !== undefined && !hasAccountRole(account, rule.minRole as WorkspaceRole)) {
         throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+      }
+      // approval-gated: only a completed approval request for exactly this move opens the door
+      if (needsApproval(rule) && account?.primarySocialId !== core.account.System) {
+        const requests = await control.findAll(control.ctx, 'request:class:Request' as Ref<Class<Doc>>, { attachedTo: issue._id } as any, { limit: 50 })
+        if (approvedRequestFor(requests as any, issue._id as string, next as string, Date.now()) === undefined) {
+          throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+        }
       }
       for (const v of rule.validators ?? []) {
         if (!(await holds(v as any, merged as Issue, control, []))) {

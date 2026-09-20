@@ -40,7 +40,7 @@ import serverCore from './plugin'
 
 interface TriggerRecord {
   query?: DocumentQuery<Tx>
-  trigger: { op: TriggerFunc | Promise<TriggerFunc>, resource: Resource<TriggerFunc>, isAsync: boolean }
+  trigger: { op: TriggerFunc | Promise<TriggerFunc>, resource: Resource<TriggerFunc>, isAsync: boolean, isGuard: boolean }
 }
 /**
  * @public
@@ -63,9 +63,10 @@ export class Triggers {
     const trigger = t.trigger
     const func = getResource(trigger)
     const isAsync = t.isAsync === true
+    const isGuard = t.isGuard === true
     this.triggers.push({
       query: match,
-      trigger: { op: func, resource: trigger, isAsync }
+      trigger: { op: func, resource: trigger, isAsync, isGuard }
     })
   }
 
@@ -87,7 +88,8 @@ export class Triggers {
     ctx: MeasureContext,
     ctrl: Omit<TriggerControl, 'txFactory'>,
     matches: Tx[],
-    { trigger }: TriggerRecord
+    { trigger }: TriggerRecord,
+    rethrow: boolean = false
   ): Promise<Tx[]> {
     const result: Tx[] = []
     const apply: Tx[] = []
@@ -115,6 +117,7 @@ export class Triggers {
         result.push(...tresult)
         ctrl.txes.push(...tresult)
       } catch (err: any) {
+        if (rethrow) throw err
         ctx.error('failed to process trigger', { trigger: trigger.resource, err })
         Analytics.handleError(err)
       }
@@ -126,11 +129,12 @@ export class Triggers {
     ctx: MeasureContext,
     tx: Tx[],
     ctrl: Omit<TriggerControl, 'txFactory'>,
-    mode: 'sync' | 'async'
+    mode: 'sync' | 'async' | 'guard'
   ): Promise<Tx[]> {
     const result: Tx[] = []
     for (const { query, trigger } of this.triggers) {
-      if ((trigger.isAsync ? 'async' : 'sync') !== mode) {
+      const phase = trigger.isGuard ? 'guard' : trigger.isAsync ? 'async' : 'sync'
+      if (phase !== mode) {
         continue
       }
       let matches = tx
@@ -145,9 +149,10 @@ export class Triggers {
           {},
           async (ctx) => {
             try {
-              const tresult = await this.applyTrigger(ctx, ctrl, matches, { trigger })
+              const tresult = await this.applyTrigger(ctx, ctrl, matches, { trigger }, mode === 'guard')
               result.push(...tresult)
             } catch (err: any) {
+              if (mode === 'guard') throw err
               ctx.error('error during async processing', { err })
             }
           },

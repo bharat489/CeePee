@@ -315,6 +315,10 @@ export interface Trigger extends Doc {
   // In case defiled, trigger will be executed asyncronously after transaction will be done, trigger shouod use
   isAsync?: boolean
 
+  // A guard runs before the transaction is persisted and may throw to reject it; its
+  // returned transactions are applied after the batch like any derived transaction.
+  isGuard?: boolean
+
   // We should match transaction
   txMatch?: DocumentQuery<Tx>
 }

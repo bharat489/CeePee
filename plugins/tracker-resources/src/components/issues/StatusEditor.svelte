@@ -31,6 +31,7 @@
   import { statusStore } from '@hcengineering/view-resources'
   import { Analytics } from '@hcengineering/analytics'
   import { createEventDispatcher } from 'svelte'
+  import { approvalRuleFor, requestApproval } from '../../approvals'
 
   import tracker from '../../plugin'
   import IssueStatusIcon from './IssueStatusIcon.svelte'
@@ -69,6 +70,12 @@
     }
 
     if ('_class' in value) {
+      // a gated transition files an approval request instead of moving
+      const gate = await approvalRuleFor(value, newStatus)
+      if (gate !== undefined) {
+        await requestApproval(value, newStatus, gate)
+        return
+      }
       await client.update(value, { status: newStatus })
       Analytics.handleEvent(TrackerEvents.IssueSetStatus, {
         issue: value.identifier,
