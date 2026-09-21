@@ -90,6 +90,10 @@
     "AiContinue": "Continue writing",
     "AiTranslate": "Translate…",
     "AiAsk": "Ask AI…",
-    "AiMenu": "AI writing"
+    "AiMenu": "AI writing",
+    "Callout": "Callout",
+    "Toggle": "Toggle",
+    "Columns": "Columns",
+    "SyncedBlock": "Synced block"
   }
 }

@@ -45,7 +45,7 @@ import {
 } from '@hcengineering/model'
 import attachment from '@hcengineering/model-attachment'
 import chunter from '@hcengineering/model-chunter'
-import core, { TDoc, TTypedSpace } from '@hcengineering/model-core'
+import core, { TAttachedDoc, TDoc, TTypedSpace } from '@hcengineering/model-core'
 import { createPublicLinkAction } from '@hcengineering/model-guest'
 import { generateClassNotificationTypes } from '@hcengineering/model-notification'
 import presentation from '@hcengineering/model-presentation'
@@ -94,6 +94,9 @@ export class TDocument extends TDoc implements Document, Todoable {
   @Prop(Collection(attachment.class.Attachment), attachment.string.Attachments, { shortLabel: attachment.string.Files })
     attachments?: number
 
+  @Prop(Collection(document.class.DocumentSnapshot), document.string.Snapshots)
+    snapshots?: number
+
   @Prop(Collection(chunter.class.ChatMessage), chunter.string.Comments)
     comments?: number
 
@@ -125,7 +128,9 @@ export class TDocument extends TDoc implements Document, Todoable {
 
 @Model(document.class.DocumentSnapshot, core.class.Doc, DOMAIN_DOCUMENT)
 @UX(document.string.Version)
-export class TDocumentSnapshot extends TDoc implements DocumentSnapshot {
+export class TDocumentSnapshot extends TAttachedDoc implements DocumentSnapshot {
+  declare attachedTo: Ref<Document>
+
   @Prop(TypeRef(core.class.Space), core.string.Space)
   @Index(IndexKind.Indexed)
   @Hidden()

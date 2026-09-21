@@ -94,6 +94,38 @@ export const storeNodes: Record<string, NodeProcessor> = {
       state.renderContent(node)
     })
   },
+  callout: (state, node) => {
+    const kind = String(nodeAttrs(node).kind ?? 'info').toUpperCase()
+    state.wrapBlock('> ', null, node, () => {
+      state.write(`[!${kind}]\n`)
+      state.renderContent(node)
+    })
+  },
+  details: (state, node) => {
+    state.write('<details>\n')
+    state.renderContent(node)
+    state.ensureNewLine()
+    state.write('</details>')
+    state.closeBlock(node)
+  },
+  detailsSummary: (state, node) => {
+    state.write('<summary>')
+    state.renderInline(node)
+    state.write('</summary>\n\n')
+  },
+  detailsContent: (state, node) => {
+    state.renderContent(node)
+  },
+  columnList: (state, node) => {
+    state.renderContent(node)
+  },
+  column: (state, node) => {
+    state.renderContent(node)
+  },
+  syncedBlock: (state, node) => {
+    state.write(`> ⟳ Synced block: ${String(nodeAttrs(node).title ?? '')}`)
+    state.closeBlock(node)
+  },
   codeBlock: (state, node) => {
     state.write('```' + `${nodeAttrs(node).language ?? ''}` + '\n')
     // TODO: Check for node.textContent

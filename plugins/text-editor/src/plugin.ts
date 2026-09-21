@@ -121,6 +121,10 @@ export default plugin(textEditorId, {
     TodoItem: '' as IntlString,
     DrawingBoard: '' as IntlString,
     MermaidDiargram: '' as IntlString,
+    Callout: '' as IntlString,
+    Toggle: '' as IntlString,
+    Columns: '' as IntlString,
+    SyncedBlock: '' as IntlString,
 
     TableOptions: '' as IntlString,
     SelectTable: '' as IntlString,

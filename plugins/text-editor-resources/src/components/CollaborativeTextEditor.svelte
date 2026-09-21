@@ -36,7 +36,8 @@
     getFileUrl,
     getImageSize,
     imageSizeToRatio,
-    KeyedAttribute
+    KeyedAttribute,
+    ObjectPopup
   } from '@hcengineering/presentation'
   import { isDocCreatedByAccount } from '@hcengineering/contact'
   import { markupToJSON } from '@hcengineering/text'
@@ -50,7 +51,8 @@
     Loading,
     PopupAlignment,
     themeStore,
-    ThrottledCaller
+    ThrottledCaller,
+    showPopup
   } from '@hcengineering/ui'
   import view from '@hcengineering/view'
   import { Editor, FocusPosition, mergeAttributes } from '@tiptap/core'
@@ -316,6 +318,45 @@
       case 'mermaid':
         editor.commands.insertContentAt(pos, { type: 'mermaid' })
         break
+      case 'callout':
+        editor.chain().focus(pos).setCallout('info').run()
+        break
+      case 'toggle':
+        editor.chain().focus(pos).setDetails().run()
+        break
+      case 'columns':
+        editor.chain().focus(pos).setColumns(2).run()
+        break
+      case 'synced-block': {
+        // pick the document whose body this block will mirror
+        let position: PopupAlignment | undefined = undefined
+        if (targetItem !== undefined) {
+          position =
+            targetItem instanceof MouseEvent ? getEventPositionElement(targetItem) : getPopupPositionElement(targetItem)
+        }
+        setTimeout(() => {
+          showPopup(
+            ObjectPopup,
+            {
+              _class: 'document:class:Document' as Ref<Class<Doc>>,
+              docQuery: { _id: { $ne: collaborativeDoc.objectId } },
+              allowDeselect: false,
+              closeAfterSelect: true
+            },
+            position ?? 'top',
+            (res: any) => {
+              if (res != null) {
+                editor
+                  .chain()
+                  .focus(pos)
+                  .setSyncedBlock({ sourceId: res._id, sourceClass: res._class, title: res.title ?? 'Document' })
+                  .run()
+              }
+            }
+          )
+        }, 0)
+        break
+      }
     }
   }
 
@@ -356,6 +397,24 @@
     }
   }
 
+  // synced blocks: one live session per source document, shared by every block on this page
+  const syncedSources: Record<string, { ydoc: YDoc, provider: Provider }> = {}
+  function openSource (sourceId: string, sourceClass: string, content: string | null): { ydoc: YDoc, loaded: Promise<void> } {
+    let s = syncedSources[sourceId]
+    if (s === undefined) {
+      const ydoc = new YDoc({ guid: sourceId, gc: false })
+      const collabId: CollaborativeDoc = {
+        objectClass: sourceClass as Ref<Class<Doc>>,
+        objectId: sourceId as Ref<Doc>,
+        objectAttr: 'content'
+      }
+      const provider = createRemoteProvider(ydoc, collabId, content as Ref<Blob> | null)
+      s = { ydoc, provider }
+      syncedSources[sourceId] = s
+    }
+    return { ydoc: s.ydoc, loaded: s.provider.loaded.then(() => {}) }
+  }
+
   onMount(async () => {
     // it is recommended to wait for the local provider to be loaded
     // https://discuss.yjs.dev/t/initial-offline-value-of-a-shared-document/465/4
@@ -383,6 +442,7 @@
           codeBlockMermaid: { ydoc, ydocContentField: field }
         },
         drawingBoard: { getSavedBoard },
+        blocks: { openSource },
         leftMenu: withSideMenu && {
           width: 20,
           height: 20,
@@ -400,7 +460,11 @@
             { id: 'separator-line', label: textEditor.string.SeparatorLine, icon: view.icon.SeparatorLine },
             { id: 'todo-list', label: textEditor.string.TodoItem, icon: view.icon.TodoList },
             { id: 'drawing-board', label: textEditor.string.DrawingBoard, icon: IconScribble as any },
-            { id: 'mermaid', label: textEditor.string.MermaidDiargram, icon: view.icon.Model }
+            { id: 'mermaid', label: textEditor.string.MermaidDiargram, icon: view.icon.Model },
+            { id: 'callout', label: textEditor.string.Callout, icon: view.icon.Bubble },
+            { id: 'toggle', label: textEditor.string.Toggle, icon: view.icon.DetailsFilled },
+            { id: 'columns', label: textEditor.string.Columns, icon: view.icon.MasterDetail },
+            { id: 'synced-block', label: textEditor.string.SyncedBlock, icon: view.icon.Copy }
           ],
           handleSelect: handleLeftMenuClick
         },
@@ -491,6 +555,7 @@
     if (contextProvider === undefined) {
       void provider.destroy()
     }
+    for (const s of Object.values(syncedSources)) void s.provider.destroy()
   })
 </script>
 

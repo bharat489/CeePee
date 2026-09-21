@@ -215,6 +215,11 @@
       id: 'references',
       icon: document.icon.References,
       showTooltip: { label: document.string.Backlinks, direction: 'bottom' }
+    },
+    {
+      id: 'history',
+      icon: document.icon.History,
+      showTooltip: { label: document.string.History, direction: 'bottom' }
     }
   ]
   let selectedAside: string | boolean = false

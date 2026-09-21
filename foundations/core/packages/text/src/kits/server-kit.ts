@@ -22,6 +22,15 @@ import { ImageNode } from '../nodes/image'
 import { ReferenceNode } from '../nodes/reference'
 
 import { EmbedNode } from '../nodes/embed'
+import {
+  CalloutNode,
+  ColumnListNode,
+  ColumnNode,
+  DetailsContentNode,
+  DetailsNode,
+  DetailsSummaryNode,
+  SyncedBlockNode
+} from '../nodes/blocks'
 
 import { ExtensionFactory, extensionKit } from '../kit'
 import { HardBreak } from '../tiptapExtensions'
@@ -47,6 +56,14 @@ export const ServerKitFactory = (e: ExtensionFactory) =>
     image: e(ImageNode),
     embed: e(EmbedNode),
     emoji: e(EmojiNode),
+
+    callout: e(CalloutNode),
+    details: e(DetailsNode),
+    detailsSummary: e(DetailsSummaryNode),
+    detailsContent: e(DetailsContentNode),
+    columnList: e(ColumnListNode),
+    column: e(ColumnNode),
+    syncedBlock: e(SyncedBlockNode),
 
     inlineNote: e(NoteBaseExtension), // Semi-deprecated, should be removed in the future
     qmsInlineCommentMark: e(QMSInlineCommentMark) // Semi-deprecated, should be removed in the future

@@ -1,6 +1,6 @@
 <!--
-//
-// Copyright © 2024 Hardcore Engineering Inc.
+// Copyright © 2023 Hardcore Engineering Inc.
+// Copyright © 2026 Qicky Globaltech Private Limited
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -12,11 +12,11 @@
 //
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 -->
 <script lang="ts">
-  import { Document } from '@hcengineering/document'
-  import { Card, getClient } from '@hcengineering/presentation'
+  import { generateId } from '@hcengineering/core'
+  import { Document, DocumentSnapshot } from '@hcengineering/document'
+  import { Card, createMarkup, getClient, getMarkup } from '@hcengineering/presentation'
   import { EditBox } from '@hcengineering/ui'
   import document from '../plugin'
 
@@ -26,20 +26,24 @@
 
   let name = ''
 
+  // A version is a copy of the document's collaborative body under its own id,
+  // attached to the document so the history panel can list, compare and restore it.
   async function create (): Promise<void> {
-    // TODO implement me
-    // const snapshot = await takeSnapshot(doc.content, name)
-    // await client.addCollection(
-    //   document.class.DocumentSnapshot,
-    //   doc.space,
-    //   doc._id,
-    //   document.class.Document,
-    //   'snapshots',
-    //   {
-    //     name,
-    //     content: snapshot
-    //   }
-    // )
+    const id = generateId<DocumentSnapshot>()
+    const markup = await getMarkup({ objectClass: doc._class, objectId: doc._id, objectAttr: 'content' }, doc.content)
+    const content = await createMarkup(
+      { objectClass: document.class.DocumentSnapshot, objectId: id, objectAttr: 'content' },
+      markup
+    )
+    await client.addCollection(
+      document.class.DocumentSnapshot,
+      doc.space,
+      doc._id,
+      doc._class,
+      'snapshots',
+      { title: name.trim(), content, parent: doc.parent },
+      id
+    )
   }
 </script>
 

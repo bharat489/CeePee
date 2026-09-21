@@ -63,6 +63,10 @@ export default mergeIds(documentId, document, {
     NoParentDocument: '' as IntlString,
     NoBacklinks: '' as IntlString,
     NoHistory: '' as IntlString,
+    Restore: '' as IntlString,
+    RestoreConfirm: '' as IntlString,
+    Close: '' as IntlString,
+    DiffLegend: '' as IntlString,
     Untitled: '' as IntlString,
 
     Description: '' as IntlString,

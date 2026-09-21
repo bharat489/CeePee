@@ -17,10 +17,17 @@
 <script lang="ts">
   import { Person } from '@hcengineering/contact'
   import { EmployeePresenter, getPersonByPersonIdCb } from '@hcengineering/contact-resources'
-  import { DocumentSnapshot } from '@hcengineering/document'
-  import { TimeSince } from '@hcengineering/ui'
+  import { Document, DocumentSnapshot } from '@hcengineering/document'
+  import { TimeSince, showPopup } from '@hcengineering/ui'
+  import SnapshotPopup from './SnapshotPopup.svelte'
 
   export let value: DocumentSnapshot
+  export let doc: Document | undefined = undefined
+  export let readonly: boolean = false
+
+  function open (): void {
+    if (doc !== undefined) showPopup(SnapshotPopup, { doc, snapshot: value, readonly }, 'center')
+  }
 
   let employee: Person | undefined
   $: if (value.createdBy !== undefined) {
@@ -32,7 +39,8 @@
   }
 </script>
 
-<div class="container flex-col flex-gap-2 flex-no-shrink">
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+<div class="container flex-col flex-gap-2 flex-no-shrink" class:clickable={doc !== undefined} on:click={open}>
   <div class="flex-between h-8">
     <div class="fs-bold overflow-label">
       {value.title}
@@ -48,6 +56,12 @@
   .container {
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--theme-divider-color);
+  }
+  .clickable {
+    cursor: pointer;
+  }
+  .clickable:hover {
+    background: var(--theme-button-hovered);
   }
   .time {
     font-size: 0.75rem;

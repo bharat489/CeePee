@@ -55,6 +55,11 @@
     "ForbidCreateTeamspacePermissionDescription": "사용자의 새 팀스페이스 생성을 금지합니다",
     "IssuesInDocument": "이 페이지의 이슈",
     "PageAccess": "Permissions",
-    "Save": "Save"
+    "Save": "Save",
+    "Snapshots": "Versions",
+    "Restore": "Restore this version",
+    "RestoreConfirm": "Replace the current text with the version \"{title}\"?",
+    "Close": "Close",
+    "DiffLegend": "Green is what the current text added since this version; red is what it removed."
   }
 }

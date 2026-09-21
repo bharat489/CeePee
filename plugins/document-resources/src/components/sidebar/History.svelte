@@ -68,7 +68,7 @@
     <Scroller>
       {#each snapshots as snapshot}
         <Lazy>
-          <HistoryView value={snapshot} />
+          <HistoryView value={snapshot} doc={value} {readonly} />
         </Lazy>
       {/each}
     </Scroller>

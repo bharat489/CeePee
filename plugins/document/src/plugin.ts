@@ -71,6 +71,7 @@ export const documentPlugin = plugin(documentId, {
     ConfigLabel: '' as IntlString,
     CreateDocument: '' as IntlString,
     Documents: '' as IntlString,
+    Snapshots: '' as IntlString,
     ForbidCreateTeamspacePermission: '' as IntlString,
     ForbidCreateTeamspacePermissionDescription: '' as IntlString
   },

@@ -95,6 +95,10 @@ const inlineCommandsIds = [
   'todo-list',
   'drawing-board',
   'mermaid',
+  'callout',
+  'toggle',
+  'columns',
+  'synced-block',
   'ai-summarize',
   'ai-outline',
   'ai-action-items',
@@ -121,6 +125,10 @@ export function inlineCommandsConfig (
           { id: 'todo-list', label: textEditor.string.TodoItem, icon: view.icon.TodoList },
           { id: 'drawing-board', label: textEditor.string.DrawingBoard, icon: IconScribble as any },
           { id: 'mermaid', label: textEditor.string.MermaidDiargram, icon: view.icon.Model },
+          { id: 'callout', label: textEditor.string.Callout, icon: view.icon.Bubble },
+          { id: 'toggle', label: textEditor.string.Toggle, icon: view.icon.DetailsFilled },
+          { id: 'columns', label: textEditor.string.Columns, icon: view.icon.MasterDetail },
+          { id: 'synced-block', label: textEditor.string.SyncedBlock, icon: view.icon.Copy },
           ...(aiAvailable()
             ? [
                 { id: 'ai-summarize', label: textEditor.string.AiSummarize, icon: view.icon.AiStar },

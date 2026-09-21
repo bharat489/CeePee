@@ -201,6 +201,31 @@ function addNodeContent (builder: NodeBuilder, node?: MarkupNode): void {
     builder.openTag('blockquote')
     addNodes(builder, nodes)
     builder.closeTag('blockquote')
+  } else if (node.type === MarkupNodeType.callout) {
+    const kind = toString(attrs.kind) ?? 'info'
+    builder.openTag('div', { class: `callout callout-${kind}`, 'data-type': 'callout', 'data-kind': kind })
+    addNodes(builder, nodes)
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.details) {
+    builder.openTag('details', attrs.open === false ? {} : { open: 'open' })
+    addNodes(builder, nodes)
+    builder.closeTag('details')
+  } else if (node.type === MarkupNodeType.detailsSummary) {
+    builder.openTag('summary')
+    addNodes(builder, nodes)
+    builder.closeTag('summary')
+  } else if (node.type === MarkupNodeType.detailsContent || node.type === MarkupNodeType.column) {
+    builder.openTag('div', { 'data-type': node.type })
+    addNodes(builder, nodes)
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.columnList) {
+    builder.openTag('div', { 'data-type': 'columnList', style: 'display:flex;gap:1rem' })
+    addNodes(builder, nodes)
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.syncedBlock) {
+    builder.openTag('div', { 'data-type': 'syncedBlock' })
+    builder.addText(`⟳ ${toString(attrs.title) ?? 'Synced block'}`)
+    builder.closeTag('div')
   } else if (node.type === MarkupNodeType.horizontal_rule) {
     builder.openTag('hr', {}, { selfClosing: true })
   } else if (node.type === MarkupNodeType.heading) {

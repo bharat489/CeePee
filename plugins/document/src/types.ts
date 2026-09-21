@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-import { AccountUuid, Doc, MarkupBlobRef, Rank, Ref, TypedSpace } from '@hcengineering/core'
+import { AccountUuid, AttachedDoc, Doc, MarkupBlobRef, Rank, Ref, TypedSpace } from '@hcengineering/core'
 import { IconProps } from '@hcengineering/view'
 
 /** @public */
@@ -54,7 +54,8 @@ export interface Document extends Doc, IconProps {
 }
 
 /** @public */
-export interface DocumentSnapshot extends Doc {
+export interface DocumentSnapshot extends AttachedDoc {
+  attachedTo: Ref<Document>
   title: string
   content: MarkupBlobRef
   parent: Ref<Document>
