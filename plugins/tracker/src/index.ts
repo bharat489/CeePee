@@ -261,6 +261,31 @@ export interface Capacity extends Doc {
   allocation?: number
 }
 
+/**
+ * A project template published by the team: what a project created from it
+ * starts with. Built-in templates ship with the gallery; these come from
+ * "Publish a project as a template".
+ * @public
+ */
+export interface ProjectTemplate extends Doc {
+  name: string
+  tagline: string
+  category: string
+  emoji: string
+  bullets: string[]
+  views: string[]
+  landing: string
+  defaultManaged: 'team' | 'company'
+  components?: string[]
+  /** [label, days from creation] */
+  milestones?: Array<[string, number]>
+  labels?: string[]
+  starters?: Array<{ title: string, priority?: IssuePriority, component?: string, labels?: string[], description?: string }>
+  /** The project it was taken from, when it was. */
+  source?: Ref<Project>
+  usage: number
+}
+
 /** Workspace-wide capacity settings; one document. @public */
 export interface CapacityDefaults extends Doc {
   hoursPerWeek: number
@@ -1423,6 +1448,7 @@ const pluginState = plugin(trackerId, {
     BillingRate: '' as Ref<Class<BillingRate>>,
     Capacity: '' as Ref<Class<Capacity>>,
     CapacityDefaults: '' as Ref<Class<CapacityDefaults>>,
+    ProjectTemplate: '' as Ref<Class<ProjectTemplate>>,
     AuditEvent: '' as Ref<Class<AuditEvent>>,
     AuditPolicy: '' as Ref<Class<AuditPolicy>>,
     RequestType: '' as Ref<Class<RequestType>>,
@@ -1503,6 +1529,7 @@ const pluginState = plugin(trackerId, {
     Timesheets: '' as AnyComponent,
     Workload: '' as AnyComponent,
     CapacitySetting: '' as AnyComponent,
+    NotificationDefaults: '' as AnyComponent,
     IssueQuery: '' as AnyComponent,
     ProjectAutomation: '' as AnyComponent,
     Webhooks: '' as AnyComponent,
@@ -1706,6 +1733,7 @@ const pluginState = plugin(trackerId, {
     NothingStale: '' as IntlString,
     NoActiveSprint: '' as IntlString,
     Workload: '' as IntlString,
+    NotificationDefaults: '' as IntlString,
     Timesheets: '' as IntlString,
     ThisWeek: '' as IntlString,
     Person: '' as IntlString,

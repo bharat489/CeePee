@@ -24,6 +24,7 @@ import contact, {
   SocialIdentityRef
 } from '@hcengineering/contact'
 import core, {
+  AccountRole,
   AccountUuid,
   Class,
   concatLink,
@@ -47,6 +48,7 @@ import core, {
   TxUpdateDoc
 } from '@hcengineering/core'
 import notification, {
+  NotificationDefault,
   NotificationContent,
   notificationId,
   NotificationProvider,
@@ -200,6 +202,17 @@ export function isAllowed (
 
   if (setting !== undefined) {
     return setting.enabled
+  }
+
+  // no personal choice: what the administrators decided for the workspace, or for the person's role
+  const roles: AccountRole[] = []
+  for (const id of receiverIds) {
+    const role = control.ctx.contextData?.socialStringsToUsers?.get(id)?.role
+    if (role !== undefined) roles.push(role)
+  }
+  const workspaceDefault = notificationControl.workspaceDefault(type._id, provider._id, roles)
+  if (workspaceDefault !== undefined) {
+    return workspaceDefault
   }
 
   if (providerDefaults.some((it) => it.provider === provider._id && it.enabledTypes.includes(type._id))) {
@@ -631,12 +644,24 @@ export class NotificationProviderControl {
   public settingsByProvider: Map<Ref<NotificationProvider>, NotificationTypeSetting[]>
   constructor (
     readonly providersSettings: NotificationProviderSetting[],
-    readonly typesSettings: NotificationTypeSetting[]
+    readonly typesSettings: NotificationTypeSetting[],
+    /** workspace defaults set by administrators, for people without a setting of their own */
+    readonly defaults: NotificationDefault[] = []
   ) {
     this.byProvider = groupByArray(providersSettings, (it) => it.attachedTo)
     this.settingsByProvider = groupByArray(typesSettings, (it) => it.attachedTo)
   }
+
+  /** The administrators' default for this event on this channel: a role-specific one first, then the general one. */
+  workspaceDefault (type: Ref<NotificationType>, provider: Ref<NotificationProvider>, roles: AccountRole[]): boolean | undefined {
+    const rows = this.defaults.filter((d) => d.type === type && d.provider === provider)
+    if (rows.length === 0) return undefined
+    const byRole = rows.find((d) => d.role !== undefined && roles.includes(d.role))
+    if (byRole !== undefined) return byRole.enabled
+    return rows.find((d) => d.role === undefined)?.enabled
+  }
 }
+const notificationDefaultsKey = 'notification_workspace_defaults'
 const notificationProvidersKey = 'notification_provider_settings'
 const typesSettingsKey = 'notification_type_settings'
 export async function getNotificationProviderControl (
@@ -657,7 +682,14 @@ export async function getNotificationProviderControl (
     })
     control.contextCache.set(typesSettingsKey, typesSettings)
   }
-  return new NotificationProviderControl(providersSettings, typesSettings)
+  let defaults: NotificationDefault[] = control.contextCache.get(notificationDefaultsKey)
+  if (defaults === undefined) {
+    defaults = control.hierarchy.hasClass(notification.class.NotificationDefault)
+      ? await control.queryFind(ctx, notification.class.NotificationDefault, {})
+      : []
+    control.contextCache.set(notificationDefaultsKey, defaults)
+  }
+  return new NotificationProviderControl(providersSettings, typesSettings, defaults)
 }
 
 export async function getObjectSpace (control: TriggerControl, doc: Doc, cache: Map<Ref<Doc>, Doc>): Promise<Space> {

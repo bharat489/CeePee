@@ -92,6 +92,7 @@ import type {
   BillingRate,
   Capacity,
   CapacityDefaults,
+  ProjectTemplate,
   Dashboard,
   DashboardWidget,
   NotificationScheme,
@@ -1081,6 +1082,28 @@ export class TCapacityDefaults extends TDoc implements CapacityDefaults {
   pointsPerWeek?: number
   overloadThreshold!: number
   unestimatedHours!: number
+}
+
+@Model(tracker.class.ProjectTemplate, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.ProjectTemplates)
+export class TProjectTemplate extends TDoc implements ProjectTemplate {
+  @Prop(TypeString(), tracker.string.Title)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  tagline!: string
+  category!: string
+  emoji!: string
+  bullets!: string[]
+  views!: string[]
+  landing!: string
+  defaultManaged!: 'team' | 'company'
+  components?: string[]
+  milestones?: Array<[string, number]>
+  labels?: string[]
+  starters?: Array<{ title: string, priority?: IssuePriority, component?: string, labels?: string[], description?: string }>
+  source?: Ref<Project>
+  usage!: number
 }
 
 @Model(tracker.class.AuditEvent, core.class.Doc, DOMAIN_TRACKER)

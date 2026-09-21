@@ -48,6 +48,7 @@ export const LINKS: Array<{ category: string, label: string, hint: string }> = [
   { category: 'reminders', label: 'Notifications', hint: 'Digest and reminder defaults' },
   { category: 'spaceTypes', label: 'Space types', hint: 'Project and teamspace types, statuses, task types' },
   { category: 'capacity', label: 'Capacity', hint: 'Hours per week per person, overload threshold' },
+  { category: 'notificationDefaults', label: 'Notification defaults', hint: 'What everyone receives unless they change it' },
   { category: 'classes', label: 'Custom fields', hint: 'Attributes on every class' },
   { category: 'backup', label: 'Backup', hint: 'Workspace backups' }
 ]

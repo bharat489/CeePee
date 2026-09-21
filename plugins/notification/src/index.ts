@@ -15,6 +15,7 @@
 
 import { ActivityMessage, Reaction } from '@hcengineering/activity'
 import {
+  AccountRole,
   PersonId,
   AnyAttribute,
   Class,
@@ -179,6 +180,18 @@ export interface NotificationProviderDefaults extends Doc {
 export interface NotificationProviderSetting extends Preference {
   attachedTo: Ref<NotificationProvider>
   enabled: boolean
+}
+
+/**
+ * A workspace-wide default for one event on one channel, applied to people who
+ * have no setting of their own; with `role` it applies to that role only.
+ * @public
+ */
+export interface NotificationDefault extends Doc {
+  type: Ref<NotificationType>
+  provider: Ref<NotificationProvider>
+  enabled: boolean
+  role?: AccountRole
 }
 
 export interface NotificationTypeSetting extends Preference {
@@ -368,6 +381,7 @@ const notification = plugin(notificationId, {
     MentionInboxNotification: '' as Ref<Class<MentionInboxNotification>>,
     NotificationProvider: '' as Ref<Class<NotificationProvider>>,
     NotificationTypeSetting: '' as Ref<Class<NotificationTypeSetting>>,
+    NotificationDefault: '' as Ref<Class<NotificationDefault>>,
     NotificationProviderSetting: '' as Ref<Class<NotificationProviderSetting>>,
     NotificationProviderDefaults: '' as Ref<Mixin<NotificationProviderDefaults>>,
     ReactionInboxNotification: '' as Ref<Class<ReactionInboxNotification>>

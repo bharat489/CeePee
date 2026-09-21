@@ -59,6 +59,7 @@ import preference, { TPreference } from '@hcengineering/model-preference'
 import view, { createAction, template } from '@hcengineering/model-view'
 import workbench from '@hcengineering/model-workbench'
 import {
+  type NotificationDefault,
   type Collaborators,
   DOMAIN_DOC_NOTIFY,
   DOMAIN_NOTIFICATION,
@@ -151,6 +152,18 @@ export class TNotificationTypeSetting extends TPreference implements Notificatio
   declare attachedTo: Ref<TNotificationProvider>
   type!: Ref<NotificationType>
   enabled!: boolean
+}
+
+@Model(notification.class.NotificationDefault, core.class.Doc, DOMAIN_NOTIFICATION)
+export class TNotificationDefault extends TDoc implements NotificationDefault {
+  @Index(IndexKind.Indexed)
+    type!: Ref<NotificationType>
+
+  @Index(IndexKind.Indexed)
+    provider!: Ref<NotificationProvider>
+
+  enabled!: boolean
+  role?: AccountRole
 }
 
 @Model(notification.class.NotificationProviderSetting, preference.class.Preference)
@@ -370,6 +383,7 @@ export function createModel (builder: Builder): void {
     TNotificationProvider,
     TNotificationProviderSetting,
     TNotificationTypeSetting,
+    TNotificationDefault,
     TNotificationProviderDefaults,
     TReactionInboxNotification
   )

@@ -845,7 +845,8 @@
     "ManageMilestonesPermission": "Manage milestones",
     "ManageMilestonesPermissionDescription": "Create, edit and delete milestones",
     "ManageAutomationPermission": "Manage automation",
-    "ManageAutomationPermissionDescription": "Create, edit, enable and disable automation rules"
+    "ManageAutomationPermissionDescription": "Create, edit, enable and disable automation rules",
+    "NotificationDefaults": "Notification defaults"
   },
   "status": {}
 }

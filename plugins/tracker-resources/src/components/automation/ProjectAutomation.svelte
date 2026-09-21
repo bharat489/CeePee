@@ -27,6 +27,7 @@
 
   import tracker from '../../plugin'
   import RuleBuilder from './RuleBuilder.svelte'
+  import AutomationTemplates from './AutomationTemplates.svelte'
 
   export let currentSpace: Ref<Project>
 
@@ -170,6 +171,7 @@
     </div>
   </section>
 
+  <AutomationTemplates {currentSpace} />
   <RuleBuilder {currentSpace} />
 </div>
 

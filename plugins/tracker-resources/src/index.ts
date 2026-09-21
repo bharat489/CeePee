@@ -96,6 +96,7 @@ import Dashboard from './components/dashboard/Dashboard.svelte'
 import Timesheets from './components/timesheets/Timesheets.svelte'
 import Workload from './components/workload/Workload.svelte'
 import CapacitySetting from './components/workload/CapacitySetting.svelte'
+import NotificationDefaults from './components/admin/NotificationDefaults.svelte'
 import IssueQuery from './components/query/IssueQuery.svelte'
 import ProjectAutomation from './components/automation/ProjectAutomation.svelte'
 import Webhooks from './components/webhooks/Webhooks.svelte'
@@ -488,6 +489,7 @@ export default async (): Promise<Resources> => ({
     Timesheets,
     Workload,
     CapacitySetting,
+    NotificationDefaults,
     IssueQuery,
     ProjectAutomation,
     Webhooks,

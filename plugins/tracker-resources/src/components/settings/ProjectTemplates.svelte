@@ -22,12 +22,12 @@
   SLAs, WIP limits, permission and notification schemes.
 -->
 <script lang="ts">
-  import core, { AccountRole, generateId, getCurrentAccount, type Data, type Ref } from '@hcengineering/core'
-  import { getClient } from '@hcengineering/presentation'
+  import core, { hasAccountRole, AccountRole, generateId, getCurrentAccount, type Data, type Ref } from '@hcengineering/core'
+  import { createQuery, getClient, ObjectPopup } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task, { type ProjectType, type TaskType } from '@hcengineering/task'
-  import { IssuePriority, MilestoneStatus, TimeReportDayType, type Component, type Issue, type IssueStatus, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
-  import { Button, getCurrentLocation, Label, navigate } from '@hcengineering/ui'
+  import { type ProjectTemplate, IssuePriority, MilestoneStatus, TimeReportDayType, type Component, type Issue, type IssueStatus, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
+  import { Button, getCurrentLocation, Label, navigate, showPopup } from '@hcengineering/ui'
   import { onMount } from 'svelte'
 
   import { createIssueDoc } from '../../createIssueDoc'
@@ -61,6 +61,9 @@
     milestones?: Array<[string, number]>
     labels?: string[]
     starters?: Starter[]
+    /** set when the template was published by the team */
+    published?: Ref<ProjectTemplate>
+    usage?: number
   }
   const P = IssuePriority
   const TEMPLATES: Template[] = [
@@ -270,7 +273,7 @@
       ]
     }
   ]
-  const CATEGORIES: Array<'All' | 'Favourites' | Category> = ['All', 'Favourites', 'Software', 'Product', 'Marketing', 'Operations', 'People', 'Sales']
+  const CATEGORIES: Array<'All' | 'Favourites' | 'Published' | Category> = ['All', 'Favourites', 'Published', 'Software', 'Product', 'Marketing', 'Operations', 'People', 'Sales']
   const GRADIENT: Record<Category, string> = {
     Software: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     Product: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
@@ -292,7 +295,63 @@
 
   let category: (typeof CATEGORIES)[number] = 'All'
   let search = ''
-  $: shown = TEMPLATES.filter((t) => (category === 'All' || (category === 'Favourites' ? favs.includes(t.id) : t.category === category)) && (search.trim() === '' || `${t.name} ${t.tagline} ${t.category} ${t.bullets.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())))
+  // templates the team published from its own projects
+  const pubQ = createQuery()
+  let publishedDocs: ProjectTemplate[] = []
+  pubQ.query(tracker.class.ProjectTemplate, {}, (r) => { publishedDocs = r })
+  const fromDoc = (d: ProjectTemplate): Template => ({ id: d._id, name: d.name, emoji: d.emoji, category: d.category as Category, tagline: d.tagline, bullets: d.bullets, defaultManaged: d.defaultManaged, views: d.views, landing: d.landing, components: d.components, milestones: d.milestones, labels: d.labels, starters: d.starters, published: d._id, usage: d.usage })
+  $: allTemplates = [...TEMPLATES, ...publishedDocs.map(fromDoc)]
+  const canPublish = hasAccountRole(getCurrentAccount(), AccountRole.Maintainer)
+  let publishing = false
+  function publishFromProject (): void {
+    showPopup(ObjectPopup, { _class: tracker.class.Project, allowDeselect: false, closeAfterSelect: true }, 'top', (p: Project | undefined | null) => {
+      if (p == null) return
+      void publishProject(p)
+    })
+  }
+  async function publishProject (p: Project): Promise<void> {
+    publishing = true
+    try {
+      const components: Component[] = await client.findAll(tracker.class.Component, { space: p._id })
+      const milestones = await client.findAll(tracker.class.Milestone, { space: p._id })
+      const now = Date.now()
+      const open = statuses.filter((st) => st.category !== task.statusCategory.Won && st.category !== task.statusCategory.Lost).map((st) => st._id)
+      const issues: Issue[] = await client.findAll(tracker.class.Issue, { space: p._id, ...(open.length > 0 ? { status: { $in: open } } : {}), attachedTo: tracker.ids.NoParent }, { limit: 15 })
+      const compName = new Map(components.map((c) => [c._id, c.label]))
+      await client.createDoc(tracker.class.ProjectTemplate, core.space.Workspace, {
+        name: p.name,
+        tagline: `Published from ${p.identifier} · ${p.name}`,
+        category: 'Software',
+        emoji: '📦',
+        bullets: [`${components.length} components`, `${milestones.length} milestones`, `${issues.length} starter issues from the project's open work`],
+        views: ['Board', 'List', 'Timeline'],
+        landing: 'issues',
+        defaultManaged: 'team',
+        components: components.map((c) => c.label),
+        milestones: milestones.map((m) => [m.label, Math.max(0, Math.round((m.targetDate - now) / 86400000))] as [string, number]),
+        labels: [],
+        starters: issues.map((i) => ({ title: i.title, priority: i.priority, component: i.component != null ? compName.get(i.component) : undefined })),
+        source: p._id,
+        usage: 0
+      })
+      category = 'Published'
+    } finally {
+      publishing = false
+    }
+  }
+  async function duplicateTemplate (t: Template): Promise<void> {
+    const d = publishedDocs.find((x) => x._id === t.published)
+    if (d === undefined) return
+    const { _id, _class, space, modifiedBy, modifiedOn, createdBy, createdOn, ...rest } = d as any
+    await client.createDoc(tracker.class.ProjectTemplate, core.space.Workspace, { ...rest, name: `${d.name} (copy)`, usage: 0 })
+  }
+  async function unpublishTemplate (t: Template): Promise<void> {
+    const d = publishedDocs.find((x) => x._id === t.published)
+    if (d === undefined || !confirm(`Remove "${d.name}" from the gallery?`)) return
+    await client.remove(d)
+    if (picked.id === t.id) picked = TEMPLATES[0]
+  }
+  $: shown = allTemplates.filter((t) => (category === 'All' || (category === 'Favourites' ? favs.includes(t.id) : category === 'Published' ? t.published !== undefined : t.category === category)) && (search.trim() === '' || `${t.name} ${t.tagline} ${t.category} ${t.bullets.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())))
 
   let picked: Template = TEMPLATES[0]
   let managed: 'team' | 'company' = picked.defaultManaged
@@ -456,6 +515,10 @@
         }
       }
 
+      if (t.published !== undefined) {
+        const doc = publishedDocs.find((d) => d._id === t.published)
+        if (doc !== undefined) await client.update(doc, { $inc: { usage: 1 } })
+      }
       progress = 'Opening the project…'
       const loc = getCurrentLocation()
       navigate({ path: [loc.path[0], loc.path[1], 'tracker', projectId, t.landing] })
@@ -475,6 +538,9 @@
       <span class="tg__sub"><Label label={tracker.string.ProjectTemplatesHint} /></span>
     </div>
     <label class="search">{@html icon('filter')}<input placeholder="Search templates" bind:value={search} /></label>
+    {#if canPublish}
+      <button class="pub" disabled={publishing} title="Turn one of your projects into a template the whole team can start from" on:click={publishFromProject}>{@html icon('share')}<span>{publishing ? 'Publishing…' : 'Publish a project'}</span></button>
+    {/if}
   </header>
   <div class="cats">
     {#each CATEGORIES as c}
@@ -490,7 +556,7 @@
           <span class="tcard__fav" class:tcard__fav--on={favs.includes(t.id)} role="button" tabindex="-1" title={favs.includes(t.id) ? 'Remove from favourites' : 'Add to favourites'} on:click={(e) => { toggleFav(t.id, e) }} on:keydown|stopPropagation>{@html icon(favs.includes(t.id) ? 'starFilled' : 'star')}</span>
           <span class="tcard__name">{t.name}</span>
           <span class="tcard__tag">{t.tagline}</span>
-          <span class="tcard__meta"><span class="chip">{t.category}</span>{#if (t.components ?? []).length > 0}<span class="chip chip--soft">{t.components?.length} components</span>{/if}{#if starterCount(t) > 0}<span class="chip chip--soft">{starterCount(t)} starter issues</span>{/if}</span>
+          <span class="tcard__meta">{#if t.published !== undefined}<span class="chip chip--pub">Team · used {t.usage ?? 0}×</span>{/if}<span class="chip">{t.category}</span>{#if (t.components ?? []).length > 0}<span class="chip chip--soft">{t.components?.length} components</span>{/if}{#if starterCount(t) > 0}<span class="chip chip--soft">{starterCount(t)} starter issues</span>{/if}</span>
         </button>
       {/each}
       {#if shown.length === 0}
@@ -511,6 +577,15 @@
         </div>
       </div>
 
+      {#if picked.published !== undefined}
+        <div class="pubtools">
+          <span class="muted">Published by your team{picked.usage !== undefined ? ` · used ${picked.usage}×` : ''}</span>
+          {#if canPublish}
+            <button class="lnk" on:click={() => { void duplicateTemplate(picked) }}>Duplicate</button>
+            <button class="lnk lnk--bad" on:click={() => { void unpublishTemplate(picked) }}>Unpublish</button>
+          {/if}
+        </div>
+      {/if}
       <section class="blk">
         <span class="blk__t">What you get</span>
         <ul class="bullets">{#each picked.bullets as b}<li>{b}</li>{/each}</ul>
@@ -619,4 +694,8 @@
   .input { padding: 0.5rem 0.65rem; border: 1px solid var(--theme-divider-color); border-radius: 0.5rem; background: var(--theme-bg-color); color: var(--theme-caption-color); font: inherit; font-size: 0.9375rem; outline: none; &:focus { border-color: var(--accent-brand); } }
   .progress { width: 100%; font-size: 0.78rem; color: var(--accent-brand); font-weight: 600; }
   .err { margin: 0; width: 100%; font-size: 0.8125rem; color: var(--negative-button-default); }
+  .pub { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; border: none; border-radius: 0.5rem; background: var(--primary-button-default); color: #fff; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; :global(svg) { width: 0.9rem; height: 0.9rem; } &:disabled { opacity: 0.6; cursor: default; } }
+  .chip--pub { background: #dcfce7 !important; color: #166534 !important; }
+  .pubtools { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.78rem; }
+  .lnk { border: none; background: transparent; padding: 0; color: var(--primary-button-default); font: inherit; font-size: 0.78rem; cursor: pointer; &--bad { color: var(--negative-button-default); } }
 </style>

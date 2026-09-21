@@ -50,6 +50,7 @@ import {
   TBillingRate,
   TCapacity,
   TCapacityDefaults,
+  TProjectTemplate,
   TAuditEvent,
   TAuditPolicy,
   TRequestType,
@@ -717,6 +718,7 @@ export function createModel (builder: Builder): void {
     TBillingRate,
   TCapacity,
   TCapacityDefaults,
+  TProjectTemplate,
     TAuditEvent,
     TAuditPolicy,
     TRequestType,
@@ -760,6 +762,16 @@ export function createModel (builder: Builder): void {
     icon: tracker.icon.Estimation,
     component: tracker.component.CapacitySetting,
     order: 1180,
+    role: AccountRole.Maintainer
+  })
+
+  // what everyone is notified about unless they changed it themselves
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'notificationDefaults',
+    label: tracker.string.NotificationDefaults,
+    icon: tracker.icon.Inbox,
+    component: tracker.component.NotificationDefaults,
+    order: 1185,
     role: AccountRole.Maintainer
   })
 
