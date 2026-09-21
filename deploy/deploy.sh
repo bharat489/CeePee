@@ -22,7 +22,7 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 SERVER="${SERVER:-}"
 SERVER_DIR="${SERVER_DIR:-/opt/ceepee}"
 WORKSPACES="${WORKSPACES:-}"
-IMAGES=(front account transactor workspace collaborator datalake integrations tool notification)
+IMAGES=(front account transactor workspace collaborator datalake integrations tool notification love fulltext)
 
 build () {
   (cd "$root" && node common/scripts/install-run-rush.js docker:min)
