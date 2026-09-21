@@ -135,6 +135,9 @@ services:
       - PUBLIC_INTEGRATIONS_URL=https://${API_DOMAIN}
       - STATS_URL=
       - FULLTEXT_URL=http://fulltext:4702
+      # no hulylake in this kit: the newer message store stays off
+      - HULYLAKE_URL=
+      - COMMUNICATION_API_ENABLED=false
       - REGION=cockroach
     depends_on:
       - account
