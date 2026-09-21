@@ -866,7 +866,8 @@
       openAssistant()
       return
     }
-    if (!(evt.ctrlKey || evt.metaKey) || evt.key.toLowerCase() !== 'k') return
+    // Ctrl+Shift+K opens the command palette; plain Ctrl+K belongs to universal search (view action)
+    if (!(evt.ctrlKey || evt.metaKey) || !evt.shiftKey || evt.key.toLowerCase() !== 'k') return
     const t = evt.target as HTMLElement | null
     const tag = t?.tagName
     if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable === true) return

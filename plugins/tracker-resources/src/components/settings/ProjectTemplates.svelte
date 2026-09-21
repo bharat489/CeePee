@@ -23,11 +23,11 @@
 -->
 <script lang="ts">
   import core, { hasAccountRole, AccountRole, generateId, getCurrentAccount, type Data, type Ref } from '@hcengineering/core'
-  import { createQuery, getClient, ObjectPopup } from '@hcengineering/presentation'
+  import { createQuery, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import task, { type ProjectType, type TaskType } from '@hcengineering/task'
   import { type ProjectTemplate, IssuePriority, MilestoneStatus, TimeReportDayType, type Component, type Issue, type IssueStatus, type NotificationScheme, type PermissionScheme, type Project } from '@hcengineering/tracker'
-  import { Button, getCurrentLocation, Label, navigate, showPopup } from '@hcengineering/ui'
+  import { Button, getCurrentLocation, Label, navigate, SelectPopup, showPopup } from '@hcengineering/ui'
   import { onMount } from 'svelte'
 
   import { createIssueDoc } from '../../createIssueDoc'
@@ -296,6 +296,10 @@
   let category: (typeof CATEGORIES)[number] = 'All'
   let search = ''
   // templates the team published from its own projects
+  // the projects a person can publish from (their own, unarchived)
+  const projQ = createQuery()
+  let myProjects: Project[] = []
+  projQ.query(tracker.class.Project, { archived: false }, (r) => { myProjects = r.sort((a, b) => a.identifier.localeCompare(b.identifier)) })
   const pubQ = createQuery()
   let publishedDocs: ProjectTemplate[] = []
   pubQ.query(tracker.class.ProjectTemplate, {}, (r) => { publishedDocs = r })
@@ -304,10 +308,15 @@
   const canPublish = hasAccountRole(getCurrentAccount(), AccountRole.Maintainer)
   let publishing = false
   function publishFromProject (): void {
-    showPopup(ObjectPopup, { _class: tracker.class.Project, allowDeselect: false, closeAfterSelect: true }, 'top', (p: Project | undefined | null) => {
-      if (p == null) return
-      void publishProject(p)
-    })
+    showPopup(
+      SelectPopup,
+      { value: myProjects.map((p) => ({ id: p._id, text: `${p.identifier} · ${p.name}` })), searchable: myProjects.length > 6, width: 'large' },
+      'top',
+      (id: string | null | undefined) => {
+        const p = myProjects.find((x) => x._id === id)
+        if (p !== undefined) void publishProject(p)
+      }
+    )
   }
   async function publishProject (p: Project): Promise<void> {
     publishing = true

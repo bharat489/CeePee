@@ -23,11 +23,14 @@
   $: segments = enabled ? splitHighlightSegments(text, query) : [{ text, match: false }]
 </script>
 
-{#each segments as seg}
-  {#if seg.match}<mark>{seg.text}</mark>{:else}{seg.text}{/if}
-{/each}
+<!-- one inline element, so whitespace between segments survives flex parents -->
+<span class="hl">{#each segments as seg}{#if seg.match}<mark>{seg.text}</mark>{:else}{seg.text}{/if}{/each}</span>
 
 <style>
+  .hl {
+    display: inline;
+    white-space: pre-wrap;
+  }
   mark {
     background: var(--global-warning-BackgroundColor, #fff3a3);
     color: inherit;

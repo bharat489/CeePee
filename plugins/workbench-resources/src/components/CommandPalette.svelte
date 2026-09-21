@@ -13,7 +13,7 @@
 // limitations under the License.
 -->
 <!--
-  Command palette (Ctrl/Cmd-K).
+  Command palette (Ctrl/Cmd-Shift-K; plain Ctrl/Cmd-K is universal search).
 
   Built on the existing registries rather than a parallel one: applications
   come from workbench.class.Application and commands from view.class.Action

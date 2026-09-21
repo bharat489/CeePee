@@ -57,7 +57,7 @@
     labels = m
   }
   $: void loadLabels($themeStore.language)
-  const name = (id: string): string => labels.get(id) ?? id
+  $: name = (id: string): string => labels.get(id) ?? id
 
   const key = (t: Ref<NotificationType>, p: Ref<NotificationProvider>, r: RoleKey): string => `${t}|${p}|${r}`
   $: byKey = new Map(defaults.map((d) => [key(d.type, d.provider, (d.role ?? 'all') as RoleKey), d]))
