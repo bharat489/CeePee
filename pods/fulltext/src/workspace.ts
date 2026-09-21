@@ -62,7 +62,7 @@ export class WorkspaceIndexer {
     externalStorage: StorageAdapter,
     ftadapter: FullTextAdapter,
     contentAdapter: ContentTextAdapter,
-    hulylake: HulylakeWorkspaceClient,
+    hulylake: HulylakeWorkspaceClient | undefined,
     endpointProvider: (token: string) => Promise<string | undefined>,
     listener?: FulltextListener
   ): Promise<WorkspaceIndexer> {

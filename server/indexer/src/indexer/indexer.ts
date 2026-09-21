@@ -238,7 +238,7 @@ export class FullTextIndexPipeline implements FullTextPipeline {
     readonly storageAdapter: StorageAdapter,
     readonly contentAdapter: ContentTextAdapter,
     readonly broadcastUpdate: (ctx: MeasureContext, classes: Ref<Class<Doc>>[]) => void,
-    readonly hulylake: HulylakeWorkspaceClient,
+    readonly hulylake: HulylakeWorkspaceClient | undefined,
     readonly communicationApi?: CommunicationApi,
     readonly listener?: FulltextListener
   ) {
@@ -580,6 +580,8 @@ export class FullTextIndexPipeline implements FullTextPipeline {
     const rateLimit = new RateLimiter(10)
     let lastPrint = platformNow()
     let messagesGroups = []
+    // no message store configured (HULYLAKE_URL blank): nothing to index here
+    if (this.hulylake === undefined) return 0
     try {
       messagesGroups = await loadMessagesGroups(this.hulylake, card._id)
     } catch (err: any) {
@@ -744,7 +746,7 @@ export class FullTextIndexPipeline implements FullTextPipeline {
         })
       )[0]
 
-      if (meta === undefined) {
+      if (meta === undefined || this.hulylake === undefined) {
         return undefined
       }
       return (

@@ -23,7 +23,7 @@
   import { translate } from '@hcengineering/platform'
   import { getClient } from '@hcengineering/presentation'
   import { type ButtonKind, type ButtonSize, type DropdownTextItem, DropdownLabels, themeStore } from '@hcengineering/ui'
-  import { createEventDispatcher } from 'svelte'
+  import { createEventDispatcher, onMount } from 'svelte'
 
   export let type: TypeRollup | undefined
   export let attribute: AnyAttribute | undefined = undefined
@@ -110,7 +110,12 @@
   $: aggregateItems = aggregatesFor(fieldKind).map((a) => ({ id: a, label: labels[a] }))
   $: if (!aggregatesFor(fieldKind).includes(aggregate)) aggregate = 'count'
 
-  $: if (side !== undefined) {
+  // report only once mounted: the host attaches its change listener after creating this component
+  let ready = false
+  onMount(() => {
+    ready = true
+  })
+  $: if (ready && side !== undefined) {
     dispatch('change', {
       type: makeRollup({ association: side.assoc._id, direction: side.direction, field, aggregate }),
       extra: { readonly: true, automationOnly: true }

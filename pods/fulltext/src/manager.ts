@@ -350,7 +350,7 @@ export class WorkspaceManager {
         this.opt.externalStorage,
         this.fulltextAdapter,
         this.contentAdapter,
-        getHulylakeClient(this.opt.hulylakeUrl, workspace, token ?? ''),
+        this.opt.hulylakeUrl !== '' ? getHulylakeClient(this.opt.hulylakeUrl, workspace, token ?? '') : undefined,
         (token) => this.getTransactorAPIEndpoint(token),
         this.opt.listener
       )

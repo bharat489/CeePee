@@ -29,6 +29,7 @@ import {
   type CalloutKind
 } from '@hcengineering/text'
 import { Extension, InputRule } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import type { Doc as YDoc } from 'yjs'
 
 import { SvelteNodeViewRenderer } from '../../node-view'
@@ -102,15 +103,28 @@ export const DetailsExtension = DetailsNode.extend({
     return {
       setDetails:
         () =>
-          ({ commands }) =>
-            commands.insertContent({
-              type: this.name,
-              attrs: { open: true },
-              content: [
-                { type: 'detailsSummary' },
-                { type: 'detailsContent', content: [{ type: 'paragraph' }] }
-              ]
-            })
+          ({ chain }) =>
+            chain()
+              .insertContent({
+                type: this.name,
+                attrs: { open: true },
+                content: [
+                  { type: 'detailsSummary' },
+                  { type: 'detailsContent', content: [{ type: 'paragraph' }] }
+                ]
+              })
+              // insertContent leaves the cursor in the body; typing should start in the summary
+              .command(({ tr, dispatch }) => {
+                const $from = tr.selection.$from
+                for (let d = $from.depth; d > 0; d--) {
+                  if ($from.node(d).type.name === this.name) {
+                    if (dispatch !== undefined) tr.setSelection(TextSelection.create(tr.doc, $from.before(d) + 2))
+                    return true
+                  }
+                }
+                return true
+              })
+              .run()
     }
   },
 
@@ -155,12 +169,25 @@ export const ColumnListExtension = ColumnListNode.extend({
     return {
       setColumns:
         (count = 2) =>
-          ({ commands }) => {
+          ({ chain }) => {
             const n = Math.min(4, Math.max(2, count))
-            return commands.insertContent({
-              type: this.name,
-              content: Array.from({ length: n }, () => ({ type: 'column', content: [{ type: 'paragraph' }] }))
-            })
+            return chain()
+              .insertContent({
+                type: this.name,
+                content: Array.from({ length: n }, () => ({ type: 'column', content: [{ type: 'paragraph' }] }))
+              })
+              // start typing in the first column, not the last
+              .command(({ tr, dispatch }) => {
+                const $from = tr.selection.$from
+                for (let d = $from.depth; d > 0; d--) {
+                  if ($from.node(d).type.name === this.name) {
+                    if (dispatch !== undefined) tr.setSelection(TextSelection.create(tr.doc, $from.before(d) + 3))
+                    return true
+                  }
+                }
+                return true
+              })
+              .run()
           }
     }
   }
