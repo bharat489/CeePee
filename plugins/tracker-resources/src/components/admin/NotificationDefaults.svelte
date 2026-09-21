@@ -61,8 +61,9 @@
 
   const key = (t: Ref<NotificationType>, p: Ref<NotificationProvider>, r: RoleKey): string => `${t}|${p}|${r}`
   $: byKey = new Map(defaults.map((d) => [key(d.type, d.provider, (d.role ?? 'all') as RoleKey), d]))
-  const current = (t: NotificationType, p: NotificationProvider): NotificationDefault | undefined => byKey.get(key(t._id, p._id, role))
-  const inherited = (t: NotificationType, p: NotificationProvider): boolean => {
+  // reactive declarations: the table re-renders when the stored defaults or the role change
+  $: current = (t: NotificationType, p: NotificationProvider): NotificationDefault | undefined => byKey.get(key(t._id, p._id, role))
+  $: inherited = (t: NotificationType, p: NotificationProvider): boolean => {
     if (role !== 'all') {
       const all = byKey.get(key(t._id, p._id, 'all'))
       if (all !== undefined) return all.enabled
