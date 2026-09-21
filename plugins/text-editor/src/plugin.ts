@@ -125,6 +125,10 @@ export default plugin(textEditorId, {
     Toggle: '' as IntlString,
     Columns: '' as IntlString,
     SyncedBlock: '' as IntlString,
+    IssueList: '' as IntlString,
+    ChildPages: '' as IntlString,
+    StatusChip: '' as IntlString,
+    DateChip: '' as IntlString,
 
     TableOptions: '' as IntlString,
     SelectTable: '' as IntlString,

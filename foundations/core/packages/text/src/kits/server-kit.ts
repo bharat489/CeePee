@@ -31,6 +31,7 @@ import {
   DetailsSummaryNode,
   SyncedBlockNode
 } from '../nodes/blocks'
+import { ChildPagesNode, DateChipNode, IssueListNode, StatusChipNode, TocNode } from '../nodes/macros'
 
 import { ExtensionFactory, extensionKit } from '../kit'
 import { HardBreak } from '../tiptapExtensions'
@@ -64,6 +65,11 @@ export const ServerKitFactory = (e: ExtensionFactory) =>
     columnList: e(ColumnListNode),
     column: e(ColumnNode),
     syncedBlock: e(SyncedBlockNode),
+    issueList: e(IssueListNode),
+    childPages: e(ChildPagesNode),
+    tableOfContents: e(TocNode),
+    statusChip: e(StatusChipNode),
+    dateChip: e(DateChipNode),
 
     inlineNote: e(NoteBaseExtension), // Semi-deprecated, should be removed in the future
     qmsInlineCommentMark: e(QMSInlineCommentMark) // Semi-deprecated, should be removed in the future

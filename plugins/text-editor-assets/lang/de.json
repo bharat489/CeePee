@@ -103,6 +103,10 @@
     "AiContinue": "Continue writing",
     "AiTranslate": "Translate…",
     "AiAsk": "Ask AI…",
-    "AiMenu": "AI writing"
+    "AiMenu": "AI writing",
+    "IssueList": "Issue list",
+    "ChildPages": "Child pages",
+    "StatusChip": "Status label",
+    "DateChip": "Date"
   }
 }

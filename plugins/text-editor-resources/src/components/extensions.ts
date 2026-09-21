@@ -99,6 +99,11 @@ const inlineCommandsIds = [
   'toggle',
   'columns',
   'synced-block',
+  'issue-list',
+  'child-pages',
+  'toc',
+  'status-chip',
+  'date-chip',
   'ai-summarize',
   'ai-outline',
   'ai-action-items',
@@ -129,6 +134,11 @@ export function inlineCommandsConfig (
           { id: 'toggle', label: textEditor.string.Toggle, icon: view.icon.DetailsFilled },
           { id: 'columns', label: textEditor.string.Columns, icon: view.icon.MasterDetail },
           { id: 'synced-block', label: textEditor.string.SyncedBlock, icon: view.icon.Copy },
+          { id: 'issue-list', label: textEditor.string.IssueList, icon: view.icon.List },
+          { id: 'child-pages', label: textEditor.string.ChildPages, icon: view.icon.Tree },
+          { id: 'toc', label: textEditor.string.TableOfContents, icon: view.icon.Document },
+          { id: 'status-chip', label: textEditor.string.StatusChip, icon: view.icon.Statuses },
+          { id: 'date-chip', label: textEditor.string.DateChip, icon: view.icon.Timeline },
           ...(aiAvailable()
             ? [
                 { id: 'ai-summarize', label: textEditor.string.AiSummarize, icon: view.icon.AiStar },

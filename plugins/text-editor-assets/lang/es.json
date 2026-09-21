@@ -94,6 +94,10 @@
     "Callout": "Callout",
     "Toggle": "Toggle",
     "Columns": "Columns",
-    "SyncedBlock": "Synced block"
+    "SyncedBlock": "Synced block",
+    "IssueList": "Issue list",
+    "ChildPages": "Child pages",
+    "StatusChip": "Status label",
+    "DateChip": "Date"
   }
 }

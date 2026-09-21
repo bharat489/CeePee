@@ -126,6 +126,26 @@ export const storeNodes: Record<string, NodeProcessor> = {
     state.write(`> ⟳ Synced block: ${String(nodeAttrs(node).title ?? '')}`)
     state.closeBlock(node)
   },
+  issueList: (state, node) => {
+    const a = nodeAttrs(node)
+    state.write(`> ☰ Issues: ${String(a.projectName ?? '')} · ${String(a.status ?? 'open')}`)
+    state.closeBlock(node)
+  },
+  childPages: (state, node) => {
+    state.write('> ⌂ Child pages')
+    state.closeBlock(node)
+  },
+  tableOfContents: (state, node) => {
+    state.write('[[TOC]]')
+    state.closeBlock(node)
+  },
+  statusChip: (state, node) => {
+    state.write(`**[${String(nodeAttrs(node).text ?? '')}]**`)
+  },
+  dateChip: (state, node) => {
+    const d = nodeAttrs(node).date
+    state.write(d != null ? new Date(Number(d)).toISOString().slice(0, 10) : '')
+  },
   codeBlock: (state, node) => {
     state.write('```' + `${nodeAttrs(node).language ?? ''}` + '\n')
     // TODO: Check for node.textContent

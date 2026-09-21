@@ -327,6 +327,21 @@
       case 'columns':
         editor.chain().focus(pos).setColumns(2).run()
         break
+      case 'issue-list':
+        editor.chain().focus(pos).insertIssueList({}).run()
+        break
+      case 'child-pages':
+        editor.chain().focus(pos).insertChildPages().run()
+        break
+      case 'toc':
+        editor.chain().focus(pos).insertTableOfContents().run()
+        break
+      case 'status-chip':
+        editor.chain().focus(pos).insertStatusChip({}).run()
+        break
+      case 'date-chip':
+        editor.chain().focus(pos).insertDateChip().run()
+        break
       case 'synced-block': {
         // pick the document whose body this block will mirror
         let position: PopupAlignment | undefined = undefined
@@ -464,7 +479,12 @@
             { id: 'callout', label: textEditor.string.Callout, icon: view.icon.Bubble },
             { id: 'toggle', label: textEditor.string.Toggle, icon: view.icon.DetailsFilled },
             { id: 'columns', label: textEditor.string.Columns, icon: view.icon.MasterDetail },
-            { id: 'synced-block', label: textEditor.string.SyncedBlock, icon: view.icon.Copy }
+            { id: 'synced-block', label: textEditor.string.SyncedBlock, icon: view.icon.Copy },
+            { id: 'issue-list', label: textEditor.string.IssueList, icon: view.icon.List },
+            { id: 'child-pages', label: textEditor.string.ChildPages, icon: view.icon.Tree },
+            { id: 'toc', label: textEditor.string.TableOfContents, icon: view.icon.Document },
+            { id: 'status-chip', label: textEditor.string.StatusChip, icon: view.icon.Statuses },
+            { id: 'date-chip', label: textEditor.string.DateChip, icon: view.icon.Timeline }
           ],
           handleSelect: handleLeftMenuClick
         },

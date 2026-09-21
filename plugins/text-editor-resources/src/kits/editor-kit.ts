@@ -40,6 +40,7 @@ import { CodeBlockHighlighExtension, codeBlockHighlightOptions } from '../compon
 import { MermaidExtension, mermaidOptions } from '../components/extension/codeSnippets/mermaid'
 import { DrawingBoardExtension } from '../components/extension/drawingBoard'
 import { BlocksExtension } from '../components/extension/blocks/blocks'
+import { MacrosExtension } from '../components/extension/macros/macros'
 import { EmbedNode } from '../components/extension/embed/embed'
 import { defaultDriveEmbedOptions, DriveEmbedProvider } from '../components/extension/embed/providers/drive'
 import { defaultYoutubeEmbedUrlOptions, YoutubeEmbedProvider } from '../components/extension/embed/providers/youtube'
@@ -113,6 +114,7 @@ const StaticEditorKit = extensionKit(
       superscript: e(Superscript),
       drawingBoard: e(DrawingBoardExtension),
       blocks: e(BlocksExtension),
+      macros: e(MacrosExtension, { context: getActionContext(context) }),
       embed: e(
         EmbedNode,
         context.mode === 'full' && {

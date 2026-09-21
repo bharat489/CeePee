@@ -226,6 +226,26 @@ function addNodeContent (builder: NodeBuilder, node?: MarkupNode): void {
     builder.openTag('div', { 'data-type': 'syncedBlock' })
     builder.addText(`⟳ ${toString(attrs.title) ?? 'Synced block'}`)
     builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.issueList) {
+    builder.openTag('div', { 'data-type': 'issueList' })
+    builder.addText(`☰ Issues: ${toString(attrs.projectName) ?? ''}`)
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.childPages) {
+    builder.openTag('div', { 'data-type': 'childPages' })
+    builder.addText('⌂ Child pages')
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.tableOfContents) {
+    builder.openTag('div', { 'data-type': 'tableOfContents' })
+    builder.addText('Table of contents')
+    builder.closeTag('div')
+  } else if (node.type === MarkupNodeType.statusChip) {
+    builder.openTag('span', { 'data-type': 'statusChip', class: 'status-chip' })
+    builder.addText(toString(attrs.text) ?? '')
+    builder.closeTag('span')
+  } else if (node.type === MarkupNodeType.dateChip) {
+    builder.openTag('span', { 'data-type': 'dateChip' })
+    builder.addText(attrs.date != null ? new Date(Number(attrs.date)).toISOString().slice(0, 10) : '')
+    builder.closeTag('span')
   } else if (node.type === MarkupNodeType.horizontal_rule) {
     builder.openTag('hr', {}, { selfClosing: true })
   } else if (node.type === MarkupNodeType.heading) {

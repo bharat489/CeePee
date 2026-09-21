@@ -49,7 +49,12 @@ export enum MarkupNodeType {
   detailsContent = 'detailsContent',
   columnList = 'columnList',
   column = 'column',
-  syncedBlock = 'syncedBlock'
+  syncedBlock = 'syncedBlock',
+  issueList = 'issueList',
+  childPages = 'childPages',
+  tableOfContents = 'tableOfContents',
+  statusChip = 'statusChip',
+  dateChip = 'dateChip'
 }
 
 /** @public */
