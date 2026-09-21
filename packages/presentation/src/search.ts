@@ -13,10 +13,19 @@
 // limitations under the License.
 //
 
-import type { Class, Ref, Doc, SearchResultDoc, TxOperations } from '@hcengineering/core'
+import type { Class, Ref, Doc, SearchResultDoc, Space, TxOperations } from '@hcengineering/core'
 import { type ObjectSearchCategory } from './types'
 import plugin from './plugin'
 import { getClient } from './utils'
+
+/** Narrowing from inline operators; resolved to ids by the caller. */
+export interface SearchFilters {
+  classes?: Array<Ref<Class<Doc>>>
+  spaces?: Array<Ref<Space>>
+  persons?: string[]
+  after?: number
+  before?: number
+}
 
 interface SearchSection {
   category: ObjectSearchCategory
@@ -53,17 +62,30 @@ async function searchCategory (
   client: TxOperations,
   category: ObjectSearchCategory,
   query: string,
-  limit?: number
+  limit?: number,
+  filters?: SearchFilters
 ): Promise<SearchSection | undefined> {
   if (category.classToSearch === undefined) return
-  const classes =
+  let classes =
     category.includeChilds === true
       ? client.getHierarchy().getDescendants(category.classToSearch)
       : [category.classToSearch]
+  if (filters?.classes !== undefined) {
+    // a type filter: only categories that cover one of the asked classes take part
+    const wanted = new Set<string>(filters.classes)
+    const hierarchy = client.getHierarchy()
+    classes = classes.filter((c) => wanted.has(c) || filters.classes?.some((w) => hierarchy.isDerived(c, w)) === true)
+    if (classes.length === 0) return
+  }
+  const text = query.trim()
   const r = await client.searchFulltext(
     {
-      query: `${query}*`,
-      classes
+      query: text === '' ? '*' : `${text}*`,
+      classes,
+      spaces: filters?.spaces,
+      persons: filters?.persons,
+      modifiedAfter: filters?.after,
+      modifiedBefore: filters?.before
     },
     {
       limit: limit ?? 5
@@ -76,12 +98,13 @@ async function doFulltextSearch (
   client: TxOperations,
   categories: ObjectSearchCategory[],
   query: string,
-  limit?: number
+  limit?: number,
+  filters?: SearchFilters
 ): Promise<SearchSection[]> {
   const sections: SearchSection[] = []
   const promises: Array<Promise<SearchSection | undefined>> = []
   for (const cat of categories) {
-    promises.push(searchCategory(client, cat, query, limit))
+    promises.push(searchCategory(client, cat, query, limit, filters))
   }
 
   const resolvedSections = await Promise.all(promises)
@@ -107,7 +130,8 @@ export async function searchFor (
   context: 'mention' | 'spotlight',
   query: string,
   category?: Ref<ObjectSearchCategory>,
-  limit?: number
+  limit?: number,
+  filters?: SearchFilters
 ): Promise<{ items: SearchItem[], query: string }> {
   const client = getClient()
   let categories = categoriesByContext.get(context)
@@ -130,6 +154,6 @@ export async function searchFor (
     }
   }
 
-  const sections = await doFulltextSearch(client, cats, query, limit)
+  const sections = await doFulltextSearch(client, cats, query, limit, filters)
   return { items: packSearchResultsForListView(sections), query }
 }

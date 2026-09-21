@@ -260,6 +260,25 @@ class ElasticAdapter implements FullTextAdapter {
           terms: this.getTerms(query.classes, '_class')
         })
       }
+      if (query.modifiedAfter !== undefined || query.modifiedBefore !== undefined) {
+        const range: Record<string, number> = {}
+        if (query.modifiedAfter !== undefined) range.gte = query.modifiedAfter
+        if (query.modifiedBefore !== undefined) range.lte = query.modifiedBefore
+        filter.push({ range: { modifiedOn: range } })
+      }
+      if (query.persons !== undefined && query.persons.length > 0) {
+        // the author, the last editor or the assignee
+        filter.push({
+          bool: {
+            should: [
+              { terms: this.getTerms(query.persons, 'modifiedBy') },
+              { terms: this.getTerms(query.persons, 'core:class:Doc%createdBy') },
+              { terms: this.getTerms(query.persons, 'assignee') }
+            ],
+            minimum_should_match: 1
+          }
+        })
+      }
 
       if (filter.length > 0) {
         elasticQuery.query.function_score.query.bool.filter = filter

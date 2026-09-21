@@ -241,6 +241,12 @@ export interface SearchQuery {
   query: string
   classes?: Ref<Class<Doc>>[]
   spaces?: Ref<Space>[]
+  /** Person refs or social ids: matches the author, the last editor or the assignee. */
+  persons?: string[]
+  /** Only documents changed on or after this time. */
+  modifiedAfter?: number
+  /** Only documents changed on or before this time. */
+  modifiedBefore?: number
 }
 
 /**
@@ -271,6 +277,7 @@ export interface SearchResultDoc {
   emojiIcon?: string
   score?: number
   doc: Pick<Doc, '_id' | '_class' | 'createdOn'> &
+  Partial<Pick<Doc, 'space' | 'modifiedOn' | 'modifiedBy'>> &
   Partial<Pick<AttachedDoc, 'attachedTo' | 'attachedToClass'>> &
   Partial<Pick<VersionableDoc, 'baseId'>>
 }

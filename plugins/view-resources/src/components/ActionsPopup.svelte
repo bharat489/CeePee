@@ -24,6 +24,12 @@
   } from '@hcengineering/core'
   import { getResource, translate, translateCB } from '@hcengineering/platform'
   import {
+    type RecentSearch,
+    rememberSearch,
+    parseSearchOperators,
+    hasFilters,
+    getRecentSearches,
+    forgetSearch,
     ActionContext,
     SearchResult,
     addTxListener,
@@ -58,6 +64,7 @@
   import ObjectPresenter from './ObjectPresenter.svelte'
 
   import { contextStore } from '@hcengineering/presentation'
+  import { buildSearchFilters, expandQuery } from '../searchFilters'
   import ChevronDown from './icons/ChevronDown.svelte'
   import ChevronUp from './icons/ChevronUp.svelte'
 
@@ -172,6 +179,7 @@
       return
     }
     if (item.item !== undefined) {
+      recent = rememberSearch(search)
       const doc = item.item.doc
       void client.findOne(doc._class, { _id: doc._id }).then((value) => {
         if (value !== undefined) {
@@ -251,11 +259,34 @@
   }
 
   let items: SearchActionItem[] = []
+  let queryText = ''
+  let unknownOps: string[] = []
+  let recent: RecentSearch[] = getRecentSearches()
 
   const updateItems = reduceCalls(async (query: string, filteredActions: Array<WithLookup<Action>>): Promise<void> => {
     let searchItems: SearchItem[] = []
     if (query !== '' && query.indexOf('/') !== 0) {
-      searchItems = (await searchFor('spotlight', query)).items
+      const parsed = parseSearchOperators(query)
+      queryText = parsed.text
+      unknownOps = parsed.unknown
+      const filters = hasFilters(parsed) ? await buildSearchFilters(parsed) : undefined
+      const perCategory = filters?.classes !== undefined ? 25 : 8
+      searchItems = (await searchFor('spotlight', parsed.text, undefined, perCategory, filters)).items
+      // thin results: ask the local model for other phrasings and merge what they find
+      if (searchItems.length < 3 && parsed.text.length >= 3) {
+        const seen = new Set(searchItems.map((i) => i.item.id))
+        for (const alt of await expandQuery(parsed.text)) {
+          for (const it of (await searchFor('spotlight', alt, undefined, 5, filters)).items) {
+            if (!seen.has(it.item.id)) {
+              seen.add(it.item.id)
+              searchItems.push(it)
+            }
+          }
+        }
+      }
+    } else {
+      queryText = ''
+      unknownOps = []
     }
     items = packSearchAndActions(searchItems, filteredActions)
   })
@@ -384,6 +415,18 @@
         on:keydown
       />
     </div>
+    {#if search === '' && recent.length > 0}
+      <div class="recent">
+        <span class="recent__t">Recent</span>
+        {#each recent as r (r.raw)}
+          <span class="recent__chip">
+            <button class="recent__b" on:click={() => { _search = r.raw; search = r.raw }}>{r.raw}</button>
+            <button class="recent__x" title="Forget" on:click={() => { recent = forgetSearch(r.raw) }}>×</button>
+          </span>
+        {/each}
+      </div>
+    {/if}
+    <div class="hint">{#if unknownOps.length > 0}<span class="hint__bad">Could not read {unknownOps.join(', ')}. </span>{/if}Narrow with type:issue · in:project · from:person · after:2026-09-01 · before:7d</div>
     <div class="scroll">
       <div class="box">
         <ListView
@@ -414,7 +457,7 @@
             {#if item.item !== undefined}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div class="ap-menuItem withComp actionsSearchItem">
-                <SearchResult value={item.item} />
+                <SearchResult value={item.item} query={queryText} />
               </div>
             {/if}
             {#if item.action !== undefined}
@@ -572,4 +615,11 @@
     background-color: var(--theme-divider-color);
     border-radius: 0.25rem;
   }
+  .recent { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem 0; }
+  .recent__t { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--theme-dark-color); margin-right: 0.25rem; }
+  .recent__chip { display: inline-flex; align-items: center; border: 1px solid var(--theme-divider-color); border-radius: 999px; overflow: hidden; }
+  .recent__b { border: none; background: transparent; padding: 0.15rem 0.55rem; font: inherit; font-size: 0.78rem; color: var(--theme-content-color); cursor: pointer; &:hover { background: var(--theme-button-hovered); } }
+  .recent__x { border: none; background: transparent; padding: 0.1rem 0.45rem 0.1rem 0.2rem; font: inherit; font-size: 0.8rem; color: var(--theme-dark-color); cursor: pointer; &:hover { color: var(--negative-button-default); } }
+  .hint { padding: 0.25rem 0.75rem 0.35rem; font-size: 0.7rem; color: var(--theme-dark-color); }
+  .hint__bad { color: var(--negative-button-default); }
 </style>

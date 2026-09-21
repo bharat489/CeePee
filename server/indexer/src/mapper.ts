@@ -141,6 +141,9 @@ export function mapSearchResultDoc (hierarchy: Hierarchy, raw: IndexedDoc): Sear
       _id: raw.id,
       _class: raw._class[0],
       createdOn: raw.createdOn,
+      space: raw.space,
+      modifiedOn: raw.modifiedOn,
+      modifiedBy: raw.modifiedBy,
       attachedTo: raw.attachedTo,
       attachedToClass: raw.attachedToClass,
       baseId: raw.baseId

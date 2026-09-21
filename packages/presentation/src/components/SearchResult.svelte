@@ -16,10 +16,12 @@
 <script lang="ts">
   import { notEmpty, SearchResultDoc } from '@hcengineering/core'
   import { getResourceC } from '@hcengineering/platform'
-  import { Icon, type AnySvelteComponent } from '@hcengineering/ui'
+  import { HighlightedText, Icon, type AnySvelteComponent } from '@hcengineering/ui'
   import IconWithEmoji from './IconWithEmoji.svelte'
 
   export let value: SearchResultDoc
+  /** The free text of the search, for highlighting. */
+  export let query: string = ''
 
   $: icon = value.icon
 
@@ -63,12 +65,12 @@
     {#if shortTitleComponent}
       <svelte:component this={shortTitleComponent} {...value.shortTitleComponent?.props} />
     {:else if value.shortTitle !== undefined}
-      <span class="shortTitle">{value.shortTitle}</span>
+      <span class="shortTitle">{#if query !== ''}<HighlightedText text={value.shortTitle} {query} />{:else}{value.shortTitle}{/if}</span>
     {/if}
     {#if titleComponent}
       <svelte:component this={titleComponent} {...value.titleComponent?.props} />
     {:else}
-      <span class="name">{value.title}</span>
+      <span class="name">{#if query !== '' && value.title !== undefined}<HighlightedText text={value.title} {query} />{:else}{value.title}{/if}</span>
     {/if}
 
     {#if value.description !== undefined}
