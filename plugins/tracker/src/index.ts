@@ -246,6 +246,31 @@ export interface BillingRate extends Doc {
   currency: string
 }
 
+/**
+ * How much work one person can take in a week. Absent fields fall back to the
+ * workspace defaults; a person without a row uses the defaults entirely.
+ * @public
+ */
+export interface Capacity extends Doc {
+  employee: Ref<Employee>
+  /** Hours available per week at full allocation. */
+  hoursPerWeek: number
+  /** Story points per week, when the team plans in points. */
+  pointsPerWeek?: number
+  /** Share of the week on this work, 0..1; default 1. */
+  allocation?: number
+}
+
+/** Workspace-wide capacity settings; one document. @public */
+export interface CapacityDefaults extends Doc {
+  hoursPerWeek: number
+  pointsPerWeek?: number
+  /** Ratio of assigned to available above which a week is overloaded, e.g. 1 for 100 %. */
+  overloadThreshold: number
+  /** Hours charged for an open item that has no estimate. */
+  unestimatedHours: number
+}
+
 /** An administrative action that bypassed the document store. @public */
 export interface AuditEvent extends Doc {
   kind: string
@@ -1396,6 +1421,8 @@ const pluginState = plugin(trackerId, {
     Dashboard: '' as Ref<Class<Dashboard>>,
     TimesheetApproval: '' as Ref<Class<TimesheetApproval>>,
     BillingRate: '' as Ref<Class<BillingRate>>,
+    Capacity: '' as Ref<Class<Capacity>>,
+    CapacityDefaults: '' as Ref<Class<CapacityDefaults>>,
     AuditEvent: '' as Ref<Class<AuditEvent>>,
     AuditPolicy: '' as Ref<Class<AuditPolicy>>,
     RequestType: '' as Ref<Class<RequestType>>,
@@ -1474,6 +1501,8 @@ const pluginState = plugin(trackerId, {
     ProjectReports: '' as AnyComponent,
     Dashboard: '' as AnyComponent,
     Timesheets: '' as AnyComponent,
+    Workload: '' as AnyComponent,
+    CapacitySetting: '' as AnyComponent,
     IssueQuery: '' as AnyComponent,
     ProjectAutomation: '' as AnyComponent,
     Webhooks: '' as AnyComponent,

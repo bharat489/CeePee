@@ -90,6 +90,8 @@ import type {
   TimelineEntry,
   AutomationTrigger,
   BillingRate,
+  Capacity,
+  CapacityDefaults,
   Dashboard,
   DashboardWidget,
   NotificationScheme,
@@ -1056,6 +1058,29 @@ export class TBillingRate extends TDoc implements BillingRate {
 
   rate!: number
   currency!: string
+}
+
+@Model(tracker.class.Capacity, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Capacity)
+export class TCapacity extends TDoc implements Capacity {
+  @Prop(TypeRef(contact.mixin.Employee), tracker.string.Person)
+  @Index(IndexKind.Indexed)
+    employee!: Ref<Employee>
+
+  @Prop(TypeNumber(), tracker.string.Capacity)
+    hoursPerWeek!: number
+
+  pointsPerWeek?: number
+  allocation?: number
+}
+
+@Model(tracker.class.CapacityDefaults, core.class.Doc, DOMAIN_TRACKER)
+@UX(tracker.string.Capacity)
+export class TCapacityDefaults extends TDoc implements CapacityDefaults {
+  hoursPerWeek!: number
+  pointsPerWeek?: number
+  overloadThreshold!: number
+  unestimatedHours!: number
 }
 
 @Model(tracker.class.AuditEvent, core.class.Doc, DOMAIN_TRACKER)

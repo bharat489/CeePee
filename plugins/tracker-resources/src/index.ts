@@ -94,6 +94,8 @@ import SprintPresenter from './components/sprints/SprintPresenter.svelte'
 import ProjectReports from './components/reports/ProjectReports.svelte'
 import Dashboard from './components/dashboard/Dashboard.svelte'
 import Timesheets from './components/timesheets/Timesheets.svelte'
+import Workload from './components/workload/Workload.svelte'
+import CapacitySetting from './components/workload/CapacitySetting.svelte'
 import IssueQuery from './components/query/IssueQuery.svelte'
 import ProjectAutomation from './components/automation/ProjectAutomation.svelte'
 import Webhooks from './components/webhooks/Webhooks.svelte'
@@ -484,6 +486,8 @@ export default async (): Promise<Resources> => ({
     ProjectReports,
     Dashboard,
     Timesheets,
+    Workload,
+    CapacitySetting,
     IssueQuery,
     ProjectAutomation,
     Webhooks,

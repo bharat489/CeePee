@@ -48,6 +48,8 @@ import {
   TDashboard,
   TTimesheetApproval,
   TBillingRate,
+  TCapacity,
+  TCapacityDefaults,
   TAuditEvent,
   TAuditPolicy,
   TRequestType,
@@ -483,6 +485,13 @@ function defineApplication (
             component: tracker.component.Timesheets
           },
           {
+            id: 'workload',
+            position: 'top',
+            label: tracker.string.Workload,
+            icon: tracker.icon.Estimation,
+            component: tracker.component.Workload
+          },
+          {
             id: 'all-projects',
             component: workbench.component.SpecialView,
             icon: view.icon.List,
@@ -706,6 +715,8 @@ export function createModel (builder: Builder): void {
     TDashboard,
     TTimesheetApproval,
     TBillingRate,
+  TCapacity,
+  TCapacityDefaults,
     TAuditEvent,
     TAuditPolicy,
     TRequestType,
@@ -739,6 +750,16 @@ export function createModel (builder: Builder): void {
     icon: tracker.icon.Issues,
     component: tracker.component.DepartmentRolesSetting,
     order: 1150,
+    role: AccountRole.Maintainer
+  })
+
+  // capacity limits per person, read by the Workload view
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'capacity',
+    label: tracker.string.Capacity,
+    icon: tracker.icon.Estimation,
+    component: tracker.component.CapacitySetting,
+    order: 1180,
     role: AccountRole.Maintainer
   })
 
