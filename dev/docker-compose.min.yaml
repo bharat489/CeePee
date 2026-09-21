@@ -137,6 +137,7 @@ services:
       - WEB_PUSH_URL=${WEB_PUSH_URL:-http://notification:8091}
       - MAIL_AUTH_TOKEN=${PUSH_AUTH_TOKEN:-secret}
       - HULYLAKE_URL=
+      - COMMUNICATION_API_ENABLED=false
       - STATS_URL=
     links: !override
       - cockroach

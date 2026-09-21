@@ -116,7 +116,9 @@ export function start (
     workspace: WorkspaceIds,
     broadcastSessions: CommunicationCallbacks
   ): Promise<ServerApi> => {
-    if (dbUrl.startsWith('mongodb') || !opt.communicationApiEnabled) {
+    // the communication api stores messages in the hulylake; without one it can only fail
+    const hulylakeConfigured = (process.env.HULYLAKE_URL ?? '') !== ''
+    if (dbUrl.startsWith('mongodb') || !opt.communicationApiEnabled || !hulylakeConfigured) {
       return {
         findMessagesMeta: async () => [],
         findMessagesGroups: async () => [],
