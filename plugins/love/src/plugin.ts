@@ -39,6 +39,9 @@ const love = plugin(loveId, {
     ToggleVideo: '' as Ref<Action>
   },
   string: {
+    HuddleStarted: '' as IntlString,
+    HuddleJoined: '' as IntlString,
+    HuddleEnded: '' as IntlString,
     Office: '' as IntlString,
     MyOffice: '' as IntlString,
     Room: '' as IntlString,
@@ -109,7 +112,9 @@ const love = plugin(loveId, {
   function: {
     // join (and if needed start) a call in a room; registered by love-resources
     JoinRoomCall: '' as Resource<(room: Room) => Promise<void>>,
-    LeaveRoomCall: '' as Resource<() => Promise<void>>
+    LeaveRoomCall: '' as Resource<() => Promise<void>>,
+    // who LiveKit hears speaking right now, as a store of person refs; registered by love-resources
+    HuddleSpeakers: '' as Resource<() => { subscribe: (run: (value: Set<string>) => void) => () => void }>
   },
   metadata: {
     WebSocketURL: '' as Metadata<string>,

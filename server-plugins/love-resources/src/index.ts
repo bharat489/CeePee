@@ -15,6 +15,8 @@
 
 import contact, { Employee, getName, Person } from '@hcengineering/contact'
 import core, {
+  type Space,
+  type Class,
   type AccountUuid,
   combineAttributes,
   concatLink,
@@ -41,7 +43,7 @@ import love, {
   RoomAccess,
   RoomInfo
 } from '@hcengineering/love'
-import { getMetadata } from '@hcengineering/platform'
+import { type IntlString, getMetadata } from '@hcengineering/platform'
 import serverCore, { TriggerControl } from '@hcengineering/server-core'
 import view from '@hcengineering/view'
 import { workbenchId } from '@hcengineering/workbench'
@@ -212,6 +214,10 @@ async function roomJoinHandler (info: ParticipantInfo, control: TriggerControl):
             collaborator: info.account
           })
         )
+        const joinedRoom = (await control.findAll(control.ctx, love.class.Room, { _id: info.room }, { limit: 1 }))[0]
+        if (joinedRoom !== undefined) {
+          res.push(...(await huddleNote(control, joinedRoom, love.string.HuddleJoined, { name: info.name }, meetingMinutes._id)))
+        }
       }
     } else {
       const room = (await control.findAll(control.ctx, love.class.Room, { _id: info.room }))[0]
@@ -248,6 +254,7 @@ async function roomJoinHandler (info: ParticipantInfo, control: TriggerControl):
           collaborator: info.account
         })
       )
+      res.push(...(await huddleNote(control, room, love.string.HuddleStarted, { name: info.name }, _id)))
       if (isOffice(room) && room.person !== info.person && room.person !== null) {
         const person = (
           await control.findAll(control.ctx, contact.mixin.Employee, { _id: room.person as Ref<Employee> })
@@ -308,6 +315,36 @@ async function setDefaultRoomAccess (info: ParticipantInfo, control: TriggerCont
   return res
 }
 
+/**
+ * A system line in the chat a huddle room belongs to: who started or joined,
+ * and when it ended. Nothing is posted for rooms that are not a chat's huddle.
+ */
+async function huddleNote (
+  control: TriggerControl,
+  room: Room,
+  message: IntlString,
+  props: Record<string, any>,
+  minutes?: Ref<MeetingMinutes>
+): Promise<Tx[]> {
+  if (room.chat === undefined || room.chatClass === undefined) return []
+  let space: Ref<Space> = room.chat as Ref<Space>
+  if (!control.hierarchy.isDerived(room.chatClass, core.class.Space)) {
+    const doc = (await control.findAll(control.ctx, room.chatClass, { _id: room.chat }, { limit: 1 }))[0]
+    if (doc === undefined) return []
+    space = doc.space
+  }
+  return [
+    control.txFactory.createTxCreateDoc('activity:class:ActivityInfoMessage' as Ref<Class<Doc>>, space, {
+      attachedTo: room.chat,
+      attachedToClass: room.chatClass,
+      collection: 'activity',
+      message,
+      props,
+      links: minutes !== undefined ? [{ _class: love.class.MeetingMinutes, _id: minutes }] : []
+    } as any)
+  ]
+}
+
 async function finishRoomMeetings (room: Ref<Room>, meetingEnd: Timestamp, control: TriggerControl): Promise<Tx[]> {
   const res: Tx[] = []
   const meetingMinutes = await control.findAll(control.ctx, love.class.MeetingMinutes, {
@@ -315,6 +352,7 @@ async function finishRoomMeetings (room: Ref<Room>, meetingEnd: Timestamp, contr
     status: MeetingStatus.Active
   })
 
+  const roomDoc = meetingMinutes.length > 0 ? (await control.findAll(control.ctx, love.class.Room, { _id: room }, { limit: 1 }))[0] : undefined
   for (const meeting of meetingMinutes) {
     res.push(
       control.txFactory.createTxUpdateDoc(meeting._class, meeting.space, meeting._id, {
@@ -322,6 +360,12 @@ async function finishRoomMeetings (room: Ref<Room>, meetingEnd: Timestamp, contr
         meetingEnd
       })
     )
+    if (roomDoc?.chat !== undefined) {
+      const people = await control.findAll(control.ctx, core.class.Collaborator, { attachedTo: meeting._id })
+      const secs = Math.max(0, Math.round((meetingEnd - (meeting.createdOn ?? meetingEnd)) / 1000))
+      const duration = secs >= 3600 ? `${Math.floor(secs / 3600)} h ${Math.floor((secs % 3600) / 60)} min` : `${Math.floor(secs / 60)} min`
+      res.push(...(await huddleNote(control, roomDoc, love.string.HuddleEnded, { duration, count: people.length }, meeting._id)))
+    }
   }
 
   return res

@@ -24,7 +24,7 @@
   import chunter from '../plugin'
   import { getObjectIcon, getChannelName } from '../utils'
   import love, { type ParticipantInfo, type Room } from '@hcengineering/love'
-  import { huddleRoomName, huddlesEnabled, joinHuddle, leaveHuddle } from '../huddle'
+  import { historyFor, huddleRoomName, huddlesEnabled, joinHuddle, leaveHuddle } from '../huddle'
 
   // huddles: one call room per chat; the button reflects who is in it
   const callsEnabled = huddlesEnabled()
@@ -34,8 +34,18 @@
   let room: Room | undefined
   let participants: ParticipantInfo[] = []
   let calling = false
-  $: if (callsEnabled && title !== undefined) {
-    roomQ.query(love.class.Room, { name: huddleRoomName(title) }, (r) => { room = r[0] })
+  // the room linked to this chat; older rooms are found by their name
+  const nameQ = createQuery()
+  $: if (callsEnabled && title !== undefined && object !== undefined) {
+    const name = huddleRoomName(title)
+    roomQ.query(love.class.Room, { chat: object._id }, (r) => {
+      if (r.length > 0) {
+        nameQ.unsubscribe()
+        room = r[0]
+      } else {
+        nameQ.query(love.class.Room, { name }, (byName) => { room = byName[0] })
+      }
+    })
   }
   $: if (room !== undefined) {
     partQ.query(love.class.ParticipantInfo, { room: room._id }, (r) => { participants = r })
@@ -49,7 +59,7 @@
     calling = true
     try {
       if (inCall) await leaveHuddle()
-      else await joinHuddle(title)
+      else await joinHuddle(title, object?._id, object?._class)
     } finally {
       calling = false
     }
@@ -139,11 +149,16 @@
         {/if}
         <span class="call-btn__l">{inCall ? 'Leave' : participants.length > 0 ? `Join · ${participants.length}` : 'Huddle'}</span>
       </button>
+      <button class="call-btn call-btn--ghost" class:call-btn--on={$historyFor === object._id} title="Past calls in this chat" on:click={() => { historyFor.set($historyFor === object?._id ? undefined : object?._id) }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
     {/if}
   </svelte:fragment>
 </Header>
 
 <style lang="scss">
+  .call-btn--ghost { background: transparent !important; color: var(--theme-dark-color) !important; box-shadow: none !important; padding: 0 0.4rem !important; }
+  .call-btn--ghost.call-btn--on { color: var(--accent-brand) !important; }
   .call-btn { display: inline-flex; align-items: center; gap: 0.35rem; height: 2rem; padding: 0 0.7rem; border: none; border-radius: 0.5rem; background: var(--accent-gradient, var(--primary-button-default)); color: #fff; font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; box-shadow: var(--accent-glow, none); transition: transform var(--motion-fast, 0.12s) var(--ease-standard, ease); &:hover { transform: translateY(-1px); } &--busy { opacity: 0.6; pointer-events: none; } }
   .call-btn--live { background: #16a34a; animation: call-live 1.6s ease-in-out infinite; }
   .call-btn--leave { background: #e11d48; }

@@ -19,7 +19,8 @@
 // ParticipantInfo documents, so every open tab sees the participants live and
 // can join or leave without leaving the conversation.
 
-import core, { AccountRole, getCurrentAccount } from '@hcengineering/core'
+import core, { AccountRole, getCurrentAccount, type Class, type Doc, type Ref } from '@hcengineering/core'
+import { writable } from 'svelte/store'
 import love, { RoomAccess, RoomType, type Room } from '@hcengineering/love'
 import { getMetadata, getResource } from '@hcengineering/platform'
 import { getClient } from '@hcengineering/presentation'
@@ -33,11 +34,19 @@ export function huddleRoomName (title: string): string {
   return `Call · ${title}`
 }
 
+/** Which chat's call history is open, if any. */
+export const historyFor = writable<Ref<Doc> | undefined>(undefined)
+
 /** The chat's room, created on first use below everything else on the main floor. */
-export async function ensureHuddleRoom (title: string): Promise<Room> {
+export async function ensureHuddleRoom (title: string, chat?: Ref<Doc>, chatClass?: Ref<Class<Doc>>): Promise<Room> {
   const client = getClient()
   const name = huddleRoomName(title)
-  let room: Room | undefined = await client.findOne(love.class.Room, { name })
+  let room: Room | undefined = chat !== undefined ? await client.findOne(love.class.Room, { chat }) : undefined
+  if (room === undefined) room = await client.findOne(love.class.Room, { name })
+  if (room !== undefined && chat !== undefined && room.chat === undefined) {
+    // an older room found by name: remember the chat so the link survives a rename
+    await client.update(room, { chat, chatClass })
+  }
   if (room === undefined) {
     const rooms = await client.findAll(love.class.Room, { floor: love.ids.MainFloor })
     const y = rooms.reduce((m, r) => Math.max(m, r.y + r.height), 0)
@@ -53,7 +62,8 @@ export async function ensureHuddleRoom (title: string): Promise<Room> {
       language: 'en',
       startWithTranscription: false,
       startWithRecording: false,
-      description: null
+      description: null,
+      ...(chat !== undefined ? { chat, chatClass } : {})
     })
     room = await client.findOne(love.class.Room, { _id: id })
   }
@@ -61,8 +71,8 @@ export async function ensureHuddleRoom (title: string): Promise<Room> {
   return room
 }
 
-export async function joinHuddle (title: string): Promise<void> {
-  const room = await ensureHuddleRoom(title)
+export async function joinHuddle (title: string, chat?: Ref<Doc>, chatClass?: Ref<Class<Doc>>): Promise<void> {
+  const room = await ensureHuddleRoom(title, chat, chatClass)
   const join = await getResource(love.function.JoinRoomCall)
   await join(room)
 }

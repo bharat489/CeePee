@@ -15,6 +15,7 @@
 
 import contact, { type Employee, type Person } from '@hcengineering/contact'
 import {
+  type Class,
   AccountRole,
   type CollectionSize,
   type Doc,
@@ -87,6 +88,9 @@ export const DOMAIN_MEETING_MINUTES = 'meeting-minutes' as Domain
 @Model(love.class.Room, core.class.Doc, DOMAIN_LOVE)
 @UX(love.string.Room, love.icon.Love)
 export class TRoom extends TDoc implements Room {
+  chat?: Ref<Doc>
+  chatClass?: Ref<Class<Doc>>
+
   @Prop(TypeString(), core.string.Name)
   @Index(IndexKind.FullText)
     name!: string
@@ -145,6 +149,10 @@ export class TFloor extends TDoc implements Floor {
 
 @Model(love.class.ParticipantInfo, core.class.Doc, DOMAIN_TRANSIENT)
 export class TParticipantInfo extends TDoc implements ParticipantInfo {
+  mic?: boolean
+  cam?: boolean
+  screen?: boolean
+
   name!: string
   @Prop(TypeRef(contact.class.Person), getEmbeddedLabel('Person'))
     person!: Ref<Person>

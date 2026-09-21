@@ -93,6 +93,9 @@
     "Window": "Finestra",
     "MeetingEmptyTitle": "Riunione terminata?",
     "MeetingEmptyMessage": "Tutti i partecipanti hanno abbandonato. Sarai disconnesso tra 1 minuto. Vuoi rimanere?",
-    "StayInRoom": "Rimani nella stanza"
+    "StayInRoom": "Rimani nella stanza",
+    "HuddleStarted": "{name} started a huddle",
+    "HuddleJoined": "{name} joined the huddle",
+    "HuddleEnded": "Huddle ended · {duration} · {count, plural, one {# person} other {# people}}"
   }
 }

@@ -1,6 +1,6 @@
 import { Event, Schedule } from '@hcengineering/calendar'
 import { Person } from '@hcengineering/contact'
-import { AccountUuid, AttachedDoc, Doc, MarkupBlobRef, Ref, Timestamp } from '@hcengineering/core'
+import { Class, AccountUuid, AttachedDoc, Doc, MarkupBlobRef, Ref, Timestamp } from '@hcengineering/core'
 import { Preference } from '@hcengineering/preference'
 
 export enum RoomAccess {
@@ -92,6 +92,9 @@ export interface Room extends Doc {
   startWithTranscription: boolean
   startWithRecording: boolean
   description: MarkupBlobRef | null
+  /** The chat this room is the huddle of, when it was created from one. */
+  chat?: Ref<Doc>
+  chatClass?: Ref<Class<Doc>>
   attachments?: number
   meetings?: number
   messages?: number
@@ -111,6 +114,10 @@ export interface ParticipantInfo extends Doc {
   y: number
   sessionId: string | null
   account: AccountUuid | null
+  /** Media state the person publishes about themselves while in a call. */
+  mic?: boolean
+  cam?: boolean
+  screen?: boolean
 }
 
 export interface RoomInfo extends Doc {

@@ -93,6 +93,9 @@
     "Window": "Window",
     "MeetingEmptyTitle": "Meeting ended?",
     "MeetingEmptyMessage": "All participants have left. You'll be disconnected in 1 minute. Would you like to stay?",
-    "StayInRoom": "Stay in room"
+    "StayInRoom": "Stay in room",
+    "HuddleStarted": "{name} started a huddle",
+    "HuddleJoined": "{name} joined the huddle",
+    "HuddleEnded": "Huddle ended · {duration} · {count, plural, one {# person} other {# people}}"
   }
 }

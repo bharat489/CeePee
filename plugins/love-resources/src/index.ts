@@ -42,6 +42,7 @@ import {
 import { toggleMicState, toggleCamState } from '@hcengineering/media-resources'
 
 export { setCustomCreateScreenTracks } from './utils'
+import { huddleSpeakers } from './huddleState'
 import { joinMeetingHere, leaveMeeting } from './meetings'
 
 export default async (): Promise<Resources> => ({
@@ -78,6 +79,7 @@ export default async (): Promise<Resources> => ({
     CreateMeetingSchedule: createMeetingSchedule,
     JoinRoomCall: joinMeetingHere,
     LeaveRoomCall: leaveMeeting,
+    HuddleSpeakers: huddleSpeakers,
     CanShowRoomSettings: () => {
       if (!hasAccountRole(getCurrentAccount(), AccountRole.User)) {
         return
